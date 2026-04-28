@@ -9,7 +9,11 @@ def create_health_bp() -> Blueprint:
     @bp.route("/health", methods=["GET"])
     async def health():
         return jsonify(
-            {"code": 0, "message": "success", "data": {"message": "TaskPilot is running"}}
+            {
+                "code": 0,
+                "message": "success",
+                "data": {"message": "TaskPilot is running"},
+            }
         )
 
     return bp

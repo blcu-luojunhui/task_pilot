@@ -4,9 +4,9 @@ from quart import Blueprint
 
 from src.api.v1.utils import ApiDependencies
 from src.api.v1.endpoints import create_health_bp, create_tasks_bp
-from src.core.config import GlobalConfigSettings
-from src.core.database import DatabaseManager
-from src.core.observability import LogService
+from src.core.config import ProjectConfigSettings
+from src.infra.database import AsyncMySQLPool
+from src.infra.observability import LogService
 
 
 def register_v1_blueprints(deps: ApiDependencies) -> Blueprint:
@@ -19,7 +19,7 @@ def register_v1_blueprints(deps: ApiDependencies) -> Blueprint:
 
 
 def server_routes(
-    pools: DatabaseManager, log_service: LogService, config: GlobalConfigSettings
+    pools: AsyncMySQLPool, log_service: LogService, config: ProjectConfigSettings
 ) -> Blueprint:
-    deps = ApiDependencies(db=pools, log=log_service, config=config)
+    deps = ApiDependencies(mysql=pools, log=log_service, config=config)
     return register_v1_blueprints(deps)

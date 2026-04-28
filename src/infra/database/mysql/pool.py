@@ -3,14 +3,14 @@ import logging
 from aiomysql import create_pool
 from aiomysql.cursors import DictCursor
 
-from src.core.config import GlobalConfigSettings
-from src.core.observability import LogService
+from src.core.config.database import TaskPilotMySQLConfig
+from src.infra.observability import LogService
 
 logger = logging.getLogger(__name__)
 
 
-class DatabaseManager:
-    def __init__(self, config: GlobalConfigSettings, log_service: LogService):
+class AsyncMySQLPool:
+    def __init__(self, config: TaskPilotMySQLConfig, log_service: LogService):
         self.log_service = log_service
         self.config = config
         self.pools = {}
@@ -19,16 +19,15 @@ class DatabaseManager:
         await self.log_service.log(contents)
 
     async def init_pools(self):
-        db_config = self.config.default_db
         try:
             pool = await create_pool(
-                host=db_config.host,
-                port=db_config.port,
-                user=db_config.user,
-                password=db_config.password,
-                db=db_config.db,
-                minsize=db_config.minsize,
-                maxsize=db_config.maxsize,
+                host=self.config.host,
+                port=self.config.port,
+                user=self.config.user,
+                password=self.config.password,
+                db=self.config.db,
+                minsize=self.config.minsize,
+                maxsize=self.config.maxsize,
                 cursorclass=DictCursor,
                 autocommit=True,
             )
@@ -105,9 +104,7 @@ class DatabaseManager:
             )
             raise
 
-    async def async_save(
-        self, query, params, db_name="default", batch: bool = False
-    ):
+    async def async_save(self, query, params, db_name="default", batch: bool = False):
         pool = self.pools.get(db_name)
         if not pool:
             await self.init_pools()
@@ -143,3 +140,8 @@ class DatabaseManager:
 
     def list_databases(self):
         return list(self.pools.keys())
+
+
+__all__ = [
+    "AsyncMySQLPool",
+]

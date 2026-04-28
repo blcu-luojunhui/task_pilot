@@ -121,7 +121,8 @@ class LogService:
         except asyncio.CancelledError:
             pass
 
-    def _put_log(self, contents: dict):
+    @staticmethod
+    def _put_log(contents: dict):
         """
         日志写入后端（默认使用 Python logging）。
 

@@ -1,17 +1,20 @@
 import logging
-from src.core.dependency import ServerContainer
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from src.core.dependency import ServerContainer
 
 logger = logging.getLogger(__name__)
 
 
 class AppContext:
-    def __init__(self, container: ServerContainer):
+    def __init__(self, container: "ServerContainer"):
         self.container = container
 
     async def start_up(self):
-        logger.info("Initializing database pools")
-        mysql = self.container.mysql_manager()
-        await mysql.init_pools()
+        logger.info("Initializing mysql pools")
+        pool = self.container.async_mysql_pool()
+        await pool.init_pools()
         logger.info("MySQL pools initialized")
 
         logger.info("Starting log service")
@@ -21,8 +24,8 @@ class AppContext:
 
     async def shutdown(self):
         logger.info("Closing database pools")
-        mysql = self.container.mysql_manager()
-        await mysql.close_pools()
+        pool = self.container.async_mysql_pool()
+        await pool.close_pools()
         logger.info("Application resources released")
 
 

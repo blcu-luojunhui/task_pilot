@@ -12,7 +12,7 @@ import asyncio
 import logging
 from typing import Dict, Optional
 
-from src.core.database import DatabaseManager
+from src.infra.database import AsyncMySQLPool
 from src.jobs.task_config import TaskStatus, TaskConstants
 
 logger = logging.getLogger(__name__)
@@ -25,7 +25,7 @@ class TaskLifecycleManager:
 
     def __init__(
         self,
-        db_client: DatabaseManager,
+        db_client: AsyncMySQLPool,
         poll_interval: float = 5.0,
         force_kill_timeout: float = 10.0,
     ):
@@ -40,7 +40,7 @@ class TaskLifecycleManager:
     @classmethod
     def initialize(
         cls,
-        db_client: DatabaseManager,
+        db_client: AsyncMySQLPool,
         poll_interval: float = 5.0,
         force_kill_timeout: float = 10.0,
     ) -> "TaskLifecycleManager":
@@ -110,9 +110,7 @@ class TaskLifecycleManager:
                     for row in rows:
                         trace_id = row["trace_id"]
                         if trace_id in local_trace_ids:
-                            logger.info(
-                                f"Cancel signal detected for task: {trace_id}"
-                            )
+                            logger.info(f"Cancel signal detected for task: {trace_id}")
                             await self.cancel_local(trace_id)
 
             except Exception as e:
@@ -168,9 +166,7 @@ class TaskLifecycleManager:
                 )
                 logger.info("All tasks cancelled successfully")
             except asyncio.TimeoutError:
-                logger.warning(
-                    f"Some tasks did not finish within {timeout}s timeout"
-                )
+                logger.warning(f"Some tasks did not finish within {timeout}s timeout")
         else:
             logger.info("No running tasks to cancel")
 

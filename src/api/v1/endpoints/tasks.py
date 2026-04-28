@@ -3,11 +3,11 @@ from __future__ import annotations
 from pydantic import ValidationError
 from quart import Blueprint, jsonify, current_app
 
-from src.api.service import TaskScheduler
+from src.jobs import TaskScheduler
 from src.api.v1.utils import ApiDependencies
 from src.api.v1.utils import RunTaskRequest, CancelTaskRequest
 from src.api.v1.utils import parse_json, validation_error_response
-from src.shared.tools import generate_task_trace_id
+from src.infra.shared.tools import generate_task_trace_id
 
 
 def create_tasks_bp(deps: ApiDependencies) -> Blueprint:
@@ -45,7 +45,9 @@ def create_tasks_bp(deps: ApiDependencies) -> Blueprint:
         return jsonify(
             {
                 "code": 0 if success else 1,
-                "message": "cancel requested" if success else "task not found or already finished",
+                "message": "cancel requested"
+                if success
+                else "task not found or already finished",
                 "trace_id": trace_id,
             }
         )

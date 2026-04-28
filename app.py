@@ -6,7 +6,7 @@ from src.core.bootstrap import AppContext
 from src.core.dependency import ServerContainer
 from src.api.v1.routes import server_routes
 from src.jobs.task_lifecycle import TaskLifecycleManager
-from src.core.observability import AlertService
+from src.infra.observability import AlertService
 
 logging.basicConfig(level=logging.INFO)
 
@@ -19,9 +19,9 @@ ctx = AppContext(server_container)
 
 config = server_container.config()
 log_service = server_container.log_service()
-mysql_manager = server_container.mysql_manager()
+async_mysql_pool = server_container.async_mysql_pool()
 
-routes = server_routes(mysql_manager, log_service, config)
+routes = server_routes(async_mysql_pool, log_service, config)
 app.register_blueprint(routes)
 
 
@@ -33,7 +33,7 @@ async def startup():
     alert_service = AlertService.initialize()
     await alert_service.start()
 
-    lifecycle = TaskLifecycleManager.initialize(mysql_manager, poll_interval=5.0)
+    lifecycle = TaskLifecycleManager.initialize(async_mysql_pool, poll_interval=5.0)
     await lifecycle.start_polling()
 
     logging.info("TaskPilot started successfully")

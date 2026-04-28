@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Callable, Dict, Optional
 
-from src.core.config import GlobalConfigSettings
+from src.core.config import ProjectConfigSettings
 from src.jobs.task_config import TaskStatus
 from src.jobs.task_utils import TaskValidationError
 
@@ -11,9 +11,11 @@ _TASK_HANDLER_REGISTRY: Dict[str, Callable] = {}
 
 def register(task_name: str):
     """装饰器：注册任务处理器"""
+
     def decorator(func):
         _TASK_HANDLER_REGISTRY[task_name] = func
         return func
+
     return decorator
 
 
@@ -39,7 +41,7 @@ class TaskHandler:
         log_service,
         db_client,
         trace_id: str,
-        config: GlobalConfigSettings,
+        config: ProjectConfigSettings,
     ):
         self.data = data
         self.log_client = log_service

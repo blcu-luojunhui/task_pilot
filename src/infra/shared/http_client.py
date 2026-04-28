@@ -39,7 +39,12 @@ class AsyncHttpClient:
 
         try:
             async with self.session.request(
-                method, url, params=params, data=data, json=json, headers=request_headers,
+                method,
+                url,
+                params=params,
+                data=data,
+                json=json,
+                headers=request_headers,
             ) as response:
                 response.raise_for_status()
                 content_type = response.headers.get("Content-Type", "")

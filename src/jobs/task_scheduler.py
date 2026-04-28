@@ -5,7 +5,7 @@ import time
 from datetime import datetime, timedelta
 from typing import Optional, Dict, Any, List
 
-from src.shared import task_schedule_response
+from src.infra.shared import TaskScheduleResponse
 from src.jobs.task_handler import TaskHandler
 from src.jobs.task_config import (
     TaskStatus,
@@ -19,9 +19,9 @@ from src.jobs.task_utils import (
     TaskUtils,
 )
 from src.jobs.task_lifecycle import TaskLifecycleManager
-from src.core.config import GlobalConfigSettings
-from src.core.database import DatabaseManager
-from src.core.observability import LogService, AlertService
+from src.core.config import ProjectConfigSettings
+from src.infra.database import AsyncMySQLPool
+from src.infra.observability import LogService, AlertService
 
 logger = logging.getLogger(__name__)
 
@@ -39,9 +39,9 @@ class TaskScheduler(TaskHandler):
         self,
         data: dict,
         log_service: LogService,
-        db_client: DatabaseManager,
+        db_client: AsyncMySQLPool,
         trace_id: str,
-        config: GlobalConfigSettings,
+        config: ProjectConfigSettings,
     ):
         super().__init__(data, log_service, db_client, trace_id, config)
         self.table = TaskUtils.validate_table_name(
@@ -201,12 +201,12 @@ class TaskScheduler(TaskHandler):
         try:
             await self._check_task_concurrency_and_timeout(task_name)
         except TaskConcurrencyError as e:
-            return await task_schedule_response.fail_response("5005", str(e))
+            return await TaskScheduleResponse.fail_response("5005", str(e))
 
         await self._insert_or_ignore_task(task_name, date_str)
 
         if not await self._try_lock_task():
-            return await task_schedule_response.fail_response(
+            return await TaskScheduleResponse.fail_response(
                 "5001", "Task is already processing"
             )
 
@@ -289,14 +289,12 @@ class TaskScheduler(TaskHandler):
                 if lifecycle:
                     await lifecycle.unregister(self.trace_id)
 
-        task = asyncio.create_task(
-            _task_wrapper(), name=f"{task_name}_{self.trace_id}"
-        )
+        task = asyncio.create_task(_task_wrapper(), name=f"{task_name}_{self.trace_id}")
         lifecycle = TaskLifecycleManager.get_instance()
         if lifecycle:
             await lifecycle.register(self.trace_id, task)
 
-        return await task_schedule_response.success_response(
+        return await TaskScheduleResponse.success_response(
             task_name=task_name,
             data={
                 "code": 0,
@@ -367,14 +365,14 @@ class TaskScheduler(TaskHandler):
     async def deal(self) -> dict:
         task_name = self.data.get("task_name")
         if not task_name:
-            return await task_schedule_response.fail_response(
+            return await TaskScheduleResponse.fail_response(
                 "4003", "task_name is required"
             )
 
         try:
             task_name = TaskUtils.validate_task_name(task_name)
         except TaskValidationError as e:
-            return await task_schedule_response.fail_response("4003", str(e))
+            return await TaskScheduleResponse.fail_response("4003", str(e))
 
         date_str = self.data.get("date_string") or (
             datetime.utcnow() + timedelta(hours=8)
@@ -382,7 +380,7 @@ class TaskScheduler(TaskHandler):
 
         handler = self.get_handler(task_name)
         if not handler:
-            return await task_schedule_response.fail_response(
+            return await TaskScheduleResponse.fail_response(
                 "4001",
                 f"Unknown task: {task_name}. "
                 f"Available tasks: {', '.join(self.list_registered_tasks())}",
