@@ -1,77 +1,109 @@
 # Project Guide
 
-## 项目定位
+> The engineering map behind TaskPilot.
 
-TaskPilot 是一个面向异步任务与 Agent 执行的编排引擎。  
-它既提供传统任务系统的稳定执行能力，也提供 Agent 驱动的智能决策回路。
+TaskPilot 的核心不是“跑一个函数”，而是把任务从接入、调度、执行、观察到关闭组织成一条可靠链路。  
+Agent 能力被放进这条链路里，但底层仍然由清晰的状态机和基础设施边界托住。
 
-核心目标：
-
-- 可靠：任务状态可追踪、可取消、可恢复
-- 可扩展：任务处理器与技能工具都可以插件化扩展
-- 可观测：日志、告警、指标能够贯穿完整生命周期
+[Back to README](../README.md)
 
 ---
 
-## 架构分层
+## Mental Model
 
 ```text
-src/
-├── api/      # HTTP 接入层
-├── jobs/     # 任务调度与生命周期
-├── core/     # Agent/Skills/配置/DI 等核心能力
-└── infra/    # DB、可观测、MCP、HTTP 等基础设施
+HTTP API
+   |
+   v
+Task Scheduler
+   |
+   v
+Task Lifecycle + State Machine
+   |
+   v
+Handlers / Agent Loop / Skills
+   |
+   v
+MySQL + Observability + External Tools
 ```
 
-依赖方向（简化）：
-
-```text
-api -> jobs -> core <- infra
-```
+TaskPilot 的设计重点是：**让任务执行更智能，但不牺牲工程上的可控性。**
 
 ---
 
-## 关键模块说明
+## Layers
 
 ### `api`
-- 处理 HTTP 请求、参数校验、响应封装
-- 暴露任务运行、取消、健康检查等端点
+
+HTTP 接入层。它负责请求解析、参数校验、响应封装和路由注册。  
+这一层应该保持轻薄，不放复杂编排逻辑。
 
 ### `jobs`
-- 调度任务并控制并发执行
-- 维护任务状态机
-- 处理任务超时、取消与关闭时的收敛逻辑
+
+任务引擎层。它负责调度、抢占、并发控制、状态流转、取消和关闭时的任务收敛。  
+这是 TaskPilot 最核心的确定性边界。
 
 ### `core`
-- 提供 Agent Loop（Think/Act/Observe）
-- 提供 Skills 框架（注册、执行、参数验证、序列化）
-- 管理配置与依赖注入容器
+
+应用核心层。它放置 Agent Loop、Skills 框架、配置系统和依赖注入容器。  
+Agent 的智能行为在这里被组织成可注册、可执行、可替换的能力。
 
 ### `infra`
-- MySQL 异步连接池
-- 日志与告警服务
-- 外部 HTTP 客户端与 MCP 集成能力
+
+基础设施层。它封装 MySQL、日志、告警、HTTP 客户端、MCP 等外部依赖。  
+业务层不直接关心底层实现，只通过明确的依赖访问能力。
 
 ---
 
-## 任务状态机
+## Dependency Direction
 
-| 状态 | 值 | 含义 |
+```text
+api -> jobs -> core
+              ^
+              |
+            infra
+```
+
+原则很简单：
+
+- `api` 只适配协议
+- `jobs` 负责流程编排
+- `core` 提供可复用能力
+- `infra` 封装外部世界
+
+---
+
+## Task State Machine
+
+| Status | Value | Meaning |
 |---|---:|---|
-| `INIT` | 0 | 任务已入库，待处理 |
-| `PROCESSING` | 1 | 已被调度器占用并执行 |
-| `SUCCESS` | 2 | 处理成功 |
-| `CANCELLED` | 3 | 协作式取消完成 |
-| `CANCEL_REQUESTED` | 4 | 收到取消请求，等待执行线程响应 |
-| `FAILED` | 99 | 处理异常或超时失败 |
+| `INIT` | 0 | 任务已创建，等待调度 |
+| `PROCESSING` | 1 | 任务已被调度器占用并执行 |
+| `SUCCESS` | 2 | 任务执行成功 |
+| `CANCELLED` | 3 | 任务已协作式取消 |
+| `CANCEL_REQUESTED` | 4 | 已收到取消请求，等待运行中任务响应 |
+| `FAILED` | 99 | 任务异常、超时或被强制释放 |
 
-这套状态机允许跨进程协同取消，并在故障情况下保持可追踪性。
+这套状态机让多个进程可以围绕同一张 MySQL 表协作：抢占任务、观察进度、请求取消，并在异常场景下留下可追踪记录。
 
 ---
 
-## 设计原则
+## Shutdown Path
 
-- API 层保持薄：只做协议适配，不承载业务编排
-- 编排逻辑集中在 `jobs`，避免散落到端点或工具中
-- 基础设施通过接口注入，方便测试与替换实现
-- 让 Agent 能力增强任务执行，但不破坏任务引擎的确定性边界
+TaskPilot 的关闭过程分为四步：
+
+1. 停止接收新任务
+2. 等待运行中的任务收敛
+3. 刷新日志、告警和指标
+4. 释放数据库连接等基础资源
+
+这样做的目的不是“优雅”本身，而是尽量避免任务半途丢失、日志未落盘、连接未释放。
+
+---
+
+## Design Principles
+
+- Keep the API thin.
+- Keep orchestration inside `jobs`.
+- Keep infrastructure replaceable.
+- Let Agent intelligence enhance execution without bypassing the task lifecycle.
