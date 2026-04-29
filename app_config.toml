@@ -1,4 +1,3 @@
-reload = true
 bind = "0.0.0.0:6060"
 workers = 4
 keep_alive_timeout = 120

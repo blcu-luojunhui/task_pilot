@@ -2,10 +2,11 @@ import asyncio
 import json
 import logging
 import time
-from datetime import datetime, timedelta
-from typing import Optional, Dict, Any, List
+from datetime import datetime, timezone
+from zoneinfo import ZoneInfo
+from typing import TYPE_CHECKING, Optional, Dict, Any, List
 
-from src.infra.shared import TaskScheduleResponse
+from src.infra.shared import TaskScheduleResponse, ErrorCode
 from src.jobs.task_handler import TaskHandler
 from src.jobs.task_config import (
     TaskStatus,
@@ -18,10 +19,10 @@ from src.jobs.task_utils import (
     TaskConcurrencyError,
     TaskUtils,
 )
-from src.jobs.task_lifecycle import TaskLifecycleManager
-from src.core.config import ProjectConfigSettings
-from src.infra.database import AsyncMySQLPool
-from src.infra.observability import LogService, AlertService
+from src.infra.observability import metrics
+
+if TYPE_CHECKING:
+    from src.api.v1.utils import ApiDependencies
 
 logger = logging.getLogger(__name__)
 
@@ -31,27 +32,30 @@ class TaskScheduler(TaskHandler):
     统一任务调度器
 
     使用方法：
-        scheduler = TaskScheduler(data, log_service, db_client, trace_id, config)
+        scheduler = TaskScheduler(data, trace_id, deps)
         result = await scheduler.deal()
     """
 
     def __init__(
         self,
         data: dict,
-        log_service: LogService,
-        db_client: AsyncMySQLPool,
         trace_id: str,
-        config: ProjectConfigSettings,
+        deps: "ApiDependencies",
     ):
-        super().__init__(data, log_service, db_client, trace_id, config)
+        super().__init__(data, deps.log, deps.db, trace_id, deps.config)
         self.table = TaskUtils.validate_table_name(
-            config.task_table or TaskConstants.TASK_TABLE
+            deps.config.task_table or TaskConstants.TASK_TABLE
         )
+        self.alert_service = deps.alert
+        self.lifecycle = deps.lifecycle
 
     async def _send_alert(self, title: str, detail: dict, dedup_key: str = None):
-        alert = AlertService.get_instance()
-        if alert:
-            await alert.send_alert(title=title, detail=detail, dedup_key=dedup_key)
+        if self.alert_service:
+            await self.alert_service.send_alert(
+                title=title,
+                detail=detail,
+                dedup_key=dedup_key,
+            )
 
     # ==================== 数据库操作 ====================
 
@@ -201,13 +205,13 @@ class TaskScheduler(TaskHandler):
         try:
             await self._check_task_concurrency_and_timeout(task_name)
         except TaskConcurrencyError as e:
-            return await TaskScheduleResponse.fail_response("5005", str(e))
+            return TaskScheduleResponse.fail_response(ErrorCode.CONCURRENCY_LIMIT, str(e))
 
         await self._insert_or_ignore_task(task_name, date_str)
 
         if not await self._try_lock_task():
-            return await TaskScheduleResponse.fail_response(
-                "5001", "Task is already processing"
+            return TaskScheduleResponse.fail_response(
+                ErrorCode.TASK_ALREADY_PROCESSING, "Task is already processing"
             )
 
         async def _task_wrapper():
@@ -227,6 +231,13 @@ class TaskScheduler(TaskHandler):
                     duration=duration,
                 )
 
+                # 记录成功完成的任务
+                status_label = "success" if status == TaskStatus.SUCCESS else "failed"
+                metrics.tasks_completed_total.labels(
+                    task_name=task_name,
+                    status=status_label,
+                ).inc()
+
             except TaskError as e:
                 duration = time.time() - start_time
                 error_detail = TaskUtils.format_error_detail(e)
@@ -237,6 +248,11 @@ class TaskScheduler(TaskHandler):
                     error=error_detail,
                     duration=duration,
                 )
+
+                metrics.tasks_completed_total.labels(
+                    task_name=task_name,
+                    status="failed",
+                ).inc()
 
                 if config.alert_on_failure:
                     await self._send_alert(
@@ -259,6 +275,10 @@ class TaskScheduler(TaskHandler):
                     task_name=task_name,
                     duration=duration,
                 )
+                metrics.tasks_completed_total.labels(
+                    task_name=task_name,
+                    status="cancelled",
+                ).inc()
                 raise
 
             except Exception as e:
@@ -271,6 +291,11 @@ class TaskScheduler(TaskHandler):
                     error=error_detail,
                     duration=duration,
                 )
+
+                metrics.tasks_completed_total.labels(
+                    task_name=task_name,
+                    status="error",
+                ).inc()
 
                 await self._send_alert(
                     title=f"Task Error: {task_name}",
@@ -285,16 +310,15 @@ class TaskScheduler(TaskHandler):
 
             finally:
                 await self._release_task(status)
-                lifecycle = TaskLifecycleManager.get_instance()
-                if lifecycle:
-                    await lifecycle.unregister(self.trace_id)
+                if self.lifecycle:
+                    await self.lifecycle.unregister(self.trace_id)
 
         task = asyncio.create_task(_task_wrapper(), name=f"{task_name}_{self.trace_id}")
-        lifecycle = TaskLifecycleManager.get_instance()
-        if lifecycle:
-            await lifecycle.register(self.trace_id, task)
+        metrics.tasks_started_total.labels(task_name=task_name).inc()
+        if self.lifecycle:
+            await self.lifecycle.register(self.trace_id, task)
 
-        return await TaskScheduleResponse.success_response(
+        return TaskScheduleResponse.success_response(
             task_name=task_name,
             data={
                 "code": 0,
@@ -365,23 +389,23 @@ class TaskScheduler(TaskHandler):
     async def deal(self) -> dict:
         task_name = self.data.get("task_name")
         if not task_name:
-            return await TaskScheduleResponse.fail_response(
-                "4003", "task_name is required"
+            return TaskScheduleResponse.fail_response(
+                ErrorCode.VALIDATION_ERROR, "task_name is required"
             )
 
         try:
             task_name = TaskUtils.validate_task_name(task_name)
         except TaskValidationError as e:
-            return await TaskScheduleResponse.fail_response("4003", str(e))
+            return TaskScheduleResponse.fail_response(ErrorCode.VALIDATION_ERROR, str(e))
 
-        date_str = self.data.get("date_string") or (
-            datetime.utcnow() + timedelta(hours=8)
+        date_str = self.data.get("date_string") or datetime.now(
+            ZoneInfo(self.config.timezone)
         ).strftime("%Y-%m-%d")
 
         handler = self.get_handler(task_name)
         if not handler:
-            return await TaskScheduleResponse.fail_response(
-                "4001",
+            return TaskScheduleResponse.fail_response(
+                ErrorCode.UNKNOWN_TASK,
                 f"Unknown task: {task_name}. "
                 f"Available tasks: {', '.join(self.list_registered_tasks())}",
             )

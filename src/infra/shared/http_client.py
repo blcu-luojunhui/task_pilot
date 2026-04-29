@@ -13,18 +13,38 @@ class AsyncHttpClient:
         default_headers: Optional[Dict[str, str]] = None,
     ):
         self.timeout = aiohttp.ClientTimeout(total=timeout)
-        self.connector = aiohttp.TCPConnector(limit=max_connections)
+        self.max_connections = max_connections
         self.default_headers = default_headers or {}
+        self.connector = None
         self.session = None
 
-    async def __aenter__(self):
+    async def start(self):
+        if self.session and not self.session.closed:
+            return
+
+        self.connector = aiohttp.TCPConnector(limit=self.max_connections)
         self.session = aiohttp.ClientSession(
-            connector=self.connector, timeout=self.timeout, headers=self.default_headers
+            connector=self.connector,
+            timeout=self.timeout,
+            headers=self.default_headers,
         )
+
+    async def close(self):
+        if self.session and not self.session.closed:
+            await self.session.close()
+        self.session = None
+        self.connector = None
+
+    async def __aenter__(self):
+        await self.start()
         return self
 
     async def __aexit__(self, exc_type, exc_val, exc_tb):
-        await self.session.close()
+        await self.close()
+
+    async def _ensure_session(self):
+        if self.session is None or self.session.closed:
+            await self.start()
 
     async def request(
         self,
@@ -35,6 +55,7 @@ class AsyncHttpClient:
         json: Optional[Dict[str, Any]] = None,
         headers: Optional[Dict[str, str]] = None,
     ) -> Union[Dict[str, Any], str]:
+        await self._ensure_session()
         request_headers = {**self.default_headers, **(headers or {})}
 
         try:

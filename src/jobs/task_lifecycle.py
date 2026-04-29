@@ -14,20 +14,20 @@ from typing import Dict, Optional
 
 from src.infra.database import AsyncMySQLPool
 from src.jobs.task_config import TaskStatus, TaskConstants
+from src.jobs.task_utils import TaskUtils
 
 logger = logging.getLogger(__name__)
 
 
 class TaskLifecycleManager:
-    """任务生命周期管理器（单例）"""
-
-    _instance: Optional["TaskLifecycleManager"] = None
+    """任务生命周期管理器"""
 
     def __init__(
         self,
         db_client: AsyncMySQLPool,
         poll_interval: float = 5.0,
         force_kill_timeout: float = 10.0,
+        task_table: str = TaskConstants.TASK_TABLE,
     ):
         self._registry: Dict[str, asyncio.Task] = {}
         self._lock = asyncio.Lock()
@@ -36,24 +36,7 @@ class TaskLifecycleManager:
         self._force_kill_timeout = force_kill_timeout
         self._poll_task: Optional[asyncio.Task] = None
         self._shutting_down = False
-
-    @classmethod
-    def initialize(
-        cls,
-        db_client: AsyncMySQLPool,
-        poll_interval: float = 5.0,
-        force_kill_timeout: float = 10.0,
-    ) -> "TaskLifecycleManager":
-        if cls._instance is None:
-            cls._instance = cls(db_client, poll_interval, force_kill_timeout)
-            logger.info(
-                f"TaskLifecycleManager initialized with poll_interval={poll_interval}s"
-            )
-        return cls._instance
-
-    @classmethod
-    def get_instance(cls) -> Optional["TaskLifecycleManager"]:
-        return cls._instance
+        self._task_table = TaskUtils.validate_table_name(task_table)
 
     async def register(self, trace_id: str, task: asyncio.Task) -> None:
         async with self._lock:
@@ -94,7 +77,7 @@ class TaskLifecycleManager:
 
     async def _poll_loop(self) -> None:
         logger.info("Task lifecycle polling loop started")
-        table = TaskConstants.TASK_TABLE
+        table = self._task_table
 
         while not self._shutting_down:
             try:

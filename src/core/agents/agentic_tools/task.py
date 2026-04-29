@@ -7,6 +7,7 @@ Task Tools - 任务调度和管理工具
 from typing import Any, Dict, Optional
 
 from src.core.agents.skills import skill, SkillContext
+from src.jobs.task_utils import TaskUtils
 
 
 @skill(
@@ -30,8 +31,10 @@ async def task_query_status(
         "trace_id": trace_id,
     })
 
-    # 从配置获取表名，默认 task_manager
-    table = ctx.config.task_table if ctx.config else "task_manager"
+    # 从配置获取表名并验证
+    table = TaskUtils.validate_table_name(
+        ctx.config.task_table if ctx.config else "task_manager"
+    )
 
     row = await ctx.db.async_fetch_one(
         f"SELECT * FROM {table} WHERE trace_id = %s",
@@ -61,7 +64,9 @@ async def task_list_processing(
         "task_name": task_name,
     })
 
-    table = ctx.config.task_table if ctx.config else "task_manager"
+    table = TaskUtils.validate_table_name(
+        ctx.config.task_table if ctx.config else "task_manager"
+    )
 
     rows = await ctx.db.async_fetch(
         f"SELECT trace_id, start_timestamp, data FROM {table} "
@@ -90,7 +95,9 @@ async def task_cancel(ctx: SkillContext, trace_id: str) -> bool:
         "trace_id": trace_id,
     })
 
-    table = ctx.config.task_table if ctx.config else "task_manager"
+    table = TaskUtils.validate_table_name(
+        ctx.config.task_table if ctx.config else "task_manager"
+    )
 
     # 将 INIT 或 PROCESSING 状态的任务标记为 CANCEL_REQUESTED
     affected = await ctx.db.async_save(

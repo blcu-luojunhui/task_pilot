@@ -5,23 +5,58 @@ from quart import Quart
 from src.core.bootstrap import AppContext
 from src.core.dependency import ServerContainer
 from src.api.v1.routes import server_routes
-from src.jobs.task_lifecycle import TaskLifecycleManager
-from src.infra.observability import AlertService
+from src.api.middleware import (
+    TraceMiddleware,
+    ErrorHandlerMiddleware,
+    RequestLoggerMiddleware,
+    RateLimitMiddleware,
+)
+from src.infra.observability import TraceIdFilter
 
-logging.basicConfig(level=logging.INFO)
+# 配置日志格式，包含 trace_id
+logging.basicConfig(
+    level=logging.INFO,
+    format="[%(asctime)s] [%(trace_id)s] [%(levelname)s] %(name)s: %(message)s",
+    datefmt="%Y-%m-%d %H:%M:%S",
+)
+
+# 为所有 logger 添加 TraceIdFilter
+trace_filter = TraceIdFilter()
+for handler in logging.root.handlers:
+    handler.addFilter(trace_filter)
 
 app = Quart(__name__)
 app = cors(app, allow_origin="*")
 app.config["ACCEPTING_TASKS"] = True
+app.config["MAX_CONTENT_LENGTH"] = 1 * 1024 * 1024  # 1MB
+
+# 注册中间件（顺序很重要）
+TraceMiddleware(app)
+ErrorHandlerMiddleware(app)
+RequestLoggerMiddleware(app)
+RateLimitMiddleware(
+    app,
+    max_requests=60,
+    window_seconds=60,
+    rate_limit_paths={"/api/run_task", "/api/cancel_task"},
+)
 
 server_container = ServerContainer()
 ctx = AppContext(server_container)
 
 config = server_container.config()
 log_service = server_container.log_service()
+alert_service = server_container.alert_service()
 async_mysql_pool = server_container.async_mysql_pool()
+lifecycle = server_container.task_lifecycle_manager()
 
-routes = server_routes(async_mysql_pool, log_service, config)
+routes = server_routes(
+    async_mysql_pool,
+    log_service,
+    config,
+    alert_service,
+    lifecycle,
+)
 app.register_blueprint(routes)
 
 
@@ -29,36 +64,12 @@ app.register_blueprint(routes)
 async def startup():
     logging.info("Starting TaskPilot...")
     await ctx.start_up()
-
-    alert_service = AlertService.initialize()
-    await alert_service.start()
-
-    lifecycle = TaskLifecycleManager.initialize(async_mysql_pool, poll_interval=5.0)
-    await lifecycle.start_polling()
-
     logging.info("TaskPilot started successfully")
 
 
 @app.after_serving
 async def shutdown():
     logging.info("Shutting down TaskPilot...")
-
     app.config["ACCEPTING_TASKS"] = False
-    logging.info("Phase 1: Stopped accepting new tasks")
-
-    lifecycle = TaskLifecycleManager.get_instance()
-    if lifecycle:
-        await lifecycle.shutdown(timeout=30.0)
-    logging.info("Phase 2: All tasks cancelled/completed")
-
-    alert_service = AlertService.get_instance()
-    if alert_service:
-        await alert_service.stop(drain_timeout=5.0)
-
-    await log_service.stop(drain_timeout=10.0)
-    logging.info("Phase 3: Alerts and logs flushed")
-
     await ctx.shutdown()
-    logging.info("Phase 4: Database pools closed")
-
     logging.info("TaskPilot shutdown complete")

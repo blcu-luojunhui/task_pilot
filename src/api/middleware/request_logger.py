@@ -1,0 +1,51 @@
+import logging
+import time
+from quart import Quart, request, g
+
+from src.infra.observability import metrics
+
+logger = logging.getLogger(__name__)
+
+
+class RequestLoggerMiddleware:
+    """
+    请求日志中间件
+
+    记录每个请求的方法、路径、状态码和耗时
+    """
+
+    def __init__(self, app: Quart):
+        self.app = app
+        app.before_request(self.before_request)
+        app.after_request(self.after_request)
+
+    async def before_request(self):
+        g.request_start_time = time.time()
+
+    async def after_request(self, response):
+        duration = time.time() - getattr(g, "request_start_time", time.time())
+        trace_id = getattr(request, "trace_id", "-")
+
+        # 更新 Prometheus 指标
+        metrics.http_requests_total.labels(
+            method=request.method,
+            path=request.path,
+            status_code=str(response.status_code),
+        ).inc()
+        metrics.http_request_duration_seconds.labels(
+            method=request.method,
+            path=request.path,
+        ).observe(duration)
+
+        logger.info(
+            f"[{trace_id}] {request.method} {request.path} "
+            f"-> {response.status_code} ({duration:.3f}s)"
+        )
+
+        response.headers["X-Trace-ID"] = trace_id
+        response.headers["X-Response-Time"] = f"{duration:.3f}s"
+
+        return response
+
+
+__all__ = ["RequestLoggerMiddleware"]

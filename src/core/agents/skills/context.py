@@ -33,9 +33,7 @@ class ContainerResolver:
         if dep_name == "db":
             obj = self.container.async_mysql_pool()
         elif dep_name == "http":
-            # AsyncHttpClient 需要手动实例化
-            from src.infra.shared import AsyncHttpClient
-            obj = AsyncHttpClient()
+            obj = self.container.http_client()
         elif dep_name == "log":
             obj = self.container.log_service()
         elif dep_name == "config":

@@ -4,7 +4,8 @@ from dataclasses import dataclass
 
 from src.core.config import ProjectConfigSettings
 from src.infra.database import AsyncMySQLPool
-from src.infra.observability import LogService
+from src.infra.observability import LogService, AlertService
+from src.jobs.task_lifecycle import TaskLifecycleManager
 
 
 @dataclass(frozen=True)
@@ -14,3 +15,10 @@ class ApiDependencies:
     mysql: AsyncMySQLPool
     log: LogService
     config: ProjectConfigSettings
+    alert: AlertService
+    lifecycle: TaskLifecycleManager
+
+    # 向后兼容别名
+    @property
+    def db(self) -> AsyncMySQLPool:
+        return self.mysql

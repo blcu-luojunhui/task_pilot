@@ -1,4 +1,5 @@
 import logging
+from contextlib import asynccontextmanager
 
 from aiomysql import create_pool
 from aiomysql.cursors import DictCursor
@@ -34,14 +35,12 @@ class AsyncMySQLPool:
             self.pools["default"] = pool
             logger.info("Default MySQL pool created successfully")
         except Exception as e:
-            await self._log(
-                contents={
-                    "db_name": "default",
-                    "error": str(e),
-                    "message": "Failed to create default pool",
-                }
-            )
-            self.pools["default"] = None
+            logger.critical(f"Failed to create MySQL pool: {e}")
+            raise RuntimeError(
+                f"MySQL pool initialization failed: {e}. "
+                f"Check database connection settings (host={self.config.host}, "
+                f"port={self.config.port}, db={self.config.db})"
+            ) from e
 
     async def close_pools(self):
         for name, pool in self.pools.items():
@@ -140,6 +139,43 @@ class AsyncMySQLPool:
 
     def list_databases(self):
         return list(self.pools.keys())
+
+    @asynccontextmanager
+    async def transaction(self, db_name="default"):
+        """
+        事务上下文管理器
+
+        用法:
+            async with pool.transaction() as conn:
+                async with conn.cursor() as cursor:
+                    await cursor.execute("INSERT ...")
+                    await cursor.execute("UPDATE ...")
+                # 自动 commit，异常时自动 rollback
+        """
+        pool = self.pools.get(db_name)
+        if not pool:
+            await self.init_pools()
+            pool = self.pools.get(db_name)
+
+        if not pool:
+            raise RuntimeError(f"Database pool '{db_name}' not available after init")
+
+        async with pool.acquire() as conn:
+            # 关闭 autocommit，手动控制事务
+            await conn.begin()
+            try:
+                yield conn
+                await conn.commit()
+            except Exception as e:
+                await conn.rollback()
+                await self._log(
+                    contents={
+                        "task": "transaction",
+                        "db_name": db_name,
+                        "error": str(e),
+                    }
+                )
+                raise
 
 
 __all__ = [

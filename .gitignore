@@ -34,3 +34,4 @@ ENV/
 *~
 .DS_Store
 .claude
+.logs/

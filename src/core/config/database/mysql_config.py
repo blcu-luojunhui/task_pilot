@@ -1,3 +1,4 @@
+from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -16,6 +17,28 @@ class MySQLConfig(BaseSettings):
     model_config = SettingsConfigDict(
         env_prefix="", case_sensitive=False, extra="ignore"
     )
+
+    @field_validator("password")
+    @classmethod
+    def validate_password(cls, v: str) -> str:
+        if not v or len(v.strip()) == 0:
+            raise ValueError("password cannot be empty")
+        return v
+
+    @field_validator("port")
+    @classmethod
+    def validate_port(cls, v: int) -> int:
+        if not (1 <= v <= 65535):
+            raise ValueError(f"port must be between 1 and 65535, got: {v}")
+        return v
+
+    @field_validator("maxsize")
+    @classmethod
+    def validate_pool_size(cls, v: int, info) -> int:
+        minsize = info.data.get("minsize", 5)
+        if v < minsize:
+            raise ValueError(f"maxsize ({v}) must be >= minsize ({minsize})")
+        return v
 
     def to_dict(self) -> dict:
         """转换为字典格式，用于兼容旧代码"""

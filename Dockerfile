@@ -13,4 +13,4 @@ COPY . .
 
 EXPOSE 6060
 
-CMD ["hypercorn", "task_app:app", "--config", "app_config.toml"]
+CMD ["hypercorn", "app:app", "--config", "app_config.toml"]

@@ -2,11 +2,17 @@ import asyncio
 import contextlib
 import json
 import logging
+import os
 import sys
 import time
 from typing import Optional
 
 logger = logging.getLogger(__name__)
+
+# 关键事件类型，队列满时写入兜底文件
+_CRITICAL_EVENT_TYPES = frozenset({
+    "task_failed", "task_error", "task_cancelled", "task_timeout_detected",
+})
 
 
 class LogService:
@@ -24,6 +30,7 @@ class LogService:
         self._running = False
         self._dropped_count = 0
         self._last_drop_warn_time = 0
+        self._fallback_file = ".logs/critical_events.jsonl"
 
     async def start(self):
         if self._running:
@@ -77,6 +84,15 @@ class LogService:
                 logger.error(f"LogService drain error: {e}")
                 self.queue.task_done()
 
+    def _write_fallback_log(self, contents: dict):
+        """关键日志兜底写入本地文件"""
+        try:
+            os.makedirs(os.path.dirname(self._fallback_file), exist_ok=True)
+            with open(self._fallback_file, "a", encoding="utf-8") as f:
+                f.write(json.dumps(contents, ensure_ascii=False, default=str) + "\n")
+        except Exception as e:
+            logger.error(f"Failed to write fallback log: {e}")
+
     async def log(self, contents: dict):
         if not self._running or self.queue is None:
             return
@@ -86,19 +102,20 @@ class LogService:
         except asyncio.QueueFull:
             self._dropped_count += 1
 
+            event_type = contents.get("event_type", "")
+            if event_type in _CRITICAL_EVENT_TYPES:
+                self._write_fallback_log(contents)
+                print(
+                    f"[CRITICAL LOG DROPPED] {json.dumps(contents, ensure_ascii=False, default=str)}",
+                    file=sys.stderr,
+                )
+
             now = time.time()
             if now - self._last_drop_warn_time > 60:
                 self._last_drop_warn_time = now
                 logger.warning(
                     f"LogService queue full, dropped {self._dropped_count} logs total"
                 )
-
-                event_type = contents.get("event_type", "")
-                if event_type in ("task_failed", "task_error", "task_cancelled"):
-                    print(
-                        f"[CRITICAL LOG DROPPED] {json.dumps(contents, ensure_ascii=False, default=str)}",
-                        file=sys.stderr,
-                    )
 
     def get_metrics(self) -> dict:
         return {

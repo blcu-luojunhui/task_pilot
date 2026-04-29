@@ -7,7 +7,8 @@ from src.jobs import TaskScheduler
 from src.api.v1.utils import ApiDependencies
 from src.api.v1.utils import RunTaskRequest, CancelTaskRequest
 from src.api.v1.utils import parse_json, validation_error_response
-from src.infra.shared.tools import generate_task_trace_id
+from src.api.middleware.trace import get_current_trace_id
+from src.infra.shared import ErrorCode
 
 
 def create_tasks_bp(deps: ApiDependencies) -> Blueprint:
@@ -16,9 +17,9 @@ def create_tasks_bp(deps: ApiDependencies) -> Blueprint:
     @bp.route("/run_task", methods=["POST"])
     async def run_task():
         if not current_app.config.get("ACCEPTING_TASKS", True):
-            return jsonify({"code": 5003, "message": "Server is shutting down"}), 503
+            return jsonify({"code": ErrorCode.SERVICE_SHUTTING_DOWN, "message": "Server is shutting down"}), 503
 
-        trace_id = generate_task_trace_id()
+        trace_id = get_current_trace_id()
 
         try:
             _, body = await parse_json(RunTaskRequest)
@@ -26,7 +27,7 @@ def create_tasks_bp(deps: ApiDependencies) -> Blueprint:
             payload, status = validation_error_response(e)
             return jsonify(payload), status
 
-        scheduler = TaskScheduler(body, deps.log, deps.db, trace_id, deps.config)
+        scheduler = TaskScheduler(body, trace_id, deps)
         result = await scheduler.deal()
         return jsonify(result)
 
@@ -39,12 +40,12 @@ def create_tasks_bp(deps: ApiDependencies) -> Blueprint:
             return jsonify(payload), status
 
         trace_id = body["trace_id"]
-        scheduler = TaskScheduler(body, deps.log, deps.db, trace_id, deps.config)
+        scheduler = TaskScheduler(body, trace_id, deps)
         success = await scheduler.cancel_task(trace_id)
 
         return jsonify(
             {
-                "code": 0 if success else 1,
+                "code": ErrorCode.SUCCESS if success else 1,
                 "message": "cancel requested"
                 if success
                 else "task not found or already finished",

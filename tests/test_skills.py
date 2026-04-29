@@ -78,7 +78,7 @@ class TestSkillModel(unittest.TestCase):
         )
 
         executor = SkillExecutor()
-        result = asyncio.get_event_loop().run_until_complete(
+        result = asyncio.run(
             executor.execute(s, None, value="hello")
         )
         self.assertEqual(result, "result: hello")
@@ -88,7 +88,7 @@ class TestSkillModel(unittest.TestCase):
 
         executor = SkillExecutor()
         with self.assertRaises(Exception):
-            asyncio.get_event_loop().run_until_complete(executor.execute(s, None))
+            asyncio.run(executor.execute(s, None))
 
 
 class TestSkillRegistry(unittest.TestCase):

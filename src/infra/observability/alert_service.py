@@ -24,11 +24,10 @@ class AlertService:
     """
     异步告警服务
 
-    通过 initialize() 传入自定义的 alert_backend 可接入飞书、钉钉、Slack 等。
+    通过 DI 容器管理生命周期，不再使用单例模式。
+    通过构造函数传入自定义的 alert_backend 可接入飞书、钉钉、Slack 等。
     默认使用 logging.warning 输出。
     """
-
-    _instance: Optional["AlertService"] = None
 
     def __init__(
         self,
@@ -42,20 +41,6 @@ class AlertService:
         self._max_queue_size = max_queue_size
         self._recent_alerts = deque(maxlen=200)
         self._dropped_count = 0
-
-    @classmethod
-    def initialize(
-        cls,
-        alert_backend: Optional[Callable] = None,
-        max_queue_size: int = 1000,
-    ) -> "AlertService":
-        if cls._instance is None:
-            cls._instance = cls(alert_backend, max_queue_size=max_queue_size)
-        return cls._instance
-
-    @classmethod
-    def get_instance(cls) -> Optional["AlertService"]:
-        return cls._instance
 
     async def start(self):
         if self._running:
@@ -159,3 +144,11 @@ class AlertService:
                 break
             except Exception as e:
                 logger.exception(f"AlertService worker error: {e}")
+
+    def get_metrics(self) -> dict:
+        return {
+            "queue_size": self.queue.qsize() if self.queue else 0,
+            "queue_maxsize": self.queue.maxsize if self.queue else 0,
+            "dropped_count": self._dropped_count,
+            "is_running": self._running,
+        }

@@ -1,7 +1,12 @@
+from typing import Dict
+
 from datetime import datetime
 from typing import Callable, Dict, Optional
 
 from src.core.config import ProjectConfigSettings
+from src.infra.database import AsyncMySQLPool
+from src.infra.observability import LogService
+
 from src.jobs.task_config import TaskStatus
 from src.jobs.task_utils import TaskValidationError
 
@@ -37,15 +42,15 @@ class TaskHandler:
 
     def __init__(
         self,
-        data: dict,
-        log_service,
-        db_client,
+        data: Dict,
         trace_id: str,
+        log_service: LogService,
+        pool: AsyncMySQLPool,
         config: ProjectConfigSettings,
     ):
         self.data = data
-        self.log_client = log_service
-        self.db_client = db_client
+        self.log_service = log_service
+        self.pool = pool
         self.trace_id = trace_id
         self.config = config
 
@@ -65,7 +70,7 @@ class TaskHandler:
             "task": self.data.get("task_name"),
             **kwargs,
         }
-        await self.log_client.log(contents=log_data)
+        await self.log_service.log(contents=log_data)
 
 
 __all__ = ["TaskHandler", "register"]

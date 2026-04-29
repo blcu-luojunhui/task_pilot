@@ -5,6 +5,8 @@ from typing import Any, Dict, Tuple, Type, TypeVar
 from pydantic import BaseModel, ValidationError
 from quart import request
 
+from src.infra.shared import ErrorCode
+
 T = TypeVar("T", bound=BaseModel)
 
 
@@ -22,4 +24,4 @@ async def parse_json(model: Type[T]) -> Tuple[T, Dict[str, Any]]:
 
 
 def validation_error_response(e: ValidationError) -> Tuple[Dict[str, Any], int]:
-    return {"code": 400, "message": "invalid request body", "errors": e.errors()}, 400
+    return {"code": ErrorCode.BAD_REQUEST, "message": "invalid request body", "errors": e.errors()}, 400

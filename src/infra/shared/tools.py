@@ -38,9 +38,7 @@ def yield_batch(data: List, batch_size: int):
 
 def timestamp_to_str(timestamp, string_format="%Y-%m-%d %H:%M:%S") -> str:
     """时间戳转字符串"""
-    dt_object = (
-        datetime.utcfromtimestamp(timestamp).replace(tzinfo=timezone.utc).astimezone()
-    )
+    dt_object = datetime.fromtimestamp(timestamp, tz=timezone.utc).astimezone()
     return dt_object.strftime(string_format)
 
 
