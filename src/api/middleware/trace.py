@@ -23,7 +23,8 @@ class TraceMiddleware:
         self.app = app
         app.before_request(self.before_request)
 
-    async def before_request(self):
+    @staticmethod
+    async def before_request():
         # 优先从 header 获取，否则生成统一格式的 trace_id
         trace_id = request.headers.get("X-Trace-ID") or generate_task_trace_id()
         trace_id_var.set(trace_id)

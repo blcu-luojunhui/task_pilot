@@ -20,7 +20,8 @@ class ErrorHandlerMiddleware:
         app.register_error_handler(Exception, self.handle_exception)
         app.register_error_handler(ValidationError, self.handle_validation_error)
 
-    async def handle_validation_error(self, error: ValidationError):
+    @staticmethod
+    async def handle_validation_error(error: ValidationError):
         """处理 Pydantic 验证错误"""
         errors = error.errors()
         return (

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+from typing import Any
 from quart import Blueprint, jsonify
 
 from src.api.v1.utils import ApiDependencies
@@ -19,7 +20,7 @@ def create_health_bp(deps: ApiDependencies) -> Blueprint:
 
         检查应用状态和 MySQL 连接池可用性
         """
-        health_status = {
+        health_status: dict[str, Any] = {
             "status": "healthy",
             "checks": {},
         }
