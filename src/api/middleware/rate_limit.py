@@ -28,7 +28,8 @@ class RateLimitMiddleware:
 
         app.before_request(self.before_request)
 
-    def _get_client_ip(self) -> str:
+    @staticmethod
+    def _get_client_ip() -> str:
         forwarded = request.headers.get("X-Forwarded-For")
         if forwarded:
             return forwarded.split(",")[0].strip()
@@ -46,7 +47,7 @@ class RateLimitMiddleware:
     async def before_request(self):
         # 如果指定了路径，只对这些路径限流
         if self.rate_limit_paths and request.path not in self.rate_limit_paths:
-            return
+            return None
 
         client_ip = self._get_client_ip()
         now = time.time()
@@ -65,6 +66,7 @@ class RateLimitMiddleware:
             return response
 
         timestamps.append(now)
+        return None
 
 
 __all__ = ["RateLimitMiddleware"]

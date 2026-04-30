@@ -19,10 +19,12 @@ class RequestLoggerMiddleware:
         app.before_request(self.before_request)
         app.after_request(self.after_request)
 
-    async def before_request(self):
+    @staticmethod
+    async def before_request():
         g.request_start_time = time.time()
 
-    async def after_request(self, response):
+    @staticmethod
+    async def after_request(response):
         duration = time.time() - getattr(g, "request_start_time", time.time())
         trace_id = getattr(request, "trace_id", "-")
 
