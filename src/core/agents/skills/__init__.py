@@ -1,5 +1,5 @@
 from .model import Skill, SkillType
-from .context import SkillContext, ContainerResolver
+from .context import SkillContext, ContainerResolver, MappingResolver
 from .registry import SkillRegistry, skill, get_global_registry
 from .loader import SkillLoader, FrontmatterParser, InlineMetadataParser, load_skills_from_dir
 from .executor import SkillExecutor, SkillExecutionError, execute_skill
@@ -14,6 +14,7 @@ __all__ = [
     # 执行
     "SkillContext",
     "ContainerResolver",
+    "MappingResolver",
     "SkillExecutor",
     "SkillExecutionError",
     "execute_skill",

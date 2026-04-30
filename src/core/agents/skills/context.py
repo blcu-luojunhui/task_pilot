@@ -5,7 +5,7 @@ Skill 执行上下文
 """
 
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any, Dict, Optional
+from typing import TYPE_CHECKING, Any, Dict, Mapping, Optional
 
 from .types import DependencyResolver
 
@@ -43,6 +43,18 @@ class ContainerResolver:
 
         self._cache[dep_name] = obj
         return obj
+
+
+class MappingResolver:
+    """Resolve skill dependencies from an explicit mapping."""
+
+    def __init__(self, dependencies: Optional[Mapping[str, Any]] = None):
+        self.dependencies = dict(dependencies or {})
+
+    def resolve(self, dep_name: str) -> Any:
+        if dep_name not in self.dependencies:
+            raise ValueError(f"Dependency '{dep_name}' is not configured")
+        return self.dependencies[dep_name]
 
 
 @dataclass
@@ -88,5 +100,13 @@ class SkillContext:
         """从自定义 Resolver 创建上下文"""
         return cls(_resolver=resolver)
 
+    @classmethod
+    def from_dependencies(
+        cls,
+        dependencies: Optional[Mapping[str, Any]] = None,
+    ) -> "SkillContext":
+        """Create a context from explicitly configured tool dependencies."""
+        return cls(_resolver=MappingResolver(dependencies))
 
-__all__ = ["SkillContext", "ContainerResolver"]
+
+__all__ = ["SkillContext", "ContainerResolver", "MappingResolver"]

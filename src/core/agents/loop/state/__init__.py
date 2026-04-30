@@ -1,6 +1,14 @@
 from dataclasses import asdict, dataclass, field
+from datetime import datetime
 from enum import Enum
 from typing import Any, Optional
+import uuid
+
+
+def generate_agent_trace_id() -> str:
+    """Generate a trace id for one agent run."""
+    timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
+    return f"Agent-{timestamp}-{uuid.uuid4().hex[:16]}"
 
 
 class StopReason(str, Enum):
@@ -9,6 +17,8 @@ class StopReason(str, Enum):
     CANCELLED = "cancelled"
     TOOL_ERROR_ABORT = "tool_error_abort"
     LLM_ERROR_ABORT = "llm_error_abort"
+    BUDGET_EXHAUSTED = "budget_exhausted"
+    CONSTRAINT_VIOLATION = "constraint_violation"
 
 
 @dataclass
@@ -31,6 +41,7 @@ class AgentLoopState:
     goal: str
     messages: list[dict]
     max_steps: int
+    trace_id: str
     step: int = 0
     tool_call_history: list[ToolCallRecord] = field(default_factory=list)
     stop_reason: Optional[StopReason] = None
@@ -39,6 +50,7 @@ class AgentLoopState:
     def to_dict(self) -> dict:
         return {
             "goal": self.goal,
+            "trace_id": self.trace_id,
             "messages": self.messages,
             "max_steps": self.max_steps,
             "step": self.step,
@@ -59,6 +71,7 @@ class AgentLoopState:
 
 @dataclass
 class AgentLoopResult:
+    trace_id: str
     success: bool
     final_answer: Optional[str]
     stop_reason: StopReason
@@ -68,6 +81,7 @@ class AgentLoopResult:
 
     def to_dict(self) -> dict:
         return {
+            "trace_id": self.trace_id,
             "success": self.success,
             "final_answer": self.final_answer,
             "stop_reason": self.stop_reason.value,
@@ -75,3 +89,12 @@ class AgentLoopResult:
             "tool_calls_count": self.tool_calls_count,
             "duration_seconds": self.duration_seconds,
         }
+
+
+__all__ = [
+    "AgentLoopResult",
+    "AgentLoopState",
+    "StopReason",
+    "ToolCallRecord",
+    "generate_agent_trace_id",
+]
