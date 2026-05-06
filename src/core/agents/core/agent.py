@@ -7,7 +7,7 @@ Agent - 统一的 Agent 创建和使用接口
 from dataclasses import dataclass, field
 from typing import Any, Callable, Dict, List, Mapping, Optional
 
-from src.core.agents.foundation import AgentLoopState, AgentLoopResult
+from src.core.agents.state import AgentLoopState, AgentLoopResult
 from src.core.agents.capabilities import (
     SkillRegistry,
     SkillExecutor,
@@ -18,7 +18,7 @@ from src.core.agents.capabilities import (
     SkillType,
     RiskLevel,
 )
-from src.core.agents.orchestration import AgentLoopRunner
+from src.core.agents.execution import AgentLoopRunner
 
 
 @dataclass

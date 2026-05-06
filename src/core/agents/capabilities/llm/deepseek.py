@@ -14,8 +14,8 @@ from typing import Any, Dict, List, Optional
 
 import aiohttp
 
-from src.core.agents.foundation.protocol import ToolCall, assistant_message, get_tool_calls
-from src.infra.streaming.agents.streaming import get_stream_context
+from src.core.agents.state.protocol import ToolCall, assistant_message, get_tool_calls
+from src.infra.streaming.agents import get_stream_context
 from src.core.agents.capabilities.skills import SkillRegistry
 
 

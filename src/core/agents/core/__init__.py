@@ -5,6 +5,7 @@ Core module - Agent 控制层
 - agent: Agent 主类
 - loop: Think-Act-Observe 循环
 - types: 核心类型定义
+- prompting: Prompt 工程组件
 """
 
 from .agent import Agent, AgentConfig
@@ -17,6 +18,7 @@ from .types import (
     Observation,
     Step,
 )
+from .prompting import PromptAssembler, KnowledgeSelector
 
 __all__ = [
     "Agent",
@@ -31,4 +33,6 @@ __all__ = [
     "Action",
     "Observation",
     "Step",
+    "PromptAssembler",
+    "KnowledgeSelector",
 ]

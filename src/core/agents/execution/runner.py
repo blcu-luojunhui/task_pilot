@@ -3,9 +3,9 @@
 from dataclasses import dataclass
 from typing import Any, Callable, Dict, List, Mapping, Optional
 
-from src.core.agents.loop.act import Act
-from src.core.agents.foundation.context import ContextWindowManager
-from src.core.agents.orchestration.runtime.harness import (
+from src.core.agents.core.loop import Act
+from src.core.agents.state.context import ContextWindowManager
+from src.core.agents.runtime.harness import (
     AgentBudget,
     AgentLoopHarness,
     ConstraintSet,
@@ -14,12 +14,12 @@ from src.core.agents.orchestration.runtime.harness import (
     HarnessHook,
     WorkflowController,
 )
-from src.core.agents.loop.observe import Observe
-from src.core.agents.orchestration.routing.router import TaskRouter
-from src.core.agents.foundation.state import AgentLoopResult, StopReason
-from src.core.agents.loop.think import AssistantPlanner, Think
-from src.core.agents.loop.think.knowledge_selector import KnowledgeSelector
-from src.core.agents.loop.think.prompt_assembler import PromptAssembler
+from src.core.agents.core.loop import Observe
+from src.core.agents.execution.router import TaskRouter
+from src.core.agents.state import AgentLoopResult, StopReason
+from src.core.agents.core.loop import AssistantPlanner, Think
+from src.core.agents.core.prompting import KnowledgeSelector
+from src.core.agents.core.prompting import PromptAssembler
 from src.core.agents.capabilities.skills import SkillContext, SkillExecutor, SkillRegistry
 from src.core.agents.capabilities.skills.guard import PermissionGuard
 

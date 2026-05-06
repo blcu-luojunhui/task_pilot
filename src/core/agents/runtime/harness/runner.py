@@ -5,8 +5,8 @@ Harness Runner - 主运行入口
 from typing import Any, Dict, List, Optional
 from dataclasses import dataclass
 
-from ..core.types import Step, Action, Observation
-from ..execution import ExecutionResult
+from ...core.types import Step, Action, Observation
+from ...execution import ExecutionResult
 
 
 @dataclass

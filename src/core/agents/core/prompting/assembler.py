@@ -7,8 +7,8 @@ Builds a per-step system message from current agent state and selected knowledge
 from dataclasses import dataclass
 from typing import Any, Dict, Optional
 
-from src.core.agents.foundation.state import AgentLoopState
-from src.core.agents.loop.think.knowledge_selector import KnowledgeSelector
+from ...state import AgentLoopState
+from .knowledge_selector import KnowledgeSelector
 
 
 @dataclass

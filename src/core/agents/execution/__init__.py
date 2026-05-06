@@ -16,10 +16,14 @@ from .result import (
 )
 from .dispatcher import Dispatcher
 
+# Import from executor
+from src.core.agents.execution.runner import AgentLoopRunner
+
 __all__ = [
     "ExecutionStatus",
     "ExecutionResult",
     "ToolExecutionResult",
     "SkillExecutionResult",
     "Dispatcher",
+    "AgentLoopRunner",
 ]

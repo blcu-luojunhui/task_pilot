@@ -7,7 +7,7 @@ Core Agents - Agent 系统
 ├── state/         - 状态层（State, Protocol, Context, Memory）
 ├── execution/     - 执行层（Executor, Router, Dispatcher）
 ├── runtime/       - 运行时环境（Session, Env, Hooks, Harness）
-└── multi_agent/   - 多 Agent 系统（预留）
+└── multi_agents/   - 多 Agent 系统（预留）
 """
 
 # 主要接口 - 从 core 导出
@@ -76,8 +76,8 @@ from .runtime.harness.debugger import Debugger, TraceEvent
 from .runtime.harness.evaluator import Evaluator, EvaluationResult, EvaluationMetric
 from .runtime.harness.fixtures import FixtureManager, MockTool
 
-# 多 Agent - 从 multi_agent 导出
-from .multi_agent import (
+# 多 Agent - 从 multi_agents 导出
+from .multi_agents import (
     MultiAgentCoordinator,
     MessageType,
     Message,

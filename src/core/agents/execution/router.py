@@ -4,7 +4,7 @@ import json
 from dataclasses import dataclass
 from typing import Any, Dict, List
 
-from src.core.agents.loop.think import AssistantPlanner
+from src.core.agents.core.loop import AssistantPlanner
 
 
 @dataclass
