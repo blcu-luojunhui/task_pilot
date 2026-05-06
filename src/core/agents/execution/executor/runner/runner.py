@@ -4,8 +4,8 @@ from dataclasses import dataclass
 from typing import Any, Callable, Dict, List, Mapping, Optional
 
 from src.core.agents.loop.act import Act
-from src.core.agents.context import ContextWindowManager
-from src.core.agents.runtime.harness import (
+from src.core.agents.foundation.context import ContextWindowManager
+from src.core.agents.orchestration.runtime.harness import (
     AgentBudget,
     AgentLoopHarness,
     ConstraintSet,
@@ -15,13 +15,13 @@ from src.core.agents.runtime.harness import (
     WorkflowController,
 )
 from src.core.agents.loop.observe import Observe
-from src.core.agents.routing.router import TaskRouter
-from src.core.agents.state import AgentLoopResult, StopReason
+from src.core.agents.orchestration.routing.router import TaskRouter
+from src.core.agents.foundation.state import AgentLoopResult, StopReason
 from src.core.agents.loop.think import AssistantPlanner, Think
 from src.core.agents.loop.think.knowledge_selector import KnowledgeSelector
 from src.core.agents.loop.think.prompt_assembler import PromptAssembler
-from src.core.agents.skills import SkillContext, SkillExecutor, SkillRegistry
-from src.core.agents.skills.guard import PermissionGuard
+from src.core.agents.capabilities.skills import SkillContext, SkillExecutor, SkillRegistry
+from src.core.agents.capabilities.skills.guard import PermissionGuard
 
 
 @dataclass
@@ -63,7 +63,7 @@ class AgentLoopRunner:
             self.continuous_improvement = ContinuousImprovement()
         if self.thinker is None:
             context_manager = ContextWindowManager(
-                max_context_tokens=self.max_context_tokens,
+                max_tokens=self.max_context_tokens,
             )
             knowledge_selector = KnowledgeSelector(self.registry)
             prompt_assembler = PromptAssembler(knowledge_selector=knowledge_selector)

@@ -6,10 +6,10 @@ import time
 from dataclasses import dataclass
 from typing import Any, Callable, Dict, List, Mapping, Optional
 
-from src.core.agents.protocol import ToolCall, tool_result_message
-from src.core.agents.state import AgentLoopState, ToolCallRecord
-from src.core.agents.skills import SkillContext, SkillExecutor, SkillRegistry
-from src.core.agents.skills.guard import PermissionGuard
+from src.core.agents.foundation.protocol import ToolCall, tool_result_message
+from src.core.agents.foundation.state import AgentLoopState, ToolCallRecord
+from src.core.agents.capabilities.skills import SkillContext, SkillExecutor, SkillRegistry
+from src.core.agents.capabilities.skills.guard import PermissionGuard
 
 
 @dataclass

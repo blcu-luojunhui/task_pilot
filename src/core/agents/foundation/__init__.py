@@ -1,20 +1,19 @@
 """
-State Layer - 状态层
+Foundation Layer - 基础层
 
-提供 Agent 系统的状态管理和基础设施：
+提供 Agent 系统的核心抽象和基础设施：
 - state: 状态管理
 - protocol: 消息协议
 - context: 上下文管理
-- memory: 记忆管理
 """
 
-from .models import (
+from .state import (
     StopReason,
     ToolCallRecord,
     AgentLoopState,
     AgentLoopResult,
+    generate_agent_trace_id,
 )
-from .utils import generate_agent_trace_id
 from .protocol import (
     ToolCall,
     assistant_message,
@@ -23,7 +22,6 @@ from .protocol import (
     normalize_tool_calls,
 )
 from .context import ContextWindowManager
-from .memory import ShortTermMemory, LongTermMemory, MemoryEntry
 
 __all__ = [
     # State
@@ -40,8 +38,4 @@ __all__ = [
     "normalize_tool_calls",
     # Context
     "ContextWindowManager",
-    # Memory
-    "ShortTermMemory",
-    "LongTermMemory",
-    "MemoryEntry",
 ]

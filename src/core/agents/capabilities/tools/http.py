@@ -6,7 +6,7 @@ HTTP Tools - HTTP 客户端工具
 
 from typing import Any, Dict, Optional
 
-from src.core.agents.skills import skill, SkillContext
+from src.core.agents.capabilities.skills import skill, SkillContext
 from src.infra.shared import AsyncHttpClient
 
 

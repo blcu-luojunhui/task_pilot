@@ -8,7 +8,7 @@ payload and stop the workflow before unsafe or unwanted work is performed.
 from dataclasses import dataclass, field
 from typing import Any, Callable, Dict, List, Mapping, Optional
 
-from src.core.agents.state import AgentLoopState, StopReason
+from src.core.agents.foundation.state import AgentLoopState, StopReason
 
 
 @dataclass(frozen=True)

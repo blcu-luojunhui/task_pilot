@@ -4,8 +4,8 @@ import logging
 from dataclasses import dataclass
 from typing import Any, Awaitable, Callable, Dict, List, Optional
 
-from src.core.agents.context import ContextWindowManager
-from src.core.agents.state import AgentLoopState, StopReason
+from src.core.agents.foundation.context import ContextWindowManager
+from src.core.agents.foundation.state import AgentLoopState, StopReason
 from src.infra.streaming.agents import set_stream_context, clear_stream_context
 from .prompt_assembler import PromptAssembler
 

@@ -7,8 +7,8 @@ Selects relevant knowledge skills based on current goal and tool usage.
 from dataclasses import dataclass
 from typing import List, Set
 
-from src.core.agents.state import AgentLoopState
-from src.core.agents.skills import SkillRegistry
+from src.core.agents.foundation.state import AgentLoopState
+from src.core.agents.capabilities.skills import SkillRegistry
 
 
 _DOMAIN_KEYWORDS = {

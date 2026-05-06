@@ -35,3 +35,6 @@ ENV/
 .DS_Store
 .claude
 .logs/
+tests/
+examples/
+scripts/

@@ -6,8 +6,8 @@ Database Tools - 数据库操作工具
 
 from typing import Any, Dict, List, Optional
 
-from src.core.agents.skills import skill, SkillContext
-from src.core.agents.skills.sql_filter import QUERY_FILTER, EXECUTE_FILTER
+from src.core.agents.capabilities.skills import skill, SkillContext
+from src.core.agents.capabilities.skills.sql_filter import QUERY_FILTER, EXECUTE_FILTER
 
 
 @skill(

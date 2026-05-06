@@ -7,7 +7,7 @@ Utility Tools - 通用工具函数
 from datetime import datetime
 from typing import List
 
-from src.core.agents.skills import skill, SkillContext
+from src.core.agents.capabilities.skills import skill, SkillContext
 from src.infra.shared.tools import (
     str_to_md5,
     timestamp_to_str,

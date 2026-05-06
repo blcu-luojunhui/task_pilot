@@ -7,7 +7,7 @@ Task Tools - 任务调度和管理工具
 import time
 from typing import Any, Dict, List, Optional
 
-from src.core.agents.skills import skill, SkillContext
+from src.core.agents.capabilities.skills import skill, SkillContext
 from src.jobs.task_utils import TaskUtils
 
 

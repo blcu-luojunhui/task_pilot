@@ -3,8 +3,8 @@
 from dataclasses import dataclass
 from typing import Any, Dict, List
 
-from src.core.agents.protocol import get_tool_calls
-from src.core.agents.state import AgentLoopState, StopReason
+from src.core.agents.foundation.protocol import get_tool_calls
+from src.core.agents.foundation.state import AgentLoopState, StopReason
 
 
 @dataclass

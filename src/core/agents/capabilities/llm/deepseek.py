@@ -14,9 +14,9 @@ from typing import Any, Dict, List, Optional
 
 import aiohttp
 
-from src.core.agents.protocol import ToolCall, assistant_message, get_tool_calls
+from src.core.agents.foundation.protocol import ToolCall, assistant_message, get_tool_calls
 from src.infra.streaming.agents.streaming import get_stream_context
-from src.core.agents.skills import SkillRegistry
+from src.core.agents.capabilities.skills import SkillRegistry
 
 
 DEFAULT_DEEPSEEK_BASE_URL = "https://api.deepseek.com/chat/completions"
