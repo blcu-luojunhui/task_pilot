@@ -9,7 +9,7 @@ import logging
 from dataclasses import dataclass
 from typing import Any, Dict, Optional
 
-logger = logging.getLogger("src.core.agents.loop.harness")
+logger = logging.getLogger("src.core.agents.runtime.harness")
 
 
 @dataclass

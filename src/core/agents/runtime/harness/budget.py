@@ -7,7 +7,7 @@ The harness asks this layer whether another step or tool call is allowed.
 from dataclasses import dataclass, field
 from typing import Any, Dict, Optional
 
-from src.core.agents.loop.state import AgentLoopState, StopReason
+from src.core.agents.state import AgentLoopState, StopReason
 
 
 @dataclass(frozen=True)

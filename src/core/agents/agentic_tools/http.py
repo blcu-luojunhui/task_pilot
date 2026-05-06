@@ -14,6 +14,7 @@ from src.infra.shared import AsyncHttpClient
     name="http_get",
     description="发送 HTTP GET 请求，获取数据",
     dependencies=["log"],
+    risk_level="read",
     parameters={
         "url": {
             "type": "string",
@@ -54,6 +55,7 @@ async def http_get(
     name="http_post",
     description="发送 HTTP POST 请求，提交数据",
     dependencies=["log"],
+    risk_level="write",
     parameters={
         "url": {
             "type": "string",

@@ -7,6 +7,7 @@ from src.api.v1.endpoints import create_health_bp, create_tasks_bp, create_metri
 from src.core.config import ProjectConfigSettings
 from src.infra.database import AsyncMySQLPool
 from src.infra.observability import LogService, AlertService
+from src.infra.streaming import TraceEventBus
 from src.jobs.task_lifecycle import TaskLifecycleManager
 
 
@@ -26,6 +27,7 @@ def server_routes(
     config: ProjectConfigSettings,
     alert_service: AlertService,
     lifecycle: TaskLifecycleManager,
+    events: TraceEventBus,
 ) -> Blueprint:
     deps = ApiDependencies(
         mysql=pools,
@@ -33,5 +35,6 @@ def server_routes(
         config=config,
         alert=alert_service,
         lifecycle=lifecycle,
+        events=events,
     )
     return register_v1_blueprints(deps)

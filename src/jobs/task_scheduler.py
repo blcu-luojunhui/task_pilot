@@ -42,12 +42,13 @@ class TaskScheduler(TaskHandler):
         trace_id: str,
         deps: "ApiDependencies",
     ):
-        super().__init__(data, deps.log, deps.db, trace_id, deps.config)
+        super().__init__(data, trace_id, deps.log, deps.db, deps.config)
         self.table = TaskUtils.validate_table_name(
             deps.config.task_table or TaskConstants.TASK_TABLE
         )
         self.alert_service = deps.alert
         self.lifecycle = deps.lifecycle
+        self.events = getattr(deps, "events", None)
 
     async def _send_alert(self, title: str, detail: dict, dedup_key: str = None):
         if self.alert_service:
@@ -55,6 +56,16 @@ class TaskScheduler(TaskHandler):
                 title=title,
                 detail=detail,
                 dedup_key=dedup_key,
+            )
+
+    def _publish_event(self, event_type: str, data: dict, step: Optional[int] = None):
+        if self.events:
+            self.events.publish(
+                trace_id=self.trace_id,
+                event_type=event_type,
+                data=data,
+                source="task_scheduler",
+                step=step,
             )
 
     # ==================== 数据库操作 ====================
@@ -214,10 +225,19 @@ class TaskScheduler(TaskHandler):
                 ErrorCode.TASK_ALREADY_PROCESSING, "Task is already processing"
             )
 
+        self._publish_event(
+            "task.accepted",
+            {"task_name": task_name},
+        )
+
         async def _task_wrapper():
             status = TaskStatus.FAILED
             config = get_task_config(task_name)
             start_time = time.time()
+            self._publish_event(
+                "task.started",
+                {"task_name": task_name},
+            )
 
             try:
                 await self._log_task_event("task_started", task_name=task_name)
@@ -312,6 +332,16 @@ class TaskScheduler(TaskHandler):
                 await self._release_task(status)
                 if self.lifecycle:
                     await self.lifecycle.unregister(self.trace_id)
+                self._publish_event(
+                    "task.finished",
+                    {
+                        "task_name": task_name,
+                        "status": str(status),
+                        "duration_seconds": time.time() - start_time,
+                    },
+                )
+                if self.events:
+                    self.events.close_trace(self.trace_id)
 
         task = asyncio.create_task(_task_wrapper(), name=f"{task_name}_{self.trace_id}")
         metrics.tasks_started_total.labels(task_name=task_name).inc()
@@ -367,6 +397,10 @@ class TaskScheduler(TaskHandler):
 
         if result:
             await self._log_task_event("task_cancel_requested", trace_id=trace_id)
+            self._publish_event(
+                "task.cancel_requested",
+                {"trace_id": trace_id},
+            )
 
         return bool(result)
 

@@ -7,16 +7,18 @@ Database Tools - 数据库操作工具
 from typing import Any, Dict, List, Optional
 
 from src.core.agents.skills import skill, SkillContext
+from src.core.agents.skills.sql_filter import QUERY_FILTER, EXECUTE_FILTER
 
 
 @skill(
     name="db_query",
-    description="从 MySQL 数据库查询数据，返回多行结果",
+    description="从 MySQL 数据库查询数据，返回多行结果。仅支持 SELECT 语句。",
     dependencies=["db", "log"],
+    risk_level="read",
     parameters={
         "query": {
             "type": "string",
-            "description": "SQL 查询语句（使用 %s 作为参数占位符）",
+            "description": "SQL SELECT 查询语句（使用 %s 作为参数占位符）",
             "required": True,
         },
         "params": {
@@ -25,11 +27,21 @@ from src.core.agents.skills import skill, SkillContext
             "required": False,
         },
     },
+    examples=[
+        {
+            "input": {"query": "SELECT * FROM task_manager WHERE trace_id = %s", "params": ["Agent-20260430-abc"]},
+            "output": "返回匹配的任务记录列表",
+        },
+    ],
 )
 async def db_query(
     ctx: SkillContext, query: str, params: Optional[tuple] = None
 ) -> List[Dict[str, Any]]:
     """查询数据库，返回多行结果"""
+    error = QUERY_FILTER.validate(query, "db_query")
+    if error:
+        raise ValueError(error)
+
     await ctx.log.log({
         "event": "db_query",
         "query": query,
@@ -41,12 +53,13 @@ async def db_query(
 
 @skill(
     name="db_query_one",
-    description="从 MySQL 数据库查询单条数据",
+    description="从 MySQL 数据库查询单条数据。仅支持 SELECT 语句。",
     dependencies=["db", "log"],
+    risk_level="read",
     parameters={
         "query": {
             "type": "string",
-            "description": "SQL 查询语句（使用 %s 作为参数占位符）",
+            "description": "SQL SELECT 查询语句（使用 %s 作为参数占位符）",
             "required": True,
         },
         "params": {
@@ -55,11 +68,21 @@ async def db_query(
             "required": False,
         },
     },
+    examples=[
+        {
+            "input": {"query": "SELECT task_status FROM task_manager WHERE trace_id = %s", "params": ["Agent-20260430-abc"]},
+            "output": "返回单条任务记录或 null",
+        },
+    ],
 )
 async def db_query_one(
     ctx: SkillContext, query: str, params: Optional[tuple] = None
 ) -> Optional[Dict[str, Any]]:
     """查询数据库，返回单条结果"""
+    error = QUERY_FILTER.validate(query, "db_query_one")
+    if error:
+        raise ValueError(error)
+
     await ctx.log.log({
         "event": "db_query_one",
         "query": query,
@@ -71,8 +94,9 @@ async def db_query_one(
 
 @skill(
     name="db_execute",
-    description="执行 MySQL 数据库写操作（INSERT/UPDATE/DELETE），返回影响行数",
+    description="执行 MySQL 数据库写操作（INSERT/UPDATE/DELETE），返回影响行数。禁止 DROP/TRUNCATE/ALTER 等危险操作。",
     dependencies=["db", "log"],
+    risk_level="write",
     parameters={
         "query": {
             "type": "string",
@@ -90,6 +114,12 @@ async def db_query_one(
             "default": False,
         },
     },
+    examples=[
+        {
+            "input": {"query": "UPDATE task_manager SET task_status = %s WHERE trace_id = %s", "params": [2, "Agent-20260430-abc"]},
+            "output": "返回影响行数，如 1",
+        },
+    ],
 )
 async def db_execute(
     ctx: SkillContext,
@@ -98,6 +128,10 @@ async def db_execute(
     batch: bool = False,
 ) -> int:
     """执行数据库写操作"""
+    error = EXECUTE_FILTER.validate(query, "db_execute")
+    if error:
+        raise ValueError(error)
+
     await ctx.log.log({
         "event": "db_execute",
         "query": query,

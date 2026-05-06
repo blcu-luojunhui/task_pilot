@@ -1,3 +1,4 @@
+import uuid
 import random
 import string
 import hashlib
@@ -46,3 +47,7 @@ def generate_task_trace_id() -> str:
     """生成任务追踪 ID"""
     random_str = "".join(random.choices(string.ascii_lowercase + string.digits, k=16))
     return f"Task-{datetime.now().strftime('%Y%m%d%H%M%S')}-{random_str}"
+
+def generate_agent_trace_id() -> str:
+    """Generate a unique trace ID for agent execution"""
+    return f"agent-{uuid.uuid4().hex[:12]}"

@@ -9,7 +9,7 @@ import inspect
 from dataclasses import dataclass, field
 from typing import Any, Callable, Dict, List, Optional, Union
 
-from src.core.agents.loop.state import AgentLoopState
+from src.core.agents.state import AgentLoopState
 
 FeedbackMessage = Dict[str, Any]
 FeedbackOutput = Optional[Union[str, FeedbackMessage, List[FeedbackMessage]]]

@@ -7,10 +7,10 @@ This layer centralizes decisions about whether the loop may continue.
 from dataclasses import dataclass, field
 from typing import Any, Callable, Dict, Optional
 
-from src.core.agents.loop.harness.budget import AgentBudget, BudgetViolation
-from src.core.agents.loop.harness.constraints import ConstraintSet, ConstraintViolation
-from src.core.agents.loop.messages import get_tool_calls
-from src.core.agents.loop.state import AgentLoopState, StopReason
+from src.core.agents.runtime.harness.budget import AgentBudget, BudgetViolation
+from src.core.agents.runtime.harness.constraints import ConstraintSet, ConstraintViolation
+from src.core.agents.protocol import get_tool_calls
+from src.core.agents.state import AgentLoopState, StopReason
 
 
 @dataclass(frozen=True)

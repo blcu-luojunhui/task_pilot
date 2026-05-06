@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import asyncio
+import json
 from pydantic import ValidationError
-from quart import Blueprint, jsonify, current_app
+from quart import Blueprint, Response, jsonify, current_app, request
 
 from src.jobs import TaskScheduler
 from src.api.v1.utils import ApiDependencies
@@ -52,5 +54,41 @@ def create_tasks_bp(deps: ApiDependencies) -> Blueprint:
                 "trace_id": trace_id,
             }
         )
+
+    @bp.route("/task_events/<trace_id>", methods=["GET"])
+    async def task_events(trace_id: str):
+        if not deps.events.has_trace(trace_id):
+            return jsonify({"code": 404, "message": "trace not found", "trace_id": trace_id}), 404
+
+        last_event_id = request.headers.get("Last-Event-ID")
+        after_sequence = None
+        if last_event_id and str(last_event_id).isdigit():
+            after_sequence = int(last_event_id)
+
+        async def generate():
+            subscription = deps.events.subscribe(trace_id, after_sequence=after_sequence)
+            heartbeat_seconds = 15.0
+            try:
+                while True:
+                    if deps.events.is_closed(trace_id) and subscription.queue.empty():
+                        break
+                    try:
+                        event = await asyncio.wait_for(subscription.queue.get(), timeout=heartbeat_seconds)
+                        yield (
+                            f"id: {event['sequence']}\n"
+                            f"event: {event['type']}\n"
+                            f"data: {json.dumps(event, ensure_ascii=False)}\n\n"
+                        )
+                    except asyncio.TimeoutError:
+                        yield ": keep-alive\n\n"
+            finally:
+                deps.events.unsubscribe(subscription)
+
+        headers = {
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        }
+        return Response(generate(), mimetype="text/event-stream", headers=headers)
 
     return bp

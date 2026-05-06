@@ -16,6 +16,13 @@ class SkillType(str, Enum):
     KNOWLEDGE = "knowledge"
 
 
+class RiskLevel(str, Enum):
+    """工具风险等级"""
+    READ = "read"              # 只读操作，无副作用
+    WRITE = "write"            # 写操作，可逆
+    DESTRUCTIVE = "destructive"  # 危险操作，不可逆
+
+
 @dataclass
 class Skill:
     """
@@ -40,6 +47,8 @@ class Skill:
     handler: Optional[Callable] = field(default=None, repr=False)
     parameters: Dict[str, Dict[str, Any]] = field(default_factory=dict)
     dependencies: List[str] = field(default_factory=list)
+    risk_level: RiskLevel = RiskLevel.READ
+    examples: List[Dict[str, Any]] = field(default_factory=list)
 
     # 知识型技能
     content: Optional[str] = None
@@ -65,6 +74,8 @@ class Skill:
         domain: str = "general",
         tags: Optional[List[str]] = None,
         parent_id: Optional[str] = None,
+        risk_level: RiskLevel = RiskLevel.READ,
+        examples: Optional[List[Dict[str, Any]]] = None,
     ) -> "Skill":
         """创建可执行技能"""
         now = datetime.now()
@@ -80,6 +91,8 @@ class Skill:
             handler=handler,
             parameters=parameters or {},
             dependencies=dependencies or [],
+            risk_level=risk_level,
+            examples=examples or [],
             created_at=now,
             updated_at=now,
         )
@@ -140,4 +153,4 @@ class Skill:
         return "\n".join(lines)
 
 
-__all__ = ["Skill", "SkillType"]
+__all__ = ["Skill", "SkillType", "RiskLevel"]

@@ -7,7 +7,7 @@ Skill 注册表
 import logging
 from typing import Callable, Dict, List, Optional, Any
 
-from .model import Skill, SkillType
+from .model import Skill, SkillType, RiskLevel
 from .loader import SkillLoader
 from .serializer import ToolSpecSerializer, OpenAIAdapter
 from .types import ToolSpecAdapter
@@ -106,6 +106,8 @@ def skill(
     scope: str = "agent:*",
     domain: str = "general",
     tags: Optional[List[str]] = None,
+    risk_level: str | RiskLevel = RiskLevel.READ,
+    examples: Optional[List[Dict[str, Any]]] = None,
 ):
     """
     装饰器：注册可执行技能
@@ -115,16 +117,21 @@ def skill(
             name="query_articles",
             description="查询文章列表",
             dependencies=["db"],
+            risk_level="read",
             parameters={
                 "date": {"type": "string", "description": "日期"},
                 "limit": {"type": "integer", "description": "数量", "default": 10},
             },
+            examples=[
+                {"input": {"date": "2026-01-01", "limit": 5}, "output": "返回5条文章记录"}
+            ],
         )
         async def query_articles(ctx, date: str, limit: int = 10):
             return await ctx.db.async_fetch(...)
     """
 
     def decorator(func: Callable):
+        level = RiskLevel(risk_level) if isinstance(risk_level, str) else risk_level
         skill_obj = Skill.executable(
             name=name,
             description=description,
@@ -134,6 +141,8 @@ def skill(
             scope=scope,
             domain=domain,
             tags=tags or [],
+            risk_level=level,
+            examples=examples or [],
         )
         _global_registry.register(skill_obj)
         return func

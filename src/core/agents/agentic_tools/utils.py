@@ -19,6 +19,7 @@ from src.infra.shared.tools import (
     name="util_md5",
     description="计算字符串的 MD5 哈希值",
     dependencies=[],
+    risk_level="read",
     parameters={
         "text": {
             "type": "string",
@@ -36,6 +37,7 @@ async def util_md5(ctx: SkillContext, text: str) -> str:
     name="util_timestamp_to_str",
     description="将 Unix 时间戳转换为格式化字符串",
     dependencies=[],
+    risk_level="read",
     parameters={
         "timestamp": {
             "type": "number",
@@ -60,6 +62,7 @@ async def util_timestamp_to_str(
     name="util_generate_trace_id",
     description="生成唯一的任务追踪 ID",
     dependencies=[],
+    risk_level="read",
     parameters={},
 )
 async def util_generate_trace_id(ctx: SkillContext) -> str:
@@ -71,6 +74,7 @@ async def util_generate_trace_id(ctx: SkillContext) -> str:
     name="util_batch_split",
     description="将列表分批处理",
     dependencies=[],
+    risk_level="read",
     parameters={
         "data": {
             "type": "array",
@@ -98,6 +102,7 @@ async def util_batch_split(
     name="util_current_time",
     description="获取当前时间（ISO 格式字符串）",
     dependencies=[],
+    risk_level="read",
     parameters={},
 )
 async def util_current_time(ctx: SkillContext) -> str:

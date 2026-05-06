@@ -5,6 +5,7 @@ from src.core.config import ProjectConfigSettings
 from src.infra.database import AsyncMySQLPool
 from src.infra.observability import LogService, AlertService
 from src.infra.shared import AsyncHttpClient
+from src.infra.streaming import TraceEventBus
 from src.jobs.task_lifecycle import TaskLifecycleManager
 
 
@@ -36,6 +37,8 @@ class ServerContainer(containers.DeclarativeContainer):
         force_kill_timeout=10.0,
         task_table=config.provided.task_table,
     )
+
+    trace_event_bus = providers.Singleton(TraceEventBus)
 
 
 __all__ = ["ServerContainer"]

@@ -51,6 +51,7 @@ class TaskHandler:
         self.data = data
         self.log_service = log_service
         self.pool = pool
+        self.db_client = pool
         self.trace_id = trace_id
         self.config = config
 

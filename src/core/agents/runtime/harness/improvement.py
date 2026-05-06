@@ -9,7 +9,7 @@ import inspect
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, Protocol
 
-from src.core.agents.loop.state import AgentLoopResult, AgentLoopState
+from src.core.agents.state import AgentLoopResult, AgentLoopState
 
 
 @dataclass(frozen=True)

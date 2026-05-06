@@ -49,6 +49,7 @@ log_service = server_container.log_service()
 alert_service = server_container.alert_service()
 async_mysql_pool = server_container.async_mysql_pool()
 lifecycle = server_container.task_lifecycle_manager()
+events = server_container.trace_event_bus()
 
 routes = server_routes(
     async_mysql_pool,
@@ -56,6 +57,7 @@ routes = server_routes(
     config,
     alert_service,
     lifecycle,
+    events,
 )
 app.register_blueprint(routes)
 

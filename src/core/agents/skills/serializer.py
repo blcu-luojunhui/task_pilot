@@ -4,10 +4,26 @@
 支持不同 LLM 的 function calling 格式
 """
 
+import json
 from typing import Any, Dict, List
 
 from .model import Skill
 from .types import ToolSpecAdapter
+
+
+def _build_description_with_examples(skill: Skill) -> str:
+    """构建包含 examples 的 description 文本"""
+    description = skill.description
+    if not skill.examples:
+        return description
+
+    parts = [description, "\n\nExamples:"]
+    for ex in skill.examples:
+        input_str = json.dumps(ex.get("input", {}), ensure_ascii=False)
+        output_str = ex.get("output", "")
+        parts.append(f"  Input: {input_str}")
+        parts.append(f"  Output: {output_str}")
+    return "\n".join(parts)
 
 
 class OpenAIAdapter:
@@ -16,17 +32,6 @@ class OpenAIAdapter:
     def to_spec(self, skill: Skill) -> Dict[str, Any]:
         """
         转换为 OpenAI function calling 格式
-
-        格式：
-        {
-            "name": "function_name",
-            "description": "...",
-            "parameters": {
-                "type": "object",
-                "properties": {...},
-                "required": [...]
-            }
-        }
         """
         properties = {}
         required = []
@@ -52,7 +57,7 @@ class OpenAIAdapter:
 
         return {
             "name": skill.name,
-            "description": skill.description,
+            "description": _build_description_with_examples(skill),
             "parameters": {
                 "type": "object",
                 "properties": properties,
@@ -67,17 +72,6 @@ class ClaudeAdapter:
     def to_spec(self, skill: Skill) -> Dict[str, Any]:
         """
         转换为 Claude tool use 格式
-
-        格式：
-        {
-            "name": "tool_name",
-            "description": "...",
-            "input_schema": {
-                "type": "object",
-                "properties": {...},
-                "required": [...]
-            }
-        }
         """
         properties = {}
         required = []
@@ -99,7 +93,7 @@ class ClaudeAdapter:
 
         return {
             "name": skill.name,
-            "description": skill.description,
+            "description": _build_description_with_examples(skill),
             "input_schema": {
                 "type": "object",
                 "properties": properties,

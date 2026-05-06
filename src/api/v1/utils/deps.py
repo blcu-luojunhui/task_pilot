@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from src.core.config import ProjectConfigSettings
 from src.infra.database import AsyncMySQLPool
 from src.infra.observability import LogService, AlertService
+from src.infra.streaming import TraceEventBus
 from src.jobs.task_lifecycle import TaskLifecycleManager
 
 
@@ -17,6 +18,7 @@ class ApiDependencies:
     config: ProjectConfigSettings
     alert: AlertService
     lifecycle: TaskLifecycleManager
+    events: TraceEventBus
 
     # 向后兼容别名
     @property

@@ -14,7 +14,8 @@ from typing import Any, Dict, List, Optional
 
 import aiohttp
 
-from src.core.agents.loop.messages import ToolCall, assistant_message, get_tool_calls
+from src.core.agents.protocol import ToolCall, assistant_message, get_tool_calls
+from src.infra.streaming.agents.streaming import get_stream_context
 from src.core.agents.skills import SkillRegistry
 
 
@@ -112,20 +113,31 @@ class DeepSeekPlanner:
         }
         timeout = aiohttp.ClientTimeout(total=self.settings.timeout_seconds)
 
+        stream_ctx = get_stream_context()
+        use_streaming = stream_ctx and stream_ctx.sink
+
+        if use_streaming:
+            payload["stream"] = True
+
         async with aiohttp.ClientSession(timeout=timeout) as session:
             async with session.post(
                 self.settings.base_url,
                 headers=headers,
                 json=payload,
             ) as response:
-                body = await response.text()
                 if response.status >= 400:
+                    body = await response.text()
                     raise RuntimeError(
                         f"DeepSeek API error {response.status}: {body}"
                     )
 
-        data = json.loads(body)
-        message = data["choices"][0]["message"]
+                if use_streaming:
+                    message = await self._handle_streaming_response(response, stream_ctx.sink)
+                else:
+                    body = await response.text()
+                    data = json.loads(body)
+                    message = data["choices"][0]["message"]
+
         return self._from_deepseek_message(message)
 
     def _tool_specs(self) -> List[Dict[str, Any]]:
@@ -223,6 +235,94 @@ class DeepSeekPlanner:
         if isinstance(arguments, str):
             return arguments
         return json.dumps(arguments, ensure_ascii=False)
+
+    async def _handle_streaming_response(
+        self,
+        response: aiohttp.ClientResponse,
+        sink: Any,
+    ) -> Dict[str, Any]:
+        content_parts = []
+        tool_calls_by_index: Dict[int, Dict[str, Any]] = {}
+
+        async for line in response.content:
+            line_text = line.decode("utf-8").strip()
+            if not line_text or line_text.startswith(":"):
+                continue
+            if not line_text.startswith("data: "):
+                continue
+
+            data_text = line_text[6:]
+            if data_text == "[DONE]":
+                break
+
+            try:
+                chunk = json.loads(data_text)
+            except json.JSONDecodeError:
+                continue
+
+            delta = chunk.get("choices", [{}])[0].get("delta", {})
+
+            if "content" in delta and delta["content"]:
+                content_parts.append(delta["content"])
+                await self._emit_delta(sink, "text", {"text": delta["content"]})
+
+            if "tool_calls" in delta:
+                for tc_delta in delta["tool_calls"]:
+                    index = tc_delta.get("index", 0)
+                    if index not in tool_calls_by_index:
+                        tool_calls_by_index[index] = {
+                            "id": "",
+                            "type": "function",
+                            "function": {"name": "", "arguments": ""},
+                        }
+
+                    if "id" in tc_delta:
+                        tool_calls_by_index[index]["id"] = tc_delta["id"]
+
+                    if "function" in tc_delta:
+                        func_delta = tc_delta["function"]
+                        if "name" in func_delta:
+                            tool_calls_by_index[index]["function"]["name"] += func_delta["name"]
+                            await self._emit_delta(
+                                sink,
+                                "tool_call_name",
+                                {
+                                    "tool_call_index": index,
+                                    "tool_call_id": tool_calls_by_index[index]["id"],
+                                    "tool_name": tool_calls_by_index[index]["function"]["name"],
+                                },
+                            )
+                        if "arguments" in func_delta:
+                            tool_calls_by_index[index]["function"]["arguments"] += func_delta["arguments"]
+                            await self._emit_delta(
+                                sink,
+                                "tool_call_arguments",
+                                {
+                                    "tool_call_index": index,
+                                    "tool_call_id": tool_calls_by_index[index]["id"],
+                                    "arguments_fragment": func_delta["arguments"],
+                                },
+                            )
+
+        final_message = {
+            "role": "assistant",
+            "content": "".join(content_parts) or None,
+        }
+        if tool_calls_by_index:
+            final_message["tool_calls"] = [
+                tool_calls_by_index[i] for i in sorted(tool_calls_by_index.keys())
+            ]
+
+        return final_message
+
+    async def _emit_delta(self, sink: Any, delta_kind: str, data: Dict[str, Any]) -> None:
+        if sink is None:
+            return
+        event = {"delta_kind": delta_kind, **data}
+        if callable(sink):
+            result = sink(event)
+            if hasattr(result, "__await__"):
+                await result
 
 
 __all__ = ["DeepSeekPlanner", "DeepSeekSettings", "load_dotenv"]

@@ -12,19 +12,19 @@ from dataclasses import dataclass, field
 from typing import Any, Callable, Dict, List, Optional
 
 from src.core.agents.loop.act import Act
-from src.core.agents.loop.harness.budget import AgentBudget, BudgetViolation
-from src.core.agents.loop.harness.constraints import ConstraintSet, ConstraintViolation
-from src.core.agents.loop.harness.feedback import FeedbackLoop
-from src.core.agents.loop.harness.improvement import (
+from src.core.agents.runtime.harness.budget import AgentBudget, BudgetViolation
+from src.core.agents.runtime.harness.constraints import ConstraintSet, ConstraintViolation
+from src.core.agents.runtime.harness.feedback import FeedbackLoop
+from src.core.agents.runtime.harness.improvement import (
     ContinuousImprovement,
     ImprovementRecord,
     InMemoryImprovementStore,
 )
-from src.core.agents.loop.harness.logging import HarnessEventLogger
-from src.core.agents.loop.harness.workflow import WorkflowController, WorkflowDecision
-from src.core.agents.loop.messages import get_tool_calls
+from src.core.agents.runtime.harness.logging import HarnessEventLogger
+from src.core.agents.runtime.harness.workflow import WorkflowController, WorkflowDecision
+from src.core.agents.protocol import get_tool_calls
 from src.core.agents.loop.observe import Observe
-from src.core.agents.loop.state import (
+from src.core.agents.state import (
     AgentLoopResult,
     AgentLoopState,
     StopReason,
