@@ -14,8 +14,26 @@ from ...capabilities.skills import SkillRegistry
 _DOMAIN_KEYWORDS = {
     "database": ["db", "sql", "mysql", "database", "query", "表", "数据库", "查询"],
     "http": ["http", "api", "url", "webhook", "request", "网页", "接口"],
-    "task-management": ["task", "schedule", "scheduler", "trace_id", "cancel", "任务", "调度", "并发"],
-    "observability": ["log", "alert", "trace", "monitor", "observability", "日志", "告警", "监控"],
+    "task-management": [
+        "task",
+        "schedule",
+        "scheduler",
+        "trace_id",
+        "cancel",
+        "任务",
+        "调度",
+        "并发",
+    ],
+    "observability": [
+        "log",
+        "alert",
+        "trace",
+        "monitor",
+        "observability",
+        "日志",
+        "告警",
+        "监控",
+    ],
 }
 
 

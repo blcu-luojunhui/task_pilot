@@ -62,9 +62,7 @@ class AlertService:
             try:
                 await asyncio.wait_for(self.queue.join(), timeout=drain_timeout)
             except asyncio.TimeoutError:
-                logger.warning(
-                    f"AlertService drain timeout, {self.queue.qsize()} alerts remaining"
-                )
+                logger.warning(f"AlertService drain timeout, {self.queue.qsize()} alerts remaining")
 
         if self._worker_task:
             self._worker_task.cancel()
@@ -72,9 +70,7 @@ class AlertService:
                 await self._worker_task
 
         if self._dropped_count > 0:
-            logger.warning(
-                f"AlertService stopped, dropped alerts: {self._dropped_count}"
-            )
+            logger.warning(f"AlertService stopped, dropped alerts: {self._dropped_count}")
 
         self._worker_task = None
         self.queue = None

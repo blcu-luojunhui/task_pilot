@@ -9,9 +9,7 @@ from typing import Optional
 class TaskError(Exception):
     """任务错误基类"""
 
-    def __init__(
-        self, message: str, retryable: bool = True, task_name: Optional[str] = None
-    ):
+    def __init__(self, message: str, retryable: bool = True, task_name: Optional[str] = None):
         self.message = message
         self.retryable = retryable
         self.task_name = task_name

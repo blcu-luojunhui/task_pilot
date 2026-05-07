@@ -8,20 +8,25 @@ Agent 统一异常体系
 
 class AgentError(Exception):
     """Agent 系统基础异常"""
+
     pass
 
 
 # ==================== 配置相关 ====================
 
+
 class AgentConfigError(AgentError):
     """Agent 配置错误"""
+
     pass
 
 
 # ==================== LLM 相关 ====================
 
+
 class LLMError(AgentError):
     """LLM 调用基础异常"""
+
     pass
 
 
@@ -44,18 +49,22 @@ class LLMRateLimitError(LLMProviderError):
 
 class LLMTimeoutError(LLMError):
     """LLM 调用超时"""
+
     pass
 
 
 class LLMResponseError(LLMError):
     """LLM 响应格式异常（无法解析）"""
+
     pass
 
 
 # ==================== 执行相关 ====================
 
+
 class ExecutionError(AgentError):
     """执行层异常"""
+
     pass
 
 
@@ -87,12 +96,15 @@ class ToolNotFoundError(ExecutionError):
 
 # ==================== 路由相关 ====================
 
+
 class RoutingError(AgentError):
     """任务路由异常"""
+
     pass
 
 
 # ==================== 生命周期相关 ====================
+
 
 class LifecycleError(AgentError):
     """生命周期状态转换异常"""
@@ -105,8 +117,10 @@ class LifecycleError(AgentError):
 
 # ==================== 多 Agent 相关 ====================
 
+
 class CoordinationError(AgentError):
     """多 Agent 协调异常"""
+
     pass
 
 

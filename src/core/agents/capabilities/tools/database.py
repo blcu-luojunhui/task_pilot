@@ -29,7 +29,10 @@ from src.core.agents.capabilities.skills.sql_filter import QUERY_FILTER, EXECUTE
     },
     examples=[
         {
-            "input": {"query": "SELECT * FROM task_manager WHERE trace_id = %s", "params": ["Agent-20260430-abc"]},
+            "input": {
+                "query": "SELECT * FROM task_manager WHERE trace_id = %s",
+                "params": ["Agent-20260430-abc"],
+            },
             "output": "返回匹配的任务记录列表",
         },
     ],
@@ -42,11 +45,13 @@ async def db_query(
     if error:
         raise ValueError(error)
 
-    await ctx.log.log({
-        "event": "db_query",
-        "query": query,
-        "params": params,
-    })
+    await ctx.log.log(
+        {
+            "event": "db_query",
+            "query": query,
+            "params": params,
+        }
+    )
     rows = await ctx.db.async_fetch(query=query, params=params)
     return rows
 
@@ -70,7 +75,10 @@ async def db_query(
     },
     examples=[
         {
-            "input": {"query": "SELECT task_status FROM task_manager WHERE trace_id = %s", "params": ["Agent-20260430-abc"]},
+            "input": {
+                "query": "SELECT task_status FROM task_manager WHERE trace_id = %s",
+                "params": ["Agent-20260430-abc"],
+            },
             "output": "返回单条任务记录或 null",
         },
     ],
@@ -83,11 +91,13 @@ async def db_query_one(
     if error:
         raise ValueError(error)
 
-    await ctx.log.log({
-        "event": "db_query_one",
-        "query": query,
-        "params": params,
-    })
+    await ctx.log.log(
+        {
+            "event": "db_query_one",
+            "query": query,
+            "params": params,
+        }
+    )
     row = await ctx.db.async_fetch_one(query=query, params=params)
     return row
 
@@ -116,7 +126,10 @@ async def db_query_one(
     },
     examples=[
         {
-            "input": {"query": "UPDATE task_manager SET task_status = %s WHERE trace_id = %s", "params": [2, "Agent-20260430-abc"]},
+            "input": {
+                "query": "UPDATE task_manager SET task_status = %s WHERE trace_id = %s",
+                "params": [2, "Agent-20260430-abc"],
+            },
             "output": "返回影响行数，如 1",
         },
     ],
@@ -132,11 +145,13 @@ async def db_execute(
     if error:
         raise ValueError(error)
 
-    await ctx.log.log({
-        "event": "db_execute",
-        "query": query,
-        "batch": batch,
-        "param_count": len(params) if params else 0,
-    })
+    await ctx.log.log(
+        {
+            "event": "db_execute",
+            "query": query,
+            "batch": batch,
+            "param_count": len(params) if params else 0,
+        }
+    )
     affected = await ctx.db.async_save(query=query, params=params, batch=batch)
     return affected

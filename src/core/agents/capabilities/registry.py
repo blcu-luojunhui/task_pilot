@@ -34,7 +34,7 @@ class CapabilityRegistry:
             handler=handler,
             parameters=metadata.get("parameters", {}),
             risk_level=metadata.get("risk_level", RiskLevel.READ),
-            **metadata
+            **metadata,
         )
         self.register_skill(skill)
         self._tools[name] = handler

@@ -40,7 +40,7 @@ class MessageBus:
         self._stats = {
             "total_messages": 0,
             "messages_by_type": defaultdict(int),
-            "messages_by_agent": defaultdict(int)
+            "messages_by_agent": defaultdict(int),
         }
 
     def register_agent(self, agent_id: str) -> asyncio.Queue:
@@ -106,7 +106,7 @@ class MessageBus:
         # 记录历史
         self._history.append(message)
         if len(self._history) > self._max_history:
-            self._history = self._history[-self._max_history:]
+            self._history = self._history[-self._max_history :]
 
         # 更新统计
         self._stats["total_messages"] += 1
@@ -151,7 +151,7 @@ class MessageBus:
         self,
         agent_id: str,
         timeout: Optional[float] = None,
-        priority_filter: Optional[MessagePriority] = None
+        priority_filter: Optional[MessagePriority] = None,
     ) -> Message:
         """
         接收消息
@@ -189,7 +189,7 @@ class MessageBus:
         self,
         agent_id: Optional[str] = None,
         message_type: Optional[MessageType] = None,
-        limit: int = 100
+        limit: int = 100,
     ) -> List[Message]:
         """
         获取消息历史
@@ -205,10 +205,7 @@ class MessageBus:
         history = self._history
 
         if agent_id:
-            history = [
-                m for m in history
-                if m.sender == agent_id or m.receiver == agent_id
-            ]
+            history = [m for m in history if m.sender == agent_id or m.receiver == agent_id]
 
         if message_type:
             history = [m for m in history if m.type == message_type]
@@ -223,9 +220,8 @@ class MessageBus:
             "messages_by_agent": dict(self._stats["messages_by_agent"]),
             "active_agents": len(self._queues),
             "handlers": {
-                msg_type.value: len(handlers)
-                for msg_type, handlers in self._handlers.items()
-            }
+                msg_type.value: len(handlers) for msg_type, handlers in self._handlers.items()
+            },
         }
 
     def clear_history(self):
@@ -237,7 +233,7 @@ class MessageBus:
         self._stats = {
             "total_messages": 0,
             "messages_by_type": defaultdict(int),
-            "messages_by_agent": defaultdict(int)
+            "messages_by_agent": defaultdict(int),
         }
 
 

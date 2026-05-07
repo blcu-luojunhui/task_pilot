@@ -10,9 +10,14 @@ from typing import Optional
 logger = logging.getLogger(__name__)
 
 # 关键事件类型，队列满时写入兜底文件
-_CRITICAL_EVENT_TYPES = frozenset({
-    "task_failed", "task_error", "task_cancelled", "task_timeout_detected",
-})
+_CRITICAL_EVENT_TYPES = frozenset(
+    {
+        "task_failed",
+        "task_error",
+        "task_cancelled",
+        "task_timeout_detected",
+    }
+)
 
 
 class LogService:
@@ -57,9 +62,7 @@ class LogService:
             try:
                 await asyncio.wait_for(self._drain_remaining(), timeout=drain_timeout)
             except asyncio.TimeoutError:
-                logger.warning(
-                    f"LogService drain timeout, {self.queue.qsize()} logs lost"
-                )
+                logger.warning(f"LogService drain timeout, {self.queue.qsize()} logs lost")
 
         if self._worker_task:
             self._worker_task.cancel()
@@ -113,9 +116,7 @@ class LogService:
             now = time.time()
             if now - self._last_drop_warn_time > 60:
                 self._last_drop_warn_time = now
-                logger.warning(
-                    f"LogService queue full, dropped {self._dropped_count} logs total"
-                )
+                logger.warning(f"LogService queue full, dropped {self._dropped_count} logs total")
 
     def get_metrics(self) -> dict:
         return {

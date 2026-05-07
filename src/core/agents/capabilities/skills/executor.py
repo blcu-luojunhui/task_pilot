@@ -49,12 +49,7 @@ class SkillExecutor:
         self.validate_params = validate_params
         self.validator = ParameterValidator()
 
-    async def execute(
-        self,
-        skill: Skill,
-        ctx: SkillContext,
-        **params
-    ) -> Any:
+    async def execute(self, skill: Skill, ctx: SkillContext, **params) -> Any:
         """
         执行 Skill
 
@@ -113,12 +108,18 @@ class SkillExecutor:
         ctx: SkillContext,
         params: Dict[str, Any],
     ) -> Any:
-        """带超时的执行"""
+        """带超时的执行（兼容同步和异步 handler）"""
+        import inspect
+
         try:
-            result = await asyncio.wait_for(
-                skill.handler(ctx, **params),
-                timeout=self.timeout,
-            )
+            if inspect.iscoroutinefunction(skill.handler):
+                result = await asyncio.wait_for(
+                    skill.handler(ctx, **params),
+                    timeout=self.timeout,
+                )
+            else:
+                # 同步函数直接调用
+                result = skill.handler(ctx, **params)
             return result
         except asyncio.TimeoutError:
             logger.error(f"Skill '{skill.name}' execution timeout after {self.timeout}s")

@@ -12,6 +12,7 @@ from enum import Enum
 
 class FinishReason(str, Enum):
     """完成原因"""
+
     STOP = "stop"
     LENGTH = "length"
     TOOL_CALLS = "tool_calls"
@@ -21,6 +22,7 @@ class FinishReason(str, Enum):
 @dataclass
 class LLMMessage:
     """统一的消息格式"""
+
     role: str  # system, user, assistant, tool
     content: str
     name: Optional[str] = None
@@ -31,6 +33,7 @@ class LLMMessage:
 @dataclass
 class LLMResponse:
     """统一的响应格式"""
+
     content: str
     tool_calls: Optional[List[Dict]] = None
     finish_reason: FinishReason = FinishReason.STOP
@@ -41,6 +44,7 @@ class LLMResponse:
 @dataclass
 class LLMConfig:
     """LLM 配置"""
+
     api_key: str
     model: str
     base_url: Optional[str] = None
@@ -62,7 +66,7 @@ class LLMProvider(ABC):
         tools: Optional[List[Dict]] = None,
         temperature: Optional[float] = None,
         max_tokens: Optional[int] = None,
-        **kwargs
+        **kwargs,
     ) -> LLMResponse:
         """
         发送聊天请求
@@ -81,10 +85,7 @@ class LLMProvider(ABC):
 
     @abstractmethod
     async def stream_chat(
-        self,
-        messages: List[LLMMessage],
-        tools: Optional[List[Dict]] = None,
-        **kwargs
+        self, messages: List[LLMMessage], tools: Optional[List[Dict]] = None, **kwargs
     ) -> AsyncIterator[str]:
         """
         流式聊天

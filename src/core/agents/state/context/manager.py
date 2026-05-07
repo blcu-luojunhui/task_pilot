@@ -22,7 +22,7 @@ class ContextWindowManager:
 
     max_tokens: int = 60000
     chars_per_token: float = 4.0  # 粗略估算
-    reserve_ratio: float = 0.1   # 为响应预留 10% 空间
+    reserve_ratio: float = 0.1  # 为响应预留 10% 空间
 
     def compact_if_needed(
         self,
@@ -58,9 +58,7 @@ class ContextWindowManager:
         return self._truncate_middle(messages, effective_limit)
 
     def truncate_messages(
-        self,
-        messages: List[Dict[str, Any]],
-        max_tokens: Optional[int] = None
+        self, messages: List[Dict[str, Any]], max_tokens: Optional[int] = None
     ) -> List[Dict[str, Any]]:
         """
         截断消息以适应 token 限制
@@ -103,9 +101,7 @@ class ContextWindowManager:
         return total
 
     def _truncate_middle(
-        self,
-        messages: List[Dict[str, Any]],
-        max_tokens: int
+        self, messages: List[Dict[str, Any]], max_tokens: int
     ) -> List[Dict[str, Any]]:
         """
         从中间截断消息

@@ -49,9 +49,7 @@ class AsyncMySQLPool:
                 await pool.wait_closed()
                 logger.info(f"{name} MySQL pool closed")
 
-    async def async_fetch(
-        self, query, db_name="default", params=None, cursor_type=DictCursor
-    ):
+    async def async_fetch(self, query, db_name="default", params=None, cursor_type=DictCursor):
         pool = self.pools.get(db_name)
         if not pool:
             await self.init_pools()
@@ -76,9 +74,7 @@ class AsyncMySQLPool:
             )
             raise
 
-    async def async_fetch_one(
-        self, query, db_name="default", params=None, cursor_type=DictCursor
-    ):
+    async def async_fetch_one(self, query, db_name="default", params=None, cursor_type=DictCursor):
         pool = self.pools.get(db_name)
         if not pool:
             await self.init_pools()

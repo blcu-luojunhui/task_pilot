@@ -2,7 +2,7 @@
 Core Agents - Agent 系统
 
 新架构：
-├── core/          - 控制层（Agent 大脑）
+├── engine/          - 控制层（Agent 大脑）
 ├── capabilities/  - 能力层（LLM, Tools, Skills）
 ├── state/         - 状态层（State, Protocol, Context, Memory）
 ├── execution/     - 执行层（Executor, Router, Dispatcher）
@@ -10,9 +10,9 @@ Core Agents - Agent 系统
 └── multi_agents/   - 多 Agent 系统（预留）
 """
 
-# 主要接口 - 从 core 导出
-from .core.agent import Agent, AgentConfig
-from .core.types import (
+# 主要接口 - 从 engine 导出
+from .engine.agent import Agent, AgentConfig
+from .engine.types import (
     ActionType,
     ThoughtType,
     Thought,
@@ -20,7 +20,7 @@ from .core.types import (
     Observation,
     Step,
 )
-from .core.loop import Think, Act, Observe, AssistantPlanner
+from .engine.loop import Think, Act, Observe, AssistantPlanner
 
 # 状态层 - 从 state 导出
 from .state import (

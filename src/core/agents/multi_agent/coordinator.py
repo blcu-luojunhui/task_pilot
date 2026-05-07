@@ -12,7 +12,7 @@ import logging
 
 from .bus import MessageBus
 from .protocol import Message, MessageType
-from ..core.agent import Agent
+from ..engine.agent import Agent
 
 logger = logging.getLogger(__name__)
 
@@ -20,6 +20,7 @@ logger = logging.getLogger(__name__)
 @dataclass
 class TaskAssignment:
     """任务分配"""
+
     task_id: str
     agent_id: str
     task: str
@@ -74,7 +75,7 @@ class MultiAgentCoordinator:
         self,
         task: str,
         strategy: str = "parallel",  # parallel, sequential, dynamic
-        context: Optional[Dict[str, Any]] = None
+        context: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, Any]:
         """
         协调多个 Agent 完成任务
@@ -108,9 +109,7 @@ class MultiAgentCoordinator:
         return self._aggregate_results(results)
 
     async def _decompose_task(
-        self,
-        task: str,
-        context: Optional[Dict[str, Any]] = None
+        self, task: str, context: Optional[Dict[str, Any]] = None
     ) -> List[str]:
         """
         任务分解
@@ -152,11 +151,7 @@ class MultiAgentCoordinator:
         # 分解失败，返回原任务
         return [task]
 
-    def _assign_tasks(
-        self,
-        tasks: List[str],
-        strategy: str
-    ) -> List[TaskAssignment]:
+    def _assign_tasks(self, tasks: List[str], strategy: str) -> List[TaskAssignment]:
         """
         任务分配
 
@@ -178,19 +173,14 @@ class MultiAgentCoordinator:
             agent_id = agent_ids[i % len(agent_ids)]
 
             assignment = TaskAssignment(
-                task_id=f"task_{i}_{id(task)}",
-                agent_id=agent_id,
-                task=task
+                task_id=f"task_{i}_{id(task)}", agent_id=agent_id, task=task
             )
             assignments.append(assignment)
             self.assignments[assignment.task_id] = assignment
 
         return assignments
 
-    async def _execute_parallel(
-        self,
-        assignments: List[TaskAssignment]
-    ) -> List[TaskAssignment]:
+    async def _execute_parallel(self, assignments: List[TaskAssignment]) -> List[TaskAssignment]:
         """
         并行执行任务
 
@@ -207,9 +197,7 @@ class MultiAgentCoordinator:
             assignment.status = "running"
 
             # 创建异步任务
-            task = asyncio.create_task(
-                self._execute_assignment(agent, assignment)
-            )
+            task = asyncio.create_task(self._execute_assignment(agent, assignment))
             tasks.append(task)
 
         # 等待所有任务完成
@@ -217,10 +205,7 @@ class MultiAgentCoordinator:
 
         return assignments
 
-    async def _execute_sequential(
-        self,
-        assignments: List[TaskAssignment]
-    ) -> List[TaskAssignment]:
+    async def _execute_sequential(self, assignments: List[TaskAssignment]) -> List[TaskAssignment]:
         """
         顺序执行任务
 
@@ -243,10 +228,7 @@ class MultiAgentCoordinator:
 
         return assignments
 
-    async def _execute_dynamic(
-        self,
-        assignments: List[TaskAssignment]
-    ) -> List[TaskAssignment]:
+    async def _execute_dynamic(self, assignments: List[TaskAssignment]) -> List[TaskAssignment]:
         """
         动态执行任务（根据依赖关系）
 
@@ -260,11 +242,7 @@ class MultiAgentCoordinator:
         # 目前使用并行执行
         return await self._execute_parallel(assignments)
 
-    async def _execute_assignment(
-        self,
-        agent: Agent,
-        assignment: TaskAssignment
-    ):
+    async def _execute_assignment(self, agent: Agent, assignment: TaskAssignment):
         """
         执行单个任务分配
 
@@ -287,10 +265,7 @@ class MultiAgentCoordinator:
             assignment.status = "failed"
             assignment.error = str(e)
 
-    def _aggregate_results(
-        self,
-        assignments: List[TaskAssignment]
-    ) -> Dict[str, Any]:
+    def _aggregate_results(self, assignments: List[TaskAssignment]) -> Dict[str, Any]:
         """
         聚合任务结果
 
@@ -315,10 +290,10 @@ class MultiAgentCoordinator:
                     "task": a.task,
                     "result": a.result,
                     "status": a.status,
-                    "error": a.error
+                    "error": a.error,
                 }
                 for a in assignments
-            ]
+            ],
         }
 
         return results
@@ -337,9 +312,11 @@ class MultiAgentCoordinator:
         return {
             "agents": list(self.agents.keys()),
             "active_tasks": len([a for a in self.assignments.values() if a.status == "running"]),
-            "completed_tasks": len([a for a in self.assignments.values() if a.status == "completed"]),
+            "completed_tasks": len(
+                [a for a in self.assignments.values() if a.status == "completed"]
+            ),
             "failed_tasks": len([a for a in self.assignments.values() if a.status == "failed"]),
-            "bus_stats": self.bus.get_stats()
+            "bus_stats": self.bus.get_stats(),
         }
 
 

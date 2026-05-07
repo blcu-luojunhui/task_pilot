@@ -14,7 +14,7 @@ from typing import Any, Callable, Dict, List, Optional
 
 logger = logging.getLogger(__name__)
 
-from src.core.agents.core.loop import Act
+from src.core.agents.engine.loop import Act
 from src.core.agents.runtime.harness.budget import AgentBudget, BudgetViolation
 from src.core.agents.runtime.harness.constraints import ConstraintSet, ConstraintViolation
 from src.core.agents.runtime.harness.feedback import FeedbackLoop
@@ -26,14 +26,14 @@ from src.core.agents.runtime.harness.improvement import (
 from src.core.agents.runtime.harness.logging import HarnessEventLogger
 from src.core.agents.runtime.harness.workflow import WorkflowController, WorkflowDecision
 from src.core.agents.state.protocol import get_tool_calls
-from src.core.agents.core.loop import Observe
+from src.core.agents.engine.loop import Observe
 from src.core.agents.state import (
     AgentLoopResult,
     AgentLoopState,
     StopReason,
     generate_agent_trace_id,
 )
-from src.core.agents.core.loop import Think
+from src.core.agents.engine.loop import Think
 
 
 @dataclass
@@ -73,9 +73,7 @@ class AgentLoopHarness:
     hooks: List[HarnessHook] = field(default_factory=list)
     constraints: ConstraintSet = field(default_factory=ConstraintSet)
     feedback_loop: FeedbackLoop = field(default_factory=FeedbackLoop)
-    continuous_improvement: ContinuousImprovement = field(
-        default_factory=ContinuousImprovement
-    )
+    continuous_improvement: ContinuousImprovement = field(default_factory=ContinuousImprovement)
     workflow: Optional[WorkflowController] = None
     event_logger: HarnessEventLogger = field(default_factory=HarnessEventLogger)
 
@@ -128,48 +126,48 @@ class AgentLoopHarness:
                 decision = self.workflow.after_think(state, assistant_message)
                 if decision:
                     await self._apply_workflow_decision(state, decision)
-                break
+                    break
 
-            tool_results = []
-            decision = self.workflow.before_act(state, assistant_message)
-            if decision:
-                self._observe(state, assistant_message, tool_results)
-                await self._apply_workflow_decision(state, decision)
-            else:
-                tool_results = await self._act(state, assistant_message)
-                self._observe(state, assistant_message, tool_results)
+                tool_results = []
+                decision = self.workflow.before_act(state, assistant_message)
+                if decision:
+                    self._observe(state, assistant_message, tool_results)
+                    await self._apply_workflow_decision(state, decision)
+                else:
+                    tool_results = await self._act(state, assistant_message)
+                    self._observe(state, assistant_message, tool_results)
 
-            feedback_messages = await self.feedback_loop.run(
-                state,
-                {
-                    "assistant_message": assistant_message,
-                    "tool_results": tool_results,
-                },
-            )
-            if feedback_messages:
-                await self._emit(
-                    "feedback_collected",
+                feedback_messages = await self.feedback_loop.run(
                     state,
-                    {"messages": feedback_messages},
+                    {
+                        "assistant_message": assistant_message,
+                        "tool_results": tool_results,
+                    },
                 )
+                if feedback_messages:
+                    await self._emit(
+                        "feedback_collected",
+                        state,
+                        {"messages": feedback_messages},
+                    )
 
-            decision = self.workflow.after_step(
-                state,
-                self._elapsed_seconds(context),
-                assistant_message,
-                tool_results,
-            )
-            if decision:
-                await self._apply_workflow_decision(state, decision)
+                decision = self.workflow.after_step(
+                    state,
+                    self._elapsed_seconds(context),
+                    assistant_message,
+                    tool_results,
+                )
+                if decision:
+                    await self._apply_workflow_decision(state, decision)
 
-            await self._emit(
-                "step_end",
-                state,
-                {
-                    "assistant_message": assistant_message,
-                    "tool_results": tool_results,
-                },
-            )
+                await self._emit(
+                    "step_end",
+                    state,
+                    {
+                        "assistant_message": assistant_message,
+                        "tool_results": tool_results,
+                    },
+                )
 
         except Exception as e:
             logger.exception(f"Agent loop crashed at step {state.step}: {e}")

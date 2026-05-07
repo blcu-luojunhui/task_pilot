@@ -4,10 +4,10 @@ from importlib import import_module
 from typing import Iterable, List, Optional
 
 TOOL_AREAS = {
-    "database": "src.core.agents.agentic_tools.database",
-    "http": "src.core.agents.agentic_tools.http",
-    "task": "src.core.agents.agentic_tools.task",
-    "utils": "src.core.agents.agentic_tools.utils",
+    "database": "src.core.agents.capabilities.tools.database",
+    "http": "src.core.agents.capabilities.tools.http",
+    "task": "src.core.agents.capabilities.tools.task",
+    "utils": "src.core.agents.capabilities.tools.utils",
 }
 DEFAULT_TOOL_AREAS = ("utils",)
 

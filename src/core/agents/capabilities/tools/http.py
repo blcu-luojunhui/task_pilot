@@ -40,11 +40,13 @@ async def http_get(
     headers: Optional[Dict[str, str]] = None,
 ) -> Any:
     """发送 GET 请求"""
-    await ctx.log.log({
-        "event": "http_get",
-        "url": url,
-        "params": params,
-    })
+    await ctx.log.log(
+        {
+            "event": "http_get",
+            "url": url,
+            "params": params,
+        }
+    )
 
     async with AsyncHttpClient() as client:
         response = await client.get(url=url, params=params, headers=headers)
@@ -87,15 +89,15 @@ async def http_post(
     headers: Optional[Dict[str, str]] = None,
 ) -> Any:
     """发送 POST 请求"""
-    await ctx.log.log({
-        "event": "http_post",
-        "url": url,
-        "has_json": json is not None,
-        "has_data": data is not None,
-    })
+    await ctx.log.log(
+        {
+            "event": "http_post",
+            "url": url,
+            "has_json": json is not None,
+            "has_data": data is not None,
+        }
+    )
 
     async with AsyncHttpClient() as client:
-        response = await client.post(
-            url=url, json=json, data=data, headers=headers
-        )
+        response = await client.post(url=url, json=json, data=data, headers=headers)
         return response

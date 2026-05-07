@@ -3,12 +3,14 @@
 from dataclasses import dataclass
 from typing import Any, Callable, Dict, List, Mapping, Optional
 
-from .loop import Act, Observe, Think, AssistantPlanner
-from .prompting import KnowledgeSelector, PromptAssembler
-from ..state import AgentLoopResult, StopReason
-from ..state.context import ContextWindowManager
-from ..execution.router import TaskRouter
-from ..runtime.harness import (
+# state
+from src.core.agents.state import AgentLoopResult, StopReason, ContextWindowManager
+
+# agent execution
+from src.core.agents.execution import TaskRouter
+
+# agent harness
+from src.core.agents.runtime.harness import (
     AgentBudget,
     AgentLoopHarness,
     ConstraintSet,
@@ -17,8 +19,14 @@ from ..runtime.harness import (
     HarnessHook,
     WorkflowController,
 )
-from ..capabilities.skills import SkillContext, SkillExecutor, SkillRegistry
-from ..capabilities.skills.guard import PermissionGuard
+
+# agent capabilities
+from src.core.agents.capabilities import SkillContext, SkillExecutor, SkillRegistry
+from src.core.agents.capabilities import PermissionGuard
+
+# agent engine
+from .loop import Act, Observe, Think, AssistantPlanner
+from .prompting import KnowledgeSelector, PromptAssembler
 
 
 @dataclass
@@ -52,12 +60,16 @@ class AgentLoopRunner:
     def __post_init__(self) -> None:
         if self.budget is None:
             self.budget = AgentBudget(max_steps=self.max_steps)
+
         if self.constraints is None:
             self.constraints = ConstraintSet()
+
         if self.feedback_loop is None:
             self.feedback_loop = FeedbackLoop()
+
         if self.continuous_improvement is None:
             self.continuous_improvement = ContinuousImprovement()
+
         if self.thinker is None:
             context_manager = ContextWindowManager(
                 max_tokens=self.max_context_tokens,
@@ -69,6 +81,7 @@ class AgentLoopRunner:
                 context_manager=context_manager,
                 prompt_assembler=prompt_assembler,
             )
+
         if self.actor is None:
             self.actor = Act(
                 registry=self.registry,
@@ -78,12 +91,23 @@ class AgentLoopRunner:
                 max_tool_result_length=self.max_tool_result_length,
                 permission_guard=self.permission_guard,
             )
+
         if self.observer is None:
             self.observer = Observe(
                 abort_on_tool_error=self.abort_on_tool_error,
                 max_consecutive_errors=self.max_consecutive_errors,
             )
+
         if self.harness is None:
+            # 这些字段在上面的 __post_init__ 中已确保非 None
+            assert self.thinker is not None
+            assert self.actor is not None
+            assert self.observer is not None
+            assert self.budget is not None
+            assert self.constraints is not None
+            assert self.feedback_loop is not None
+            assert self.continuous_improvement is not None
+
             self.harness = AgentLoopHarness(
                 thinker=self.thinker,
                 actor=self.actor,
@@ -106,6 +130,7 @@ class AgentLoopRunner:
         metadata: Optional[Dict[str, Any]] = None,
         trace_id: Optional[str] = None,
     ) -> AgentLoopResult:
+        assert self.harness is not None
         return await self.harness.run(
             goal=goal,
             messages=messages,
@@ -121,27 +146,35 @@ class AgentLoopRunner:
         trace_id: Optional[str] = None,
     ) -> AgentLoopResult:
         if not self.router:
-            return await self.run(goal=goal, messages=messages, metadata=metadata, trace_id=trace_id)
+            return await self.run(
+                goal=goal, messages=messages, metadata=metadata, trace_id=trace_id
+            )
 
         sub_goals = await self.router.route(goal)
         if len(sub_goals) <= 1:
-            return await self.run(goal=goal, messages=messages, metadata=metadata, trace_id=trace_id)
+            return await self.run(
+                goal=goal, messages=messages, metadata=metadata, trace_id=trace_id
+            )
 
         accumulated_messages = list(messages or [])
         results: List[str] = []
-        last_result: Optional[AgentLoopResult] = None
+        last_result: AgentLoopResult = None  # type: ignore[assignment]
 
         for index, sub_goal in enumerate(sub_goals, start=1):
             run_messages = list(accumulated_messages)
             if results:
-                run_messages.append({
+                run_messages.append(
+                    {
+                        "role": "system",
+                        "content": "Previous sub-goal results:\n" + "\n".join(results),
+                    }
+                )
+            run_messages.append(
+                {
                     "role": "system",
-                    "content": "Previous sub-goal results:\n" + "\n".join(results),
-                })
-            run_messages.append({
-                "role": "system",
-                "content": f"Current sub-goal {index}/{len(sub_goals)}: {sub_goal}",
-            })
+                    "content": f"Current sub-goal {index}/{len(sub_goals)}: {sub_goal}",
+                }
+            )
             last_result = await self.run(
                 goal=sub_goal,
                 messages=run_messages,

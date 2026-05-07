@@ -48,6 +48,7 @@ def generate_task_trace_id() -> str:
     random_str = "".join(random.choices(string.ascii_lowercase + string.digits, k=16))
     return f"Task-{datetime.now().strftime('%Y%m%d%H%M%S')}-{random_str}"
 
+
 def generate_agent_trace_id() -> str:
     """Generate a unique trace ID for agent execution"""
     return f"agent-{uuid.uuid4().hex[:12]}"

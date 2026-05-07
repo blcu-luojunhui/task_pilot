@@ -14,9 +14,7 @@ class MySQLConfig(BaseSettings):
     minsize: int = 5
     maxsize: int = 20
 
-    model_config = SettingsConfigDict(
-        env_prefix="", case_sensitive=False, extra="ignore"
-    )
+    model_config = SettingsConfigDict(env_prefix="", case_sensitive=False, extra="ignore")
 
     @field_validator("password")
     @classmethod

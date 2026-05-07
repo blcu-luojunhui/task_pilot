@@ -18,8 +18,9 @@ class SkillType(str, Enum):
 
 class RiskLevel(str, Enum):
     """工具风险等级"""
-    READ = "read"              # 只读操作，无副作用
-    WRITE = "write"            # 写操作，可逆
+
+    READ = "read"  # 只读操作，无副作用
+    WRITE = "write"  # 写操作，可逆
     DESTRUCTIVE = "destructive"  # 危险操作，不可逆
 
 

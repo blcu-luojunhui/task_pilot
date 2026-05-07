@@ -41,7 +41,9 @@ class ToolOutput:
         return "\n".join(parts) if parts else "OK"
 
     @classmethod
-    def ok(cls, data: Any = None, message: str = "", row_count: Optional[int] = None) -> "ToolOutput":
+    def ok(
+        cls, data: Any = None, message: str = "", row_count: Optional[int] = None
+    ) -> "ToolOutput":
         """创建成功输出"""
         return cls(success=True, data=data, message=message, row_count=row_count)
 

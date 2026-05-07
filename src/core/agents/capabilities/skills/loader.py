@@ -44,7 +44,7 @@ class FrontmatterParser:
         scope = frontmatter.get("scope", "agent:*")
         parent_id = frontmatter.get("parent")
 
-        remaining_content = "\n".join(lines[i + 1:])
+        remaining_content = "\n".join(lines[i + 1 :])
         remaining_lines = remaining_content.split("\n")
 
         when_to_use = self._extract_list_items(remaining_lines, "When to use")
@@ -243,7 +243,6 @@ class SkillLoader:
         return None
 
 
-
 def load_skills_from_dir(skills_dir: Optional[str] = None) -> List[Skill]:
     """从目录加载所有 Skills"""
     all_skills = []
@@ -267,4 +266,3 @@ def load_skills_from_dir(skills_dir: Optional[str] = None) -> List[Skill]:
 
 
 __all__ = ["SkillLoader", "FrontmatterParser", "InlineMetadataParser", "load_skills_from_dir"]
-

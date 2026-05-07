@@ -31,7 +31,7 @@ class StateSnapshot:
         agent_id: str,
         loop_state: AgentLoopState,
         lifecycle_state: AgentState,
-        metadata: Optional[Dict[str, Any]] = None
+        metadata: Optional[Dict[str, Any]] = None,
     ) -> str:
         """
         保存状态快照
@@ -63,7 +63,7 @@ class StateSnapshot:
                         "arguments": tc.arguments,
                         "result": str(tc.result) if tc.result else None,
                         "error": tc.error,
-                        "duration_ms": tc.duration_ms
+                        "duration_ms": tc.duration_ms,
                     }
                     for tc in loop_state.tool_calls
                 ],
@@ -72,10 +72,10 @@ class StateSnapshot:
                 "consecutive_tool_errors": loop_state.consecutive_tool_errors,
             },
             "metadata": metadata or {},
-            "timestamp": datetime.now().isoformat()
+            "timestamp": datetime.now().isoformat(),
         }
 
-        with open(snapshot_path, 'w', encoding='utf-8') as f:
+        with open(snapshot_path, "w", encoding="utf-8") as f:
             json.dump(snapshot_data, f, indent=2, ensure_ascii=False)
 
         return snapshot_id
@@ -98,7 +98,7 @@ class StateSnapshot:
         if not snapshot_path.exists():
             raise FileNotFoundError(f"Snapshot not found: {snapshot_id}")
 
-        with open(snapshot_path, 'r', encoding='utf-8') as f:
+        with open(snapshot_path, "r", encoding="utf-8") as f:
             data = json.load(f)
 
         # 恢复 lifecycle state
@@ -106,10 +106,7 @@ class StateSnapshot:
 
         # 恢复 loop state
         loop_data = data["loop_state"]
-        loop_state = AgentLoopState(
-            goal=loop_data["goal"],
-            max_steps=loop_data["max_steps"]
-        )
+        loop_state = AgentLoopState(goal=loop_data["goal"], max_steps=loop_data["max_steps"])
         loop_state.step = loop_data["step"]
         loop_state.messages = loop_data["messages"]
         loop_state.final_answer = loop_data.get("final_answer")
@@ -120,6 +117,7 @@ class StateSnapshot:
 
         # 恢复 tool_calls
         from .models import ToolCallRecord
+
         for tc_data in loop_data.get("tool_calls", []):
             loop_state.tool_calls.append(
                 ToolCallRecord(
@@ -127,7 +125,7 @@ class StateSnapshot:
                     arguments=tc_data["arguments"],
                     result=tc_data.get("result"),
                     error=tc_data.get("error"),
-                    duration_ms=tc_data.get("duration_ms", 0.0)
+                    duration_ms=tc_data.get("duration_ms", 0.0),
                 )
             )
 
@@ -149,20 +147,22 @@ class StateSnapshot:
 
         for snapshot_file in self.storage_dir.glob("*.json"):
             try:
-                with open(snapshot_file, 'r', encoding='utf-8') as f:
+                with open(snapshot_file, "r", encoding="utf-8") as f:
                     data = json.load(f)
 
                 if agent_id and data.get("agent_id") != agent_id:
                     continue
 
-                snapshots.append({
-                    "snapshot_id": data["snapshot_id"],
-                    "agent_id": data["agent_id"],
-                    "lifecycle_state": data["lifecycle_state"],
-                    "timestamp": data["timestamp"],
-                    "goal": data["loop_state"]["goal"],
-                    "step": data["loop_state"]["step"]
-                })
+                snapshots.append(
+                    {
+                        "snapshot_id": data["snapshot_id"],
+                        "agent_id": data["agent_id"],
+                        "lifecycle_state": data["lifecycle_state"],
+                        "timestamp": data["timestamp"],
+                        "goal": data["loop_state"]["goal"],
+                        "step": data["loop_state"]["step"],
+                    }
+                )
             except:
                 continue
 

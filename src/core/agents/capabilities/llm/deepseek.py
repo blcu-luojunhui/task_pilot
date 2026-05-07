@@ -56,9 +56,7 @@ class DeepSeekSettings:
         load_dotenv(env_file)
         api_key = os.getenv("DEEPSEEK_API_KEY")
         if not api_key:
-            raise RuntimeError(
-                "DEEPSEEK_API_KEY is required. Put it in .env or export it."
-            )
+            raise RuntimeError("DEEPSEEK_API_KEY is required. Put it in .env or export it.")
 
         return cls(
             api_key=api_key,
@@ -127,9 +125,7 @@ class DeepSeekPlanner:
             ) as response:
                 if response.status >= 400:
                     body = await response.text()
-                    raise RuntimeError(
-                        f"DeepSeek API error {response.status}: {body}"
-                    )
+                    raise RuntimeError(f"DeepSeek API error {response.status}: {body}")
 
                 if use_streaming:
                     message = await self._handle_streaming_response(response, stream_ctx.sink)
@@ -141,10 +137,7 @@ class DeepSeekPlanner:
         return self._from_deepseek_message(message)
 
     def _tool_specs(self) -> List[Dict[str, Any]]:
-        return [
-            {"type": "function", "function": spec}
-            for spec in self.registry.to_tool_specs()
-        ]
+        return [{"type": "function", "function": spec} for spec in self.registry.to_tool_specs()]
 
     def _has_tool_result(
         self,
@@ -293,7 +286,9 @@ class DeepSeekPlanner:
                                 },
                             )
                         if "arguments" in func_delta:
-                            tool_calls_by_index[index]["function"]["arguments"] += func_delta["arguments"]
+                            tool_calls_by_index[index]["function"]["arguments"] += func_delta[
+                                "arguments"
+                            ]
                             await self._emit_delta(
                                 sink,
                                 "tool_call_arguments",

@@ -9,6 +9,7 @@ from typing import Any, Dict, List, Optional
 
 class ActionType(str, Enum):
     """动作类型"""
+
     TOOL_CALL = "tool_call"
     SKILL_CALL = "skill_call"
     ANSWER = "answer"
@@ -18,6 +19,7 @@ class ActionType(str, Enum):
 
 class ThoughtType(str, Enum):
     """思考类型"""
+
     REASONING = "reasoning"
     PLANNING = "planning"
     REFLECTION = "reflection"
@@ -27,6 +29,7 @@ class ThoughtType(str, Enum):
 @dataclass
 class Thought:
     """Agent 的思考过程"""
+
     type: ThoughtType
     content: str
     confidence: float = 1.0
@@ -36,6 +39,7 @@ class Thought:
 @dataclass
 class Action:
     """Agent 的动作"""
+
     type: ActionType
     target: str  # tool/skill name or answer text
     parameters: Dict[str, Any] = field(default_factory=dict)
@@ -46,6 +50,7 @@ class Action:
 @dataclass
 class Observation:
     """执行结果观察"""
+
     action: Action
     result: Any
     success: bool
@@ -57,6 +62,7 @@ class Observation:
 @dataclass
 class Step:
     """单步执行记录"""
+
     step_number: int
     thought: Optional[Thought] = None
     action: Optional[Action] = None

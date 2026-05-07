@@ -19,7 +19,9 @@ def create_tasks_bp(deps: ApiDependencies) -> Blueprint:
     @bp.route("/run_task", methods=["POST"])
     async def run_task():
         if not current_app.config.get("ACCEPTING_TASKS", True):
-            return jsonify({"code": ErrorCode.SERVICE_SHUTTING_DOWN, "message": "Server is shutting down"}), 503
+            return jsonify(
+                {"code": ErrorCode.SERVICE_SHUTTING_DOWN, "message": "Server is shutting down"}
+            ), 503
 
         trace_id = get_current_trace_id()
 
@@ -48,9 +50,7 @@ def create_tasks_bp(deps: ApiDependencies) -> Blueprint:
         return jsonify(
             {
                 "code": ErrorCode.SUCCESS if success else 1,
-                "message": "cancel requested"
-                if success
-                else "task not found or already finished",
+                "message": "cancel requested" if success else "task not found or already finished",
                 "trace_id": trace_id,
             }
         )
@@ -73,7 +73,9 @@ def create_tasks_bp(deps: ApiDependencies) -> Blueprint:
                     if deps.events.is_closed(trace_id) and subscription.queue.empty():
                         break
                     try:
-                        event = await asyncio.wait_for(subscription.queue.get(), timeout=heartbeat_seconds)
+                        event = await asyncio.wait_for(
+                            subscription.queue.get(), timeout=heartbeat_seconds
+                        )
                         yield (
                             f"id: {event['sequence']}\n"
                             f"event: {event['type']}\n"

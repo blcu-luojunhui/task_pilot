@@ -6,6 +6,7 @@ Utility Tools - 通用工具函数
 
 from datetime import datetime
 from typing import List
+from pathlib import Path
 
 from src.core.agents.capabilities.skills import skill, SkillContext
 from src.infra.shared.tools import (
@@ -52,10 +53,10 @@ async def util_md5(ctx: SkillContext, text: str) -> str:
     },
 )
 async def util_timestamp_to_str(
-    ctx: SkillContext, timestamp: int, format: str = "%Y-%m-%d %H:%M:%S"
+    ctx: SkillContext, timestamp: int, date_format: str = "%Y-%m-%d %H:%M:%S"
 ) -> str:
     """时间戳转字符串"""
-    return timestamp_to_str(timestamp, format)
+    return timestamp_to_str(timestamp, date_format)
 
 
 @skill(
@@ -88,9 +89,7 @@ async def util_generate_trace_id(ctx: SkillContext) -> str:
         },
     },
 )
-async def util_batch_split(
-    ctx: SkillContext, data: List, batch_size: int
-) -> List[List]:
+async def util_batch_split(ctx: SkillContext, data: List, batch_size: int) -> List[List]:
     """分批处理数据"""
     from src.infra.shared.tools import yield_batch
 
@@ -108,3 +107,28 @@ async def util_batch_split(
 async def util_current_time(ctx: SkillContext) -> str:
     """获取当前时间"""
     return datetime.now().isoformat()
+
+
+@skill(
+    name="write_file",
+    description="将内容写入指定路径的文件。如果文件已存在会覆盖，目录不存在会自动创建。",
+    dependencies=[],
+    risk_level="write",
+    parameters={
+        "file_path": {
+            "type": "string",
+            "description": "文件路径（相对或绝对路径）",
+            "required": True,
+        },
+        "content": {
+            "type": "string",
+            "description": "要写入的文件内容",
+            "required": True,
+        },
+    },
+)
+async def write_file(ctx: SkillContext, file_path: str, content: str) -> str:
+    path = Path(file_path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(content, encoding="utf-8")
+    return f"文件已写入: {path.resolve()} ({len(content)} 字符)"

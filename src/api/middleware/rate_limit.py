@@ -57,10 +57,12 @@ class RateLimitMiddleware:
         timestamps = self._requests[client_ip]
         if len(timestamps) >= self.max_requests:
             retry_after = int(self.window_seconds - (now - timestamps[0]))
-            response = jsonify({
-                "code": ErrorCode.RATE_LIMITED,
-                "message": "Too many requests, please try again later",
-            })
+            response = jsonify(
+                {
+                    "code": ErrorCode.RATE_LIMITED,
+                    "message": "Too many requests, please try again later",
+                }
+            )
             response.status_code = 429
             response.headers["Retry-After"] = str(max(1, retry_after))
             return response

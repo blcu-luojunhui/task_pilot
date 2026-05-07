@@ -21,7 +21,7 @@ class Dispatcher:
         action_type: str,
         target: str,
         parameters: Dict[str, Any],
-        context: Optional[Dict[str, Any]] = None
+        context: Optional[Dict[str, Any]] = None,
     ) -> ExecutionResult:
         """
         统一调度入口
@@ -47,7 +47,5 @@ class Dispatcher:
             return await self.executor.execute(target, parameters, context)
 
         return ExecutionResult(
-            status=ExecutionStatus.FAILED,
-            output=None,
-            error="No executor available"
+            status=ExecutionStatus.FAILED, output=None, error="No executor available"
         )

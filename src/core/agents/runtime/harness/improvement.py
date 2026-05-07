@@ -45,8 +45,7 @@ class ImprovementRecord:
 class ImprovementStore(Protocol):
     """Persistence boundary for improvement records."""
 
-    def save(self, record: ImprovementRecord) -> Any:
-        ...
+    def save(self, record: ImprovementRecord) -> Any: ...
 
 
 @dataclass

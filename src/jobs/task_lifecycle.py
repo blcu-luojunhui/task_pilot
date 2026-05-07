@@ -47,9 +47,7 @@ class TaskLifecycleManager:
         async with self._lock:
             if trace_id in self._registry:
                 del self._registry[trace_id]
-                logger.debug(
-                    f"Task unregistered: {trace_id}, total={len(self._registry)}"
-                )
+                logger.debug(f"Task unregistered: {trace_id}, total={len(self._registry)}")
 
     async def cancel_local(self, trace_id: str) -> bool:
         async with self._lock:
@@ -108,9 +106,7 @@ class TaskLifecycleManager:
             logger.warning("Polling already started")
             return
 
-        self._poll_task = asyncio.create_task(
-            self._poll_loop(), name="task_lifecycle_poll"
-        )
+        self._poll_task = asyncio.create_task(self._poll_loop(), name="task_lifecycle_poll")
         logger.info("Task lifecycle polling started")
 
     async def stop_polling(self) -> None:

@@ -11,6 +11,7 @@ import json
 @dataclass
 class TraceEvent:
     """追踪事件"""
+
     event_type: str
     timestamp: datetime
     data: Dict[str, Any]
@@ -34,36 +35,37 @@ class Debugger:
     def record(self, event_type: str, data: Dict[str, Any], step: Optional[int] = None):
         """记录事件"""
         event = TraceEvent(
-            event_type=event_type,
-            timestamp=datetime.now(),
-            data=data,
-            step_number=step
+            event_type=event_type, timestamp=datetime.now(), data=data, step_number=step
         )
         self.traces.append(event)
 
     def save_trace(self, filepath: str):
         """保存追踪到文件"""
-        with open(filepath, 'w') as f:
-            json.dump([
-                {
-                    "type": t.event_type,
-                    "timestamp": t.timestamp.isoformat(),
-                    "data": t.data,
-                    "step": t.step_number
-                }
-                for t in self.traces
-            ], f, indent=2)
+        with open(filepath, "w") as f:
+            json.dump(
+                [
+                    {
+                        "type": t.event_type,
+                        "timestamp": t.timestamp.isoformat(),
+                        "data": t.data,
+                        "step": t.step_number,
+                    }
+                    for t in self.traces
+                ],
+                f,
+                indent=2,
+            )
 
     def load_trace(self, filepath: str):
         """从文件加载追踪"""
-        with open(filepath, 'r') as f:
+        with open(filepath, "r") as f:
             data = json.load(f)
             self.traces = [
                 TraceEvent(
                     event_type=t["type"],
                     timestamp=datetime.fromisoformat(t["timestamp"]),
                     data=t["data"],
-                    step_number=t.get("step")
+                    step_number=t.get("step"),
                 )
                 for t in data
             ]

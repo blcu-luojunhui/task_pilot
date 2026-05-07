@@ -4,7 +4,7 @@ import json
 from dataclasses import dataclass
 from typing import Any, Dict, List
 
-from src.core.agents.core.loop import AssistantPlanner
+from src.core.agents.engine.loop import AssistantPlanner
 
 
 @dataclass
@@ -19,17 +19,15 @@ class TaskRouter:
             return [goal]
 
         prompt = self._build_prompt(goal)
-        response = await self.planner([
-            {"role": "user", "content": prompt}
-        ], 0)
+        response = await self.planner([{"role": "user", "content": prompt}], 0)
         return self._parse_response(goal, response)
 
     def _build_prompt(self, goal: str) -> str:
         return (
             "Assess whether this task is simple or complex. "
             "Return JSON only. "
-            "If simple, return: {\"type\": \"simple\"}. "
-            "If complex, return: {\"type\": \"complex\", \"sub_goals\": [\"...\", \"...\"]}. "
+            'If simple, return: {"type": "simple"}. '
+            'If complex, return: {"type": "complex", "sub_goals": ["...", "..."]}. '
             "Sub-goals must be short, sequential, and directly executable.\n\n"
             f"Goal: {goal}"
         )

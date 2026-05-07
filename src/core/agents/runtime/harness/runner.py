@@ -5,13 +5,14 @@ Harness Runner - 主运行入口
 from typing import Any, Dict, List, Optional
 from dataclasses import dataclass
 
-from ...core.types import Step, Action, Observation
+from ...engine.types import Step, Action, Observation
 from ...execution import ExecutionResult
 
 
 @dataclass
 class RunnerConfig:
     """Runner 配置"""
+
     max_steps: int = 10
     timeout_seconds: float = 300.0
     enable_tracing: bool = True
@@ -39,10 +40,7 @@ class HarnessRunner:
         self.hooks.append(hook)
 
     async def run(
-        self,
-        agent,
-        goal: str,
-        context: Optional[Dict[str, Any]] = None
+        self, agent, goal: str, context: Optional[Dict[str, Any]] = None
     ) -> ExecutionResult:
         """
         运行 Agent

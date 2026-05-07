@@ -24,21 +24,22 @@ from src.jobs.task_utils import TaskUtils
         },
     },
     examples=[
-        {"input": {"trace_id": "Agent-20260430-abc123"}, "output": "返回任务完整信息（状态、时间、数据等）"},
+        {
+            "input": {"trace_id": "Agent-20260430-abc123"},
+            "output": "返回任务完整信息（状态、时间、数据等）",
+        },
     ],
 )
-async def task_query_status(
-    ctx: SkillContext, trace_id: str
-) -> Optional[Dict[str, Any]]:
+async def task_query_status(ctx: SkillContext, trace_id: str) -> Optional[Dict[str, Any]]:
     """查询任务状态"""
-    await ctx.log.log({
-        "event": "task_query_status",
-        "trace_id": trace_id,
-    })
-
-    table = TaskUtils.validate_table_name(
-        ctx.config.task_table if ctx.config else "task_manager"
+    await ctx.log.log(
+        {
+            "event": "task_query_status",
+            "trace_id": trace_id,
+        }
     )
+
+    table = TaskUtils.validate_table_name(ctx.config.task_table if ctx.config else "task_manager")
 
     row = await ctx.db.async_fetch_one(
         f"SELECT * FROM {table} WHERE trace_id = %s",
@@ -63,18 +64,16 @@ async def task_query_status(
         {"input": {"task_name": "daily_sync"}, "output": "返回正在执行的任务列表"},
     ],
 )
-async def task_list_processing(
-    ctx: SkillContext, task_name: str
-) -> List[Dict[str, Any]]:
+async def task_list_processing(ctx: SkillContext, task_name: str) -> List[Dict[str, Any]]:
     """列出正在执行的任务"""
-    await ctx.log.log({
-        "event": "task_list_processing",
-        "task_name": task_name,
-    })
-
-    table = TaskUtils.validate_table_name(
-        ctx.config.task_table if ctx.config else "task_manager"
+    await ctx.log.log(
+        {
+            "event": "task_list_processing",
+            "task_name": task_name,
+        }
     )
+
+    table = TaskUtils.validate_table_name(ctx.config.task_table if ctx.config else "task_manager")
 
     rows = await ctx.db.async_fetch(
         f"SELECT trace_id, start_timestamp, data FROM {table} "
@@ -97,19 +96,22 @@ async def task_list_processing(
         },
     },
     examples=[
-        {"input": {"trace_id": "Agent-20260430-abc123"}, "output": "true 表示取消成功，false 表示任务不存在或已完成"},
+        {
+            "input": {"trace_id": "Agent-20260430-abc123"},
+            "output": "true 表示取消成功，false 表示任务不存在或已完成",
+        },
     ],
 )
 async def task_cancel(ctx: SkillContext, trace_id: str) -> bool:
     """请求取消任务"""
-    await ctx.log.log({
-        "event": "task_cancel",
-        "trace_id": trace_id,
-    })
-
-    table = TaskUtils.validate_table_name(
-        ctx.config.task_table if ctx.config else "task_manager"
+    await ctx.log.log(
+        {
+            "event": "task_cancel",
+            "trace_id": trace_id,
+        }
     )
+
+    table = TaskUtils.validate_table_name(ctx.config.task_table if ctx.config else "task_manager")
 
     affected = await ctx.db.async_save(
         f"""
@@ -153,7 +155,10 @@ async def task_cancel(ctx: SkillContext, trace_id: str) -> bool:
         },
     },
     examples=[
-        {"input": {"task_name": "daily_sync", "trace_id": "Agent-20260506-xyz"}, "output": "返回创建的任务 trace_id"},
+        {
+            "input": {"task_name": "daily_sync", "trace_id": "Agent-20260506-xyz"},
+            "output": "返回创建的任务 trace_id",
+        },
     ],
 )
 async def task_create(
@@ -165,15 +170,15 @@ async def task_create(
     """创建新任务"""
     import json as json_mod
 
-    await ctx.log.log({
-        "event": "task_create",
-        "task_name": task_name,
-        "trace_id": trace_id,
-    })
-
-    table = TaskUtils.validate_table_name(
-        ctx.config.task_table if ctx.config else "task_manager"
+    await ctx.log.log(
+        {
+            "event": "task_create",
+            "task_name": task_name,
+            "trace_id": trace_id,
+        }
     )
+
+    table = TaskUtils.validate_table_name(ctx.config.task_table if ctx.config else "task_manager")
 
     now = int(time.time())
     date_string = time.strftime("%Y%m%d", time.localtime(now))
@@ -192,9 +197,9 @@ async def task_create(
 
 # 任务状态机：合法的状态转换
 _VALID_TRANSITIONS = {
-    0: {1, 3},       # INIT → PROCESSING, CANCELLED
-    1: {2, 4, 99},   # PROCESSING → SUCCESS, CANCEL_REQUESTED, FAILED
-    4: {3},          # CANCEL_REQUESTED → CANCELLED
+    0: {1, 3},  # INIT → PROCESSING, CANCELLED
+    1: {2, 4, 99},  # PROCESSING → SUCCESS, CANCEL_REQUESTED, FAILED
+    4: {3},  # CANCEL_REQUESTED → CANCELLED
 }
 
 
@@ -217,22 +222,23 @@ _VALID_TRANSITIONS = {
         },
     },
     examples=[
-        {"input": {"trace_id": "Agent-20260506-xyz", "new_status": 2}, "output": "true 表示更新成功"},
+        {
+            "input": {"trace_id": "Agent-20260506-xyz", "new_status": 2},
+            "output": "true 表示更新成功",
+        },
     ],
 )
-async def task_update_status(
-    ctx: SkillContext, trace_id: str, new_status: int
-) -> bool:
+async def task_update_status(ctx: SkillContext, trace_id: str, new_status: int) -> bool:
     """更新任务状态（带状态机校验）"""
-    await ctx.log.log({
-        "event": "task_update_status",
-        "trace_id": trace_id,
-        "new_status": new_status,
-    })
-
-    table = TaskUtils.validate_table_name(
-        ctx.config.task_table if ctx.config else "task_manager"
+    await ctx.log.log(
+        {
+            "event": "task_update_status",
+            "trace_id": trace_id,
+            "new_status": new_status,
+        }
     )
+
+    table = TaskUtils.validate_table_name(ctx.config.task_table if ctx.config else "task_manager")
 
     # 查询当前状态
     row = await ctx.db.async_fetch_one(

@@ -359,9 +359,7 @@ class TaskScheduler(TaskHandler):
 
     # ==================== 任务管理接口 ====================
 
-    async def get_task_status(
-        self, trace_id: Optional[str] = None
-    ) -> Optional[Dict[str, Any]]:
+    async def get_task_status(self, trace_id: Optional[str] = None) -> Optional[Dict[str, Any]]:
         trace_id = trace_id or self.trace_id
         query = f"SELECT * FROM {self.table} WHERE trace_id = %s"
         return await self.db_client.async_fetch_one(query, params=(trace_id,))
@@ -414,9 +412,7 @@ class TaskScheduler(TaskHandler):
             query,
             (status, int(time.time()), trace_id),
         )
-        await self._log_task_event(
-            "task_force_released", trace_id=trace_id, status=status
-        )
+        await self._log_task_event("task_force_released", trace_id=trace_id, status=status)
 
     # ==================== 主入口 ====================
 

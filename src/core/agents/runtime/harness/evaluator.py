@@ -10,6 +10,7 @@ from datetime import datetime
 @dataclass
 class EvaluationMetric:
     """评估指标"""
+
     name: str
     value: float
     unit: str = ""
@@ -19,6 +20,7 @@ class EvaluationMetric:
 @dataclass
 class EvaluationResult:
     """评估结果"""
+
     task_id: str
     metrics: List[EvaluationMetric]
     success: bool
@@ -40,10 +42,7 @@ class Evaluator:
         self.results: List[EvaluationResult] = []
 
     async def evaluate(
-        self,
-        agent,
-        test_cases: List[Dict[str, Any]],
-        metrics: Optional[List[str]] = None
+        self, agent, test_cases: List[Dict[str, Any]], metrics: Optional[List[str]] = None
     ) -> List[EvaluationResult]:
         """
         评估 Agent
@@ -66,10 +65,7 @@ class Evaluator:
         return results
 
     async def _evaluate_single(
-        self,
-        agent,
-        test_case: Dict[str, Any],
-        metrics: Optional[List[str]]
+        self, agent, test_case: Dict[str, Any], metrics: Optional[List[str]]
     ) -> EvaluationResult:
         """评估单个测试用例"""
         # 实现评估逻辑

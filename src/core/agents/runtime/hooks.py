@@ -11,6 +11,7 @@ import logging
 @dataclass
 class HookContext:
     """Hook 上下文"""
+
     event_type: str
     timestamp: datetime = field(default_factory=datetime.now)
     data: Dict[str, Any] = field(default_factory=dict)

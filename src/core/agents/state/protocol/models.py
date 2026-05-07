@@ -12,6 +12,7 @@ class ToolCall:
 
     无论 LLM 返回什么格式，最终都转换为这个统一结构。
     """
+
     id: str
     name: str
     arguments: Dict[str, Any]  # 已解析的参数字典
@@ -24,7 +25,7 @@ class ToolCall:
             "function": {
                 "name": self.name,
                 "arguments": json.dumps(self.arguments, ensure_ascii=False),
-            }
+            },
         }
 
     @classmethod

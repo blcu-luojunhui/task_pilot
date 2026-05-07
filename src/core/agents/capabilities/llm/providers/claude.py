@@ -22,13 +22,13 @@ class ClaudeProvider(LLMProvider):
         tools: Optional[List[Dict]] = None,
         temperature: Optional[float] = None,
         max_tokens: Optional[int] = None,
-        **kwargs
+        **kwargs,
     ) -> LLMResponse:
         """发送聊天请求"""
         headers = {
             "x-api-key": self.config.api_key,
             "anthropic-version": "2023-06-01",
-            "Content-Type": "application/json"
+            "Content-Type": "application/json",
         }
 
         # Claude 需要分离 system 消息
@@ -59,7 +59,7 @@ class ClaudeProvider(LLMProvider):
                 f"{self.config.base_url}/messages",
                 headers=headers,
                 json=payload,
-                timeout=aiohttp.ClientTimeout(total=self.config.timeout)
+                timeout=aiohttp.ClientTimeout(total=self.config.timeout),
             ) as resp:
                 if resp.status != 200:
                     error_text = await resp.text()
@@ -77,35 +77,31 @@ class ClaudeProvider(LLMProvider):
                     if block["type"] == "text":
                         text_content += block["text"]
                     elif block["type"] == "tool_use":
-                        tool_calls.append({
-                            "id": block["id"],
-                            "type": "function",
-                            "function": {
-                                "name": block["name"],
-                                "arguments": block["input"]
+                        tool_calls.append(
+                            {
+                                "id": block["id"],
+                                "type": "function",
+                                "function": {"name": block["name"], "arguments": block["input"]},
                             }
-                        })
+                        )
 
                 return LLMResponse(
                     content=text_content,
                     tool_calls=tool_calls if tool_calls else None,
                     finish_reason=FinishReason(data.get("stop_reason", "stop")),
                     usage=data.get("usage"),
-                    raw_response=data
+                    raw_response=data,
                 )
 
     async def stream_chat(
-        self,
-        messages: List[LLMMessage],
-        tools: Optional[List[Dict]] = None,
-        **kwargs
+        self, messages: List[LLMMessage], tools: Optional[List[Dict]] = None, **kwargs
     ) -> AsyncIterator[str]:
         """流式聊天"""
         # Claude 流式实现
         headers = {
             "x-api-key": self.config.api_key,
             "anthropic-version": "2023-06-01",
-            "Content-Type": "application/json"
+            "Content-Type": "application/json",
         }
 
         system_message = None
@@ -122,7 +118,7 @@ class ClaudeProvider(LLMProvider):
             "messages": user_messages,
             "temperature": self.config.temperature,
             "max_tokens": self.config.max_tokens or 4096,
-            "stream": True
+            "stream": True,
         }
 
         if system_message:
@@ -133,14 +129,15 @@ class ClaudeProvider(LLMProvider):
                 f"{self.config.base_url}/messages",
                 headers=headers,
                 json=payload,
-                timeout=aiohttp.ClientTimeout(total=self.config.timeout)
+                timeout=aiohttp.ClientTimeout(total=self.config.timeout),
             ) as resp:
                 async for line in resp.content:
-                    line = line.decode('utf-8').strip()
-                    if line.startswith('data: '):
+                    line = line.decode("utf-8").strip()
+                    if line.startswith("data: "):
                         data_str = line[6:]
                         try:
                             import json
+
                             data = json.loads(data_str)
                             if data.get("type") == "content_block_delta":
                                 delta = data.get("delta", {})
@@ -153,7 +150,7 @@ class ClaudeProvider(LLMProvider):
         """转换消息格式"""
         return {
             "role": message.role if message.role != "system" else "user",
-            "content": message.content
+            "content": message.content,
         }
 
     def _convert_tools(self, tools: List[Dict]) -> List[Dict]:
@@ -162,11 +159,13 @@ class ClaudeProvider(LLMProvider):
         for tool in tools:
             if tool.get("type") == "function":
                 func = tool["function"]
-                claude_tools.append({
-                    "name": func["name"],
-                    "description": func.get("description", ""),
-                    "input_schema": func.get("parameters", {})
-                })
+                claude_tools.append(
+                    {
+                        "name": func["name"],
+                        "description": func.get("description", ""),
+                        "input_schema": func.get("parameters", {}),
+                    }
+                )
         return claude_tools
 
     @property

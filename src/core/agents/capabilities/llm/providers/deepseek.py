@@ -22,19 +22,17 @@ class DeepSeekProvider(LLMProvider):
         tools: Optional[List[Dict]] = None,
         temperature: Optional[float] = None,
         max_tokens: Optional[int] = None,
-        **kwargs
+        **kwargs,
     ) -> LLMResponse:
         """发送聊天请求"""
         headers = {
             "Authorization": f"Bearer {self.config.api_key}",
-            "Content-Type": "application/json"
+            "Content-Type": "application/json",
         }
 
         payload = {
             "model": self.config.model,
-            "messages": [
-                self._convert_message(m) for m in messages
-            ],
+            "messages": [self._convert_message(m) for m in messages],
             "temperature": temperature or self.config.temperature,
         }
 
@@ -49,7 +47,7 @@ class DeepSeekProvider(LLMProvider):
                 f"{self.config.base_url}/chat/completions",
                 headers=headers,
                 json=payload,
-                timeout=aiohttp.ClientTimeout(total=self.config.timeout)
+                timeout=aiohttp.ClientTimeout(total=self.config.timeout),
             ) as resp:
                 if resp.status != 200:
                     error_text = await resp.text()
@@ -67,26 +65,23 @@ class DeepSeekProvider(LLMProvider):
                     tool_calls=message.get("tool_calls"),
                     finish_reason=FinishReason(choice.get("finish_reason", "stop")),
                     usage=data.get("usage"),
-                    raw_response=data
+                    raw_response=data,
                 )
 
     async def stream_chat(
-        self,
-        messages: List[LLMMessage],
-        tools: Optional[List[Dict]] = None,
-        **kwargs
+        self, messages: List[LLMMessage], tools: Optional[List[Dict]] = None, **kwargs
     ) -> AsyncIterator[str]:
         """流式聊天"""
         headers = {
             "Authorization": f"Bearer {self.config.api_key}",
-            "Content-Type": "application/json"
+            "Content-Type": "application/json",
         }
 
         payload = {
             "model": self.config.model,
             "messages": [self._convert_message(m) for m in messages],
             "temperature": self.config.temperature,
-            "stream": True
+            "stream": True,
         }
 
         if tools:
@@ -97,29 +92,27 @@ class DeepSeekProvider(LLMProvider):
                 f"{self.config.base_url}/chat/completions",
                 headers=headers,
                 json=payload,
-                timeout=aiohttp.ClientTimeout(total=self.config.timeout)
+                timeout=aiohttp.ClientTimeout(total=self.config.timeout),
             ) as resp:
                 async for line in resp.content:
-                    line = line.decode('utf-8').strip()
-                    if line.startswith('data: '):
+                    line = line.decode("utf-8").strip()
+                    if line.startswith("data: "):
                         data = line[6:]
-                        if data == '[DONE]':
+                        if data == "[DONE]":
                             break
                         try:
                             import json
+
                             chunk = json.loads(data)
-                            delta = chunk['choices'][0]['delta']
-                            if 'content' in delta:
-                                yield delta['content']
+                            delta = chunk["choices"][0]["delta"]
+                            if "content" in delta:
+                                yield delta["content"]
                         except:
                             continue
 
     def _convert_message(self, message: LLMMessage) -> Dict:
         """转换消息格式"""
-        result = {
-            "role": message.role,
-            "content": message.content
-        }
+        result = {"role": message.role, "content": message.content}
         if message.tool_calls:
             result["tool_calls"] = message.tool_calls
         if message.tool_call_id:

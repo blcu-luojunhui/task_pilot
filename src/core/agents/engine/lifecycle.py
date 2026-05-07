@@ -27,7 +27,11 @@ class LifecycleManager:
         """检查是否可以转换到目标状态"""
         valid_transitions = {
             AgentState.IDLE: [AgentState.RUNNING],
-            AgentState.RUNNING: [AgentState.PAUSED, AgentState.STOPPED, AgentState.ERROR],
+            AgentState.RUNNING: [
+                AgentState.PAUSED,
+                AgentState.STOPPED,
+                AgentState.ERROR,
+            ],
             AgentState.PAUSED: [AgentState.RUNNING, AgentState.STOPPED],
             AgentState.STOPPED: [AgentState.IDLE],
             AgentState.ERROR: [AgentState.IDLE, AgentState.STOPPED],
@@ -46,16 +50,10 @@ class LifecycleManager:
             ValueError: 如果不能转换到目标状态
         """
         if not self.can_transition(to_state):
-            raise ValueError(
-                f"Cannot transition from {self.state} to {to_state}"
-            )
+            raise ValueError(f"Cannot transition from {self.state} to {to_state}")
 
         # 记录转换
-        transition = StateTransition(
-            from_state=self.state,
-            to_state=to_state,
-            reason=reason
-        )
+        transition = StateTransition(from_state=self.state, to_state=to_state, reason=reason)
         self.transitions.append(transition)
 
         # 更新状态

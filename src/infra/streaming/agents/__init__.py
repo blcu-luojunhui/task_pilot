@@ -12,9 +12,7 @@ from dataclasses import dataclass
 from typing import Any, Awaitable, Callable, Dict, Optional
 
 
-_stream_context: ContextVar[Optional["StreamContext"]] = ContextVar(
-    "stream_context", default=None
-)
+_stream_context: ContextVar[Optional["StreamContext"]] = ContextVar("stream_context", default=None)
 
 
 @dataclass

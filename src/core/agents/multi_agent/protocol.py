@@ -13,17 +13,19 @@ import uuid
 
 class MessageType(str, Enum):
     """消息类型"""
-    REQUEST = "request"           # 请求
-    RESPONSE = "response"         # 响应
-    BROADCAST = "broadcast"       # 广播
-    NOTIFICATION = "notification" # 通知
-    TASK = "task"                # 任务分配
-    RESULT = "result"            # 任务结果
-    HEARTBEAT = "heartbeat"      # 心跳
+
+    REQUEST = "request"  # 请求
+    RESPONSE = "response"  # 响应
+    BROADCAST = "broadcast"  # 广播
+    NOTIFICATION = "notification"  # 通知
+    TASK = "task"  # 任务分配
+    RESULT = "result"  # 任务结果
+    HEARTBEAT = "heartbeat"  # 心跳
 
 
 class MessagePriority(int, Enum):
     """消息优先级"""
+
     LOW = 0
     NORMAL = 1
     HIGH = 2
@@ -33,6 +35,7 @@ class MessagePriority(int, Enum):
 @dataclass
 class Message:
     """Agent 间消息"""
+
     id: str = field(default_factory=lambda: str(uuid.uuid4()))
     type: MessageType = MessageType.REQUEST
     sender: str = ""
@@ -62,7 +65,7 @@ class Message:
             content=content,
             reply_to=self.id,
             metadata=metadata,
-            priority=self.priority
+            priority=self.priority,
         )
 
     def is_expired(self) -> bool:
@@ -84,7 +87,7 @@ class Message:
             "timestamp": self.timestamp.isoformat(),
             "reply_to": self.reply_to,
             "priority": self.priority.value,
-            "ttl": self.ttl
+            "ttl": self.ttl,
         }
 
     @classmethod
@@ -100,7 +103,7 @@ class Message:
             timestamp=datetime.fromisoformat(data["timestamp"]),
             reply_to=data.get("reply_to"),
             priority=MessagePriority(data.get("priority", MessagePriority.NORMAL.value)),
-            ttl=data.get("ttl")
+            ttl=data.get("ttl"),
         )
 
 

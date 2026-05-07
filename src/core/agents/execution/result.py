@@ -10,6 +10,7 @@ from enum import Enum
 
 class ExecutionStatus(str, Enum):
     """执行状态"""
+
     SUCCESS = "success"
     FAILED = "failed"
     TIMEOUT = "timeout"
@@ -20,6 +21,7 @@ class ExecutionStatus(str, Enum):
 @dataclass
 class ExecutionResult:
     """执行结果"""
+
     status: ExecutionStatus
     output: Any
     error: Optional[str] = None
@@ -31,6 +33,7 @@ class ExecutionResult:
 @dataclass
 class ToolExecutionResult(ExecutionResult):
     """工具执行结果"""
+
     tool_name: str = ""
     tool_input: Dict[str, Any] = field(default_factory=dict)
 
@@ -38,5 +41,6 @@ class ToolExecutionResult(ExecutionResult):
 @dataclass
 class SkillExecutionResult(ExecutionResult):
     """技能执行结果"""
+
     skill_name: str = ""
     skill_input: Dict[str, Any] = field(default_factory=dict)

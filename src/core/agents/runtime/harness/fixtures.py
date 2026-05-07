@@ -9,6 +9,7 @@ from dataclasses import dataclass
 @dataclass
 class MockTool:
     """Mock 工具"""
+
     name: str
     handler: Callable
     return_value: Optional[Any] = None
@@ -31,13 +32,15 @@ class FixtureManager:
         self.mocks: Dict[str, MockTool] = {}
         self.env_vars: Dict[str, str] = {}
 
-    def mock_tool(self, name: str, return_value: Any = None, side_effect: Optional[Callable] = None):
+    def mock_tool(
+        self, name: str, return_value: Any = None, side_effect: Optional[Callable] = None
+    ):
         """Mock 一个工具"""
         mock = MockTool(
             name=name,
             handler=lambda *args, **kwargs: return_value,
             return_value=return_value,
-            side_effect=side_effect
+            side_effect=side_effect,
         )
         self.mocks[name] = mock
         return mock

@@ -12,6 +12,7 @@ from pathlib import Path
 @dataclass
 class MemoryEntry:
     """记忆条目"""
+
     key: str
     value: Any
     category: str = "general"
@@ -32,14 +33,11 @@ class LongTermMemory:
         if storage_path and storage_path.exists():
             self.load()
 
-    def store(self, key: str, value: Any, category: str = "general",
-              importance: float = 0.5, **metadata):
+    def store(
+        self, key: str, value: Any, category: str = "general", importance: float = 0.5, **metadata
+    ):
         """存储记忆"""
         entry = MemoryEntry(
-            key=key,
-            value=value,
-            category=category,
-            importance=importance,
-            metadata=metadata
+            key=key, value=value, category=category, importance=importance, metadata=metadata
         )
         self.memories[key] = entry

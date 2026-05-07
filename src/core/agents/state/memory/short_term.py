@@ -26,21 +26,20 @@ class ShortTermMemory:
 
     def add_message(self, role: str, content: str, **metadata):
         """添加消息到历史"""
-        self.messages.append({
-            "role": role,
-            "content": content,
-            "timestamp": datetime.now().isoformat(),
-            **metadata
-        })
+        self.messages.append(
+            {"role": role, "content": content, "timestamp": datetime.now().isoformat(), **metadata}
+        )
 
     def add_tool_result(self, tool_name: str, result: Any, **metadata):
         """添加工具调用结果"""
-        self.recent_tool_results.append({
-            "tool": tool_name,
-            "result": result,
-            "timestamp": datetime.now().isoformat(),
-            **metadata
-        })
+        self.recent_tool_results.append(
+            {
+                "tool": tool_name,
+                "result": result,
+                "timestamp": datetime.now().isoformat(),
+                **metadata,
+            }
+        )
         # 只保留最近 10 条
         if len(self.recent_tool_results) > 10:
             self.recent_tool_results = self.recent_tool_results[-10:]
