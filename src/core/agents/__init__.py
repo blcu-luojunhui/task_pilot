@@ -12,6 +12,7 @@ Core Agents - Agent 系统
 
 # 主要接口 - 从 engine 导出
 from .engine.agent import Agent, AgentConfig
+from .engine.lifecycle import LifecycleManager
 from .engine.types import (
     ActionType,
     ThoughtType,
@@ -24,6 +25,8 @@ from .engine.loop import Think, Act, Observe, AssistantPlanner
 
 # 状态层 - 从 state 导出
 from .state import (
+    AgentState,
+    StateTransition,
     StopReason,
     ToolCallRecord,
     AgentLoopState,
@@ -38,6 +41,7 @@ from .state import (
     ShortTermMemory,
     LongTermMemory,
     MemoryEntry,
+    StateSnapshot,
 )
 
 # 能力层 - 从 capabilities 导出
@@ -91,6 +95,7 @@ __all__ = [
     # Core
     "Agent",
     "AgentConfig",
+    "LifecycleManager",
     "ActionType",
     "ThoughtType",
     "Thought",
@@ -102,6 +107,8 @@ __all__ = [
     "Observe",
     "AssistantPlanner",
     # State
+    "AgentState",
+    "StateTransition",
     "StopReason",
     "ToolCallRecord",
     "AgentLoopState",
@@ -116,6 +123,7 @@ __all__ = [
     "ShortTermMemory",
     "LongTermMemory",
     "MemoryEntry",
+    "StateSnapshot",
     # Capabilities
     "Skill",
     "SkillType",

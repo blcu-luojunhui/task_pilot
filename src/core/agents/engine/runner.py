@@ -24,9 +24,14 @@ from src.core.agents.runtime.harness import (
 from src.core.agents.capabilities import SkillContext, SkillExecutor, SkillRegistry
 from src.core.agents.capabilities import PermissionGuard
 
+from typing import TYPE_CHECKING
+
 # agent engine
 from .loop import Act, Observe, Think, AssistantPlanner
 from .prompting import KnowledgeSelector, PromptAssembler
+
+if TYPE_CHECKING:
+    from .lifecycle import LifecycleManager
 
 
 @dataclass
@@ -44,6 +49,7 @@ class AgentLoopRunner:
     permission_guard: Optional[PermissionGuard] = None
     router: Optional[TaskRouter] = None
     is_cancelled: Optional[Callable[[], bool]] = None
+    lifecycle: "Optional[LifecycleManager]" = None
     tool_dependencies: Optional[Mapping[str, Any]] = None
     context_builder: Optional[Callable[[Any], SkillContext]] = None
     thinker: Optional[Think] = None
@@ -119,6 +125,7 @@ class AgentLoopRunner:
                 feedback_loop=self.feedback_loop,
                 continuous_improvement=self.continuous_improvement,
                 workflow=self.workflow,
+                lifecycle=self.lifecycle,
             )
         if self.router is None:
             self.router = TaskRouter(planner=self.planner)

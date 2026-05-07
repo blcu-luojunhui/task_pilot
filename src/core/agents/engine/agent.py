@@ -6,10 +6,12 @@ Agent - 统一的 Agent 创建和使用接口
 
 import logging
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Any, Callable, Dict, List, Mapping, Optional
 
 from src.core.agents.capabilities.llm.base import LLMMessage
-from src.core.agents.state import AgentLoopState, AgentLoopResult
+from src.core.agents.state import AgentLoopState, AgentLoopResult, AgentState
+from src.core.agents.state.snapshot import StateSnapshot
 from src.core.agents.capabilities import (
     SkillRegistry,
     SkillExecutor,
@@ -27,6 +29,7 @@ from src.core.agents.capabilities.llm.providers import (
     DeepSeekProvider,
 )
 from src.core.agents.exceptions import AgentConfigError
+from .lifecycle import LifecycleManager
 from .runner import AgentLoopRunner
 
 
@@ -126,11 +129,15 @@ class Agent:
         registry: SkillRegistry,
         config: AgentConfig,
         provider: LLMProvider,
+        lifecycle: Optional[LifecycleManager] = None,
     ):
         self._runner = runner
         self._registry = registry
         self._config = config
         self._provider = provider
+        self._lifecycle = lifecycle or LifecycleManager()
+        self._snapshot_dir: Optional[Path] = None
+        self._last_snapshot_id: Optional[str] = None
 
     @classmethod
     def create(
@@ -318,7 +325,157 @@ class Agent:
         if show_prompt:
             runner.thinker.show_prompt = True
 
-        return cls(runner, registry, config, provider)
+        lifecycle = LifecycleManager()
+        runner.lifecycle = lifecycle
+
+        return cls(runner, registry, config, provider, lifecycle=lifecycle)
+
+    # ── 生命周期控制 ──────────────────────────────────────
+
+    def pause(self):
+        """
+        暂停 Agent 执行。
+
+        如果 Agent 正在 run() 中执行，调用此方法后 Agent 会在当前 step 完成后暂停，
+        run() 协程不会返回，而是阻塞等待 resume()。
+        """
+        try:
+            self._lifecycle.transition_to(AgentState.PAUSED, reason="user paused")
+            _logger = logging.getLogger("agent.loop")
+            _logger.info("Agent 已暂停")
+        except ValueError as e:
+            _logger = logging.getLogger("agent.loop")
+            _logger.warning(f"无法暂停 Agent（当前状态: {self._lifecycle.state}）: {e}")
+
+    def resume(self):
+        """
+        恢复 Agent 执行。
+
+        恢复之前被 pause() 暂停的 Agent，run() 协程将继续从暂停点执行。
+        """
+        try:
+            self._lifecycle.transition_to(AgentState.RUNNING, reason="user resumed")
+            _logger = logging.getLogger("agent.loop")
+            _logger.info("Agent 已恢复")
+        except ValueError as e:
+            _logger = logging.getLogger("agent.loop")
+            _logger.warning(f"无法恢复 Agent（当前状态: {self._lifecycle.state}）: {e}")
+
+    def stop(self):
+        """
+        停止 Agent 执行。
+
+        调用后 run() 将在当前 step 完成后返回，stop_reason 为 USER_CANCELLED。
+        """
+        try:
+            self._lifecycle.transition_to(AgentState.STOPPED, reason="user stopped")
+            _logger = logging.getLogger("agent.loop")
+            _logger.info("Agent 已请求停止")
+        except ValueError as e:
+            _logger = logging.getLogger("agent.loop")
+            _logger.warning(f"无法停止 Agent（当前状态: {self._lifecycle.state}）: {e}")
+
+    # ── 快照管理 ──────────────────────────────────────────
+
+    def set_snapshot_dir(self, snapshot_dir: str | Path):
+        """
+        设置快照存储目录。
+
+        Args:
+            snapshot_dir: 快照文件存放路径
+        """
+        self._snapshot_dir = Path(snapshot_dir)
+        self._snapshot_dir.mkdir(parents=True, exist_ok=True)
+
+    def save_snapshot(self, metadata: Optional[Dict[str, Any]] = None) -> Optional[str]:
+        """
+        保存当前状态快照。
+
+        通常在 pause() 之后调用，以保存暂停时的执行状态。
+        需要先调用 set_snapshot_dir() 设置存储目录。
+
+        Args:
+            metadata: 附加元数据
+
+        Returns:
+            快照 ID，如果不具备保存条件则返回 None
+        """
+        if not self._snapshot_dir:
+            _logger = logging.getLogger("agent.loop")
+            _logger.warning("未设置 snapshot_dir，无法保存快照。请先调用 set_snapshot_dir()")
+            return None
+
+        loop_state = self._lifecycle._current_loop_state
+        if loop_state is None:
+            _logger = logging.getLogger("agent.loop")
+            _logger.warning("没有当前执行状态，无法保存快照")
+            return None
+
+        snapshot = StateSnapshot(self._snapshot_dir)
+        snapshot_id = snapshot.save(
+            agent_id=self._lifecycle._current_loop_state.trace_id,
+            loop_state=loop_state,
+            lifecycle_state=self._lifecycle.state,
+            metadata=metadata,
+        )
+        self._last_snapshot_id = snapshot_id
+        _logger = logging.getLogger("agent.loop")
+        _logger.info(f"快照已保存: {snapshot_id}")
+        return snapshot_id
+
+    async def run_from_snapshot(
+        self,
+        snapshot_id: str,
+        snapshot_dir: Optional[str | Path] = None,
+        metadata: Optional[Dict[str, Any]] = None,
+    ) -> AgentLoopResult:
+        """
+        从快照恢复执行。
+
+        Args:
+            snapshot_id: 快照 ID
+            snapshot_dir: 快照目录（默认使用 set_snapshot_dir 设置的目录）
+            metadata: 附加元数据
+
+        Returns:
+            执行结果
+
+        Raises:
+            FileNotFoundError: 快照不存在
+            RuntimeError: Agent 当前不在可恢复状态
+        """
+        directory = Path(snapshot_dir) if snapshot_dir else self._snapshot_dir
+        if not directory:
+            raise RuntimeError("未设置 snapshot_dir")
+
+        snapshot = StateSnapshot(directory)
+        loop_state, lifecycle_state, snap_metadata = snapshot.load(snapshot_id)
+
+        # 合并元数据
+        merged_metadata = {**(snap_metadata or {}), **(metadata or {})}
+
+        # 更新生命周期管理器状态
+        if lifecycle_state == AgentState.PAUSED:
+            self._lifecycle.state = AgentState.PAUSED
+            self._lifecycle._pause_event.clear()
+            self._lifecycle._stop_requested = False
+        else:
+            # 非 paused 状态，直接开始运行
+            self._lifecycle.state = AgentState.IDLE
+
+        self._lifecycle._current_loop_state = loop_state
+
+        _logger = logging.getLogger("agent.loop")
+        _logger.info(f"从快照恢复: {snapshot_id}, step={loop_state.step}")
+
+        return await self._runner.run(
+            goal=loop_state.goal,
+            messages=loop_state.messages,
+            metadata=merged_metadata,
+            trace_id=loop_state.trace_id,
+        )
+
+    # ── Skill 注册 ────────────────────────────────────────
 
     def skill(
         self,
@@ -419,6 +576,12 @@ class Agent:
         Returns:
             执行结果
         """
+        # 重置生命周期状态（允许从 STOPPED/ERROR 重新开始）
+        if self._lifecycle.state in (AgentState.STOPPED, AgentState.ERROR):
+            self._lifecycle.reset()
+        if self._lifecycle.state == AgentState.IDLE:
+            self._lifecycle.transition_to(AgentState.RUNNING, reason="run started")
+
         if self._config.enable_routing:
             return await self._runner.run_with_routing(
                 goal=goal,
@@ -448,6 +611,21 @@ class Agent:
     def provider(self) -> LLMProvider:
         """获取 LLM Provider"""
         return self._provider
+
+    @property
+    def lifecycle_state(self) -> AgentState:
+        """获取当前生命周期状态"""
+        return self._lifecycle.state
+
+    @property
+    def is_paused(self) -> bool:
+        """是否已暂停"""
+        return self._lifecycle.state == AgentState.PAUSED
+
+    @property
+    def is_running(self) -> bool:
+        """是否正在运行"""
+        return self._lifecycle.state == AgentState.RUNNING
 
 
 __all__ = ["Agent", "AgentConfig"]

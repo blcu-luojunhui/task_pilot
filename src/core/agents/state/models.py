@@ -40,6 +40,7 @@ class StopReason(str, Enum):
     ERROR = "error"  # 未知错误
     # 外部控制
     USER_CANCELLED = "user_cancelled"  # 用户取消
+    USER_PAUSED = "user_paused"  # 用户暂停
     CONSTRAINT_VIOLATION = "constraint_violation"  # 约束违反
 
 
@@ -73,8 +74,15 @@ class AgentLoopState:
     # 工具调用记录
     tool_calls: List[ToolCallRecord] = field(default_factory=list)
 
+    # 生命周期状态
+    lifecycle_state: "AgentState | None" = None
+
     # 元数据
     metadata: Dict[str, Any] = field(default_factory=dict)
+
+    def __post_init__(self):
+        if self.lifecycle_state is None:
+            self.lifecycle_state = AgentState.RUNNING
 
     @property
     def tool_call_history(self) -> List[ToolCallRecord]:

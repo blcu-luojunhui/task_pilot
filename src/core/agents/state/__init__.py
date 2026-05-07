@@ -26,6 +26,7 @@ from .protocol import (
 )
 from .context import ContextWindowManager
 from .memory import ShortTermMemory, LongTermMemory, MemoryEntry
+from .snapshot import StateSnapshot
 
 __all__ = [
     # State
@@ -48,4 +49,6 @@ __all__ = [
     "ShortTermMemory",
     "LongTermMemory",
     "MemoryEntry",
+    # Snapshot
+    "StateSnapshot",
 ]

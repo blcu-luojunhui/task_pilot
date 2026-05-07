@@ -22,6 +22,7 @@ class LifecycleManager:
         self._pause_event.set()  # 初始不暂停
         self._stop_requested = False
         self._on_state_change: Optional[Callable] = None
+        self._current_loop_state: Optional[Any] = None  # AgentLoopState 引用，供 snapshot 使用
 
     def can_transition(self, to_state: AgentState) -> bool:
         """检查是否可以转换到目标状态"""

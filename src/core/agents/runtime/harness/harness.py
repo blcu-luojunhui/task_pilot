@@ -14,6 +14,8 @@ from typing import Any, Callable, Dict, List, Optional
 
 logger = logging.getLogger(__name__)
 
+from typing import TYPE_CHECKING
+
 from src.core.agents.engine.loop import Act
 from src.core.agents.runtime.harness.budget import AgentBudget, BudgetViolation
 from src.core.agents.runtime.harness.constraints import ConstraintSet, ConstraintViolation
@@ -30,10 +32,14 @@ from src.core.agents.engine.loop import Observe
 from src.core.agents.state import (
     AgentLoopResult,
     AgentLoopState,
+    AgentState,
     StopReason,
     generate_agent_trace_id,
 )
 from src.core.agents.engine.loop import Think
+
+if TYPE_CHECKING:
+    from src.core.agents.engine.lifecycle import LifecycleManager
 
 
 @dataclass
@@ -76,6 +82,7 @@ class AgentLoopHarness:
     continuous_improvement: ContinuousImprovement = field(default_factory=ContinuousImprovement)
     workflow: Optional[WorkflowController] = None
     event_logger: HarnessEventLogger = field(default_factory=HarnessEventLogger)
+    lifecycle: "Optional[LifecycleManager]" = None
 
     def __post_init__(self) -> None:
         if self.workflow is None:
@@ -110,7 +117,28 @@ class AgentLoopHarness:
 
         try:
             await self._emit("run_start", state, {"metadata": context.metadata})
+
+            # 同步 lifecycle 初始状态
+            if self.lifecycle:
+                self.lifecycle._current_loop_state = state
+                if self.lifecycle.state == AgentState.IDLE:
+                    self.lifecycle.transition_to(AgentState.RUNNING, reason="harness start")
+                # 如果已在 RUNNING 状态（Agent.run() 可能预先设置了），不再重复转换
+                state.lifecycle_state = self.lifecycle.state
+
             while not state.is_terminated():
+                # 生命周期检查：暂停 / 停止
+                if self.lifecycle:
+                    self.lifecycle._current_loop_state = state
+                    state.lifecycle_state = self.lifecycle.state
+                    await self.lifecycle.wait_if_paused()
+                    if self.lifecycle.is_stop_requested():
+                        state.stop_reason = StopReason.USER_CANCELLED
+                        state.lifecycle_state = self.lifecycle.state
+                        await self._emit("run_stopped", state)
+                        break
+                    state.lifecycle_state = self.lifecycle.state
+
                 decision = self.workflow.before_step(state, self._elapsed_seconds(context))
                 if decision:
                     await self._apply_workflow_decision(state, decision)
@@ -173,8 +201,13 @@ class AgentLoopHarness:
             logger.exception(f"Agent loop crashed at step {state.step}: {e}")
             if not state.stop_reason:
                 state.stop_reason = StopReason.ERROR
+            if self.lifecycle:
+                state.lifecycle_state = self.lifecycle.state
             await self._emit("run_error", state, {"error": str(e)})
 
+        if self.lifecycle:
+            self.lifecycle._current_loop_state = state
+            state.lifecycle_state = self.lifecycle.state
         result = self._build_result(context)
         improvement_record = await self.continuous_improvement.capture(
             state,
