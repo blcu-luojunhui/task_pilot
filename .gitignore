@@ -38,5 +38,5 @@ ENV/
 tests/
 examples/
 scripts/
-docs/design/
-docs/develop/
+/docs/design/
+/docs/develop/
