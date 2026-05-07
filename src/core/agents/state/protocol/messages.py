@@ -1,5 +1,6 @@
 """Message formatting utilities"""
 
+import json
 from typing import Any, Dict, List, Optional
 
 from .models import ToolCall
@@ -12,17 +13,7 @@ def assistant_message(content: str, tool_calls: Optional[List[ToolCall]] = None)
         "content": content,
     }
     if tool_calls:
-        message["tool_calls"] = [
-            {
-                "id": tc.id,
-                "type": "function",
-                "function": {
-                    "name": tc.name,
-                    "arguments": tc.input,
-                }
-            }
-            for tc in tool_calls
-        ]
+        message["tool_calls"] = [tc.to_dict() for tc in tool_calls]
     return message
 
 
@@ -37,31 +28,34 @@ def tool_result_message(tool_call_id: str, content: str, is_error: bool = False)
 
 
 def get_tool_calls(message: Dict[str, Any]) -> List[ToolCall]:
-    """Extract tool calls from a message"""
-    if "tool_calls" not in message:
+    """
+    从 assistant message 中提取 tool calls
+
+    自动兼容 OpenAI/Claude/标准格式
+    """
+    raw_calls = message.get("tool_calls")
+    if not raw_calls:
         return []
 
-    tool_calls = []
-    for tc in message["tool_calls"]:
-        if tc.get("type") == "function":
-            func = tc["function"]
-            tool_calls.append(ToolCall(
-                id=tc["id"],
-                name=func["name"],
-                input=func.get("arguments", {})
-            ))
-    return tool_calls
+    return [ToolCall.from_raw(tc) for tc in raw_calls]
 
 
 def normalize_tool_calls(tool_calls: Any) -> List[ToolCall]:
-    """Normalize tool calls from various formats"""
+    """
+    将任意格式的 tool_calls 标准化为 ToolCall 列表
+
+    支持：
+    - List[ToolCall] (已标准化)
+    - List[Dict] (原始 LLM 响应)
+    - None / 空
+    """
     if not tool_calls:
         return []
 
-    if isinstance(tool_calls, list):
-        return [
-            tc if isinstance(tc, ToolCall) else ToolCall(**tc)
-            for tc in tool_calls
-        ]
-
-    return []
+    result = []
+    for tc in tool_calls:
+        if isinstance(tc, ToolCall):
+            result.append(tc)
+        elif isinstance(tc, dict):
+            result.append(ToolCall.from_raw(tc))
+    return result

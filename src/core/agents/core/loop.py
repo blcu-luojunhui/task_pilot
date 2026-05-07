@@ -8,7 +8,6 @@ Agent Loop - 整合 Think-Act-Observe 循环
 """
 
 import asyncio
-import json
 import logging
 import time
 from dataclasses import dataclass
@@ -69,6 +68,8 @@ class Act:
 
     async def run(self, state: AgentLoopState, tool_calls: List[ToolCall]) -> List[Dict[str, Any]]:
         """执行工具调用"""
+        if not tool_calls:
+            return []
         if len(tool_calls) == 1:
             return [await self._execute_one(state, tool_calls[0])]
         tasks = [self._execute_one(state, call) for call in tool_calls]
@@ -80,34 +81,45 @@ class Act:
         call_id = call.id
         tool_name = call.name
 
-        try:
-            arguments = json.loads(call.arguments) if isinstance(call.arguments, str) else call.arguments
-        except Exception as e:
-            return self._record_error(state, call_id, tool_name, f"Invalid arguments: {e}")
+        # 解析参数（ToolCall.arguments 已经是 dict）
+        arguments = call.arguments
+
+        # 查找 skill
+        skill = self.registry.get(tool_name)
+        if not skill:
+            return self._record_error(state, call_id, tool_name, f"Unknown tool: {tool_name}")
+
+        # 权限检查
+        if self.permission_guard:
+            denial = self.permission_guard.check(skill)
+            if denial:
+                return self._record_error(state, call_id, tool_name, denial)
 
         # 构建上下文
         context = self.context_builder(state) if self.context_builder else SkillContext()
 
         # 执行
         try:
-            result = await self.executor.execute(
-                skill_name=tool_name,
-                parameters=arguments,
-                context=context,
-                registry=self.registry,
-                dependencies=self.tool_dependencies,
-            )
+            result = await self.executor.execute(skill, context, **arguments)
             duration = time.monotonic() - started
             state.tool_calls.append(
-                ToolCallRecord(name=tool_name, arguments=arguments, result=result, duration_ms=duration * 1000)
+                ToolCallRecord(
+                    tool_name=tool_name,
+                    tool_input=arguments,
+                    tool_output=str(result),
+                    duration_ms=duration * 1000,
+                )
             )
             return tool_result_message(call_id, str(result)[:self.max_tool_result_length])
         except Exception as e:
+            logger.warning(f"Tool '{tool_name}' execution failed: {e}")
             return self._record_error(state, call_id, tool_name, str(e))
 
     def _record_error(self, state, call_id, tool_name, error_msg):
         """记录错误"""
-        state.tool_calls.append(ToolCallRecord(name=tool_name, arguments={}, result=None, error=error_msg))
+        state.tool_calls.append(
+            ToolCallRecord(tool_name=tool_name, tool_input={}, error=error_msg)
+        )
         return tool_result_message(call_id, f"Error: {error_msg}", is_error=True)
 
 

@@ -5,6 +5,7 @@ DeepSeek Provider 实现（重构现有实现）
 import aiohttp
 from typing import List, Dict, Optional, AsyncIterator
 from ..base import LLMProvider, LLMMessage, LLMResponse, LLMConfig, FinishReason
+from ....exceptions import LLMProviderError, LLMRateLimitError
 
 
 class DeepSeekProvider(LLMProvider):
@@ -52,7 +53,9 @@ class DeepSeekProvider(LLMProvider):
             ) as resp:
                 if resp.status != 200:
                     error_text = await resp.text()
-                    raise Exception(f"DeepSeek API error: {resp.status} - {error_text}")
+                    if resp.status == 429:
+                        raise LLMRateLimitError("deepseek")
+                    raise LLMProviderError("deepseek", error_text, resp.status)
 
                 data = await resp.json()
 

@@ -7,9 +7,12 @@ focused on their own stage logic.
 """
 
 import inspect
+import logging
 import time
 from dataclasses import dataclass, field
 from typing import Any, Callable, Dict, List, Optional
+
+logger = logging.getLogger(__name__)
 
 from src.core.agents.core.loop import Act
 from src.core.agents.runtime.harness.budget import AgentBudget, BudgetViolation
@@ -107,23 +110,24 @@ class AgentLoopHarness:
         )
         state = context.state
 
-        await self._emit("run_start", state, {"metadata": context.metadata})
-        while not state.is_terminated():
-            decision = self.workflow.before_step(state, self._elapsed_seconds(context))
-            if decision:
-                await self._apply_workflow_decision(state, decision)
-                break
+        try:
+            await self._emit("run_start", state, {"metadata": context.metadata})
+            while not state.is_terminated():
+                decision = self.workflow.before_step(state, self._elapsed_seconds(context))
+                if decision:
+                    await self._apply_workflow_decision(state, decision)
+                    break
 
-            state.step += 1
-            await self._emit("step_start", state)
+                state.step += 1
+                await self._emit("step_start", state)
 
-            assistant_message = await self._think(state)
-            if state.is_terminated() or assistant_message is None:
-                break
+                assistant_message = await self._think(state)
+                if state.is_terminated() or assistant_message is None:
+                    break
 
-            decision = self.workflow.after_think(state, assistant_message)
-            if decision:
-                await self._apply_workflow_decision(state, decision)
+                decision = self.workflow.after_think(state, assistant_message)
+                if decision:
+                    await self._apply_workflow_decision(state, decision)
                 break
 
             tool_results = []
@@ -166,6 +170,12 @@ class AgentLoopHarness:
                     "tool_results": tool_results,
                 },
             )
+
+        except Exception as e:
+            logger.exception(f"Agent loop crashed at step {state.step}: {e}")
+            if not state.stop_reason:
+                state.stop_reason = StopReason.ERROR
+            await self._emit("run_error", state, {"error": str(e)})
 
         result = self._build_result(context)
         improvement_record = await self.continuous_improvement.capture(

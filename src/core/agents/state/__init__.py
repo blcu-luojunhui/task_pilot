@@ -9,6 +9,8 @@ State Layer - 状态层
 """
 
 from .models import (
+    AgentState,
+    StateTransition,
     StopReason,
     ToolCallRecord,
     AgentLoopState,
@@ -27,6 +29,8 @@ from .memory import ShortTermMemory, LongTermMemory, MemoryEntry
 
 __all__ = [
     # State
+    "AgentState",
+    "StateTransition",
     "StopReason",
     "ToolCallRecord",
     "AgentLoopState",

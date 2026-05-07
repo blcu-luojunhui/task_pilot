@@ -18,7 +18,29 @@ from src.core.agents.capabilities import (
     SkillType,
     RiskLevel,
 )
-from src.core.agents.execution import AgentLoopRunner
+from src.core.agents.capabilities.llm.base import LLMProvider, LLMConfig
+from src.core.agents.capabilities.llm.providers import (
+    OpenAIProvider,
+    ClaudeProvider,
+    DeepSeekProvider,
+)
+from src.core.agents.exceptions import AgentConfigError
+from .runner import AgentLoopRunner
+
+
+# 支持的 LLM Provider 映射
+_PROVIDER_MAP = {
+    "openai": OpenAIProvider,
+    "claude": ClaudeProvider,
+    "deepseek": DeepSeekProvider,
+}
+
+# 各 Provider 的默认配置
+_PROVIDER_DEFAULTS = {
+    "openai": {"model": "gpt-4", "base_url": "https://api.openai.com/v1"},
+    "claude": {"model": "claude-3-opus-20240229", "base_url": "https://api.anthropic.com/v1"},
+    "deepseek": {"model": "deepseek-chat", "base_url": "https://api.deepseek.com"},
+}
 
 
 @dataclass
@@ -26,9 +48,10 @@ class AgentConfig:
     """Agent 配置"""
 
     # LLM 配置
-    llm_api_key: str
-    llm_model: str = "deepseek-chat"
-    llm_base_url: str = "https://api.deepseek.com/chat/completions"
+    llm_provider: str = "deepseek"  # openai, claude, deepseek
+    llm_api_key: str = ""
+    llm_model: Optional[str] = None  # None 表示使用 provider 默认值
+    llm_base_url: Optional[str] = None  # None 表示使用 provider 默认值
     llm_temperature: float = 0.2
 
     # 执行配置
@@ -39,12 +62,32 @@ class AgentConfig:
     max_consecutive_errors: int = 3
 
     # 工具配置
-    tool_areas: Optional[List[str]] = None  # ["database", "http", "task", "utils"]
+    tool_areas: Optional[List[str]] = None
     tool_dependencies: Optional[Mapping[str, Any]] = None
 
     # 其他配置
     enable_routing: bool = False
     is_cancelled: Optional[Callable[[], bool]] = None
+
+    def __post_init__(self):
+        """配置验证"""
+        if not self.llm_api_key:
+            raise AgentConfigError("llm_api_key is required")
+        if self.llm_provider not in _PROVIDER_MAP:
+            raise AgentConfigError(
+                f"Unsupported llm_provider: '{self.llm_provider}'. "
+                f"Supported: {list(_PROVIDER_MAP.keys())}"
+            )
+        if self.max_steps <= 0:
+            raise AgentConfigError("max_steps must be > 0")
+        if not (0 <= self.llm_temperature <= 2):
+            raise AgentConfigError("llm_temperature must be in [0, 2]")
+        if self.max_context_tokens <= 0:
+            raise AgentConfigError("max_context_tokens must be > 0")
+        if self.max_tool_result_length <= 0:
+            raise AgentConfigError("max_tool_result_length must be > 0")
+        if self.max_consecutive_errors <= 0:
+            raise AgentConfigError("max_consecutive_errors must be > 0")
 
 
 class Agent:
@@ -75,19 +118,20 @@ class Agent:
         runner: AgentLoopRunner,
         registry: SkillRegistry,
         config: AgentConfig,
-        planner_settings: DeepSeekSettings,
+        provider: LLMProvider,
     ):
         self._runner = runner
         self._registry = registry
         self._config = config
-        self._planner_settings = planner_settings
+        self._provider = provider
 
     @classmethod
     def create(
         cls,
         llm_api_key: str,
-        llm_model: str = "deepseek-chat",
-        llm_base_url: str = "https://api.deepseek.com/chat/completions",
+        llm_provider: str = "deepseek",
+        llm_model: Optional[str] = None,
+        llm_base_url: Optional[str] = None,
         llm_temperature: float = 0.2,
         max_steps: int = 8,
         tool_areas: Optional[List[str]] = None,
@@ -100,8 +144,9 @@ class Agent:
 
         Args:
             llm_api_key: LLM API 密钥
-            llm_model: LLM 模型名称
-            llm_base_url: LLM API 地址
+            llm_provider: LLM 提供商 (openai, claude, deepseek)
+            llm_model: LLM 模型名称（None 使用 provider 默认值）
+            llm_base_url: LLM API 地址（None 使用 provider 默认值）
             llm_temperature: 温度参数
             max_steps: 最大执行步数
             tool_areas: 要加载的工具区域列表
@@ -112,10 +157,16 @@ class Agent:
         Returns:
             Agent 实例
         """
+        # 解析 provider 默认值
+        defaults = _PROVIDER_DEFAULTS.get(llm_provider, _PROVIDER_DEFAULTS["deepseek"])
+        resolved_model = llm_model or defaults["model"]
+        resolved_base_url = llm_base_url or defaults["base_url"]
+
         config = AgentConfig(
+            llm_provider=llm_provider,
             llm_api_key=llm_api_key,
-            llm_model=llm_model,
-            llm_base_url=llm_base_url,
+            llm_model=resolved_model,
+            llm_base_url=resolved_base_url,
             llm_temperature=llm_temperature,
             max_steps=max_steps,
             tool_areas=tool_areas,
@@ -132,40 +183,68 @@ class Agent:
         registry = get_global_registry()
         executor = SkillExecutor()
 
-        # 创建 planner settings
-        planner_settings = DeepSeekSettings(
+        # 创建 LLM Provider
+        provider_cls = _PROVIDER_MAP.get(llm_provider)
+        if not provider_cls:
+            raise ValueError(
+                f"Unknown LLM provider: {llm_provider}. "
+                f"Supported: {list(_PROVIDER_MAP.keys())}"
+            )
+
+        llm_config = LLMConfig(
             api_key=config.llm_api_key,
-            model=config.llm_model,
-            base_url=config.llm_base_url,
+            model=resolved_model,
+            base_url=resolved_base_url,
             temperature=config.llm_temperature,
         )
+        provider = provider_cls(llm_config)
 
         # 创建 planner 工厂函数
-        # 注意：DeepSeekPlanner 需要 goal 参数，我们在这里创建一个包装器
-        from src.core.agents.capabilities.llm import DeepSeekPlanner
-
         async def planner_factory(messages: List[Dict[str, Any]], step: int) -> Dict[str, Any]:
             """
-            Planner 工厂函数
+            统一的 Planner 工厂函数
 
-            由于 DeepSeekPlanner 需要 goal 参数，我们在运行时动态创建实例
+            使用 LLMProvider 抽象层，支持任意 LLM
             """
-            # 从 messages 中提取 goal
-            goal = "Complete the task"
-            for msg in messages:
-                if msg.get("role") == "system":
-                    content = msg.get("content", "")
-                    if "goal" in content.lower() or "任务" in content:
-                        goal = content
-                        break
+            from src.core.agents.capabilities.llm.base import LLMMessage
 
-            # 创建 DeepSeekPlanner 实例
-            planner_instance = DeepSeekPlanner(
-                goal=goal,
-                registry=registry,
-                settings=planner_settings,
+            # 转换消息格式
+            llm_messages = [
+                LLMMessage(role=m["role"], content=m.get("content", ""))
+                for m in messages
+            ]
+
+            # 构建工具列表
+            tools = []
+            for skill in registry.list():
+                if skill.skill_type.value == "executable":
+                    tools.append({
+                        "type": "function",
+                        "function": {
+                            "name": skill.name,
+                            "description": skill.description,
+                            "parameters": skill.parameters or {},
+                        }
+                    })
+
+            # 调用 LLM
+            response = await provider.chat(
+                messages=llm_messages,
+                tools=tools if tools else None,
+                temperature=config.llm_temperature,
             )
-            return await planner_instance(messages, step)
+
+            # 转换为内部格式（标准化 tool_calls）
+            result = {
+                "role": "assistant",
+                "content": response.content,
+            }
+            if response.tool_calls:
+                from src.core.agents.state.protocol import normalize_tool_calls
+                normalized = normalize_tool_calls(response.tool_calls)
+                result["tool_calls"] = [tc.to_dict() for tc in normalized]
+
+            return result
 
         # 创建 runner
         runner = AgentLoopRunner(
@@ -181,7 +260,7 @@ class Agent:
             is_cancelled=config.is_cancelled,
         )
 
-        return cls(runner, registry, config, planner_settings)
+        return cls(runner, registry, config, provider)
 
     def skill(
         self,
@@ -302,9 +381,9 @@ class Agent:
         return self._config
 
     @property
-    def planner_settings(self) -> DeepSeekSettings:
-        """获取 planner 配置"""
-        return self._planner_settings
+    def provider(self) -> LLMProvider:
+        """获取 LLM Provider"""
+        return self._provider
 
 
 __all__ = ["Agent", "AgentConfig"]

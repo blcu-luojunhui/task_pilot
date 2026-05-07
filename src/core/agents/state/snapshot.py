@@ -10,8 +10,7 @@ from typing import Optional, Dict, Any
 from datetime import datetime
 from dataclasses import asdict
 
-from ..core.lifecycle import AgentState
-from .models import AgentLoopState, StopReason
+from .models import AgentState, AgentLoopState, StopReason
 
 
 class StateSnapshot:

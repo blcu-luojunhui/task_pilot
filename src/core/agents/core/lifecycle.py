@@ -4,29 +4,12 @@ Agent 生命周期管理
 提供 Agent 的状态管理和生命周期控制
 """
 
-from enum import Enum
 from dataclasses import dataclass, field
 from typing import Optional, Callable, List
 from datetime import datetime
 import asyncio
 
-
-class AgentState(str, Enum):
-    """Agent 状态"""
-    IDLE = "idle"           # 空闲
-    RUNNING = "running"     # 运行中
-    PAUSED = "paused"       # 暂停
-    STOPPED = "stopped"     # 已停止
-    ERROR = "error"         # 错误
-
-
-@dataclass
-class StateTransition:
-    """状态转换记录"""
-    from_state: AgentState
-    to_state: AgentState
-    timestamp: datetime = field(default_factory=datetime.now)
-    reason: Optional[str] = None
+from ..state.models import AgentState, StateTransition
 
 
 class LifecycleManager:
