@@ -5,11 +5,11 @@ Agent 生命周期管理
 """
 
 from dataclasses import dataclass, field
-from typing import Optional, Callable, List
+from typing import Optional, Callable, List, Any
 from datetime import datetime
 import asyncio
 
-from ..state.models import AgentState, StateTransition
+from ..state.models import AgentState, StateTransition, AgentLoopState
 
 
 class LifecycleManager:
@@ -22,7 +22,16 @@ class LifecycleManager:
         self._pause_event.set()  # 初始不暂停
         self._stop_requested = False
         self._on_state_change: Optional[Callable] = None
-        self._current_loop_state: Optional[Any] = None  # AgentLoopState 引用，供 snapshot 使用
+        self._current_loop_state: Optional[AgentLoopState] = None
+
+    @property
+    def current_loop_state(self) -> Optional[AgentLoopState]:
+        """当前 loop 状态引用"""
+        return self._current_loop_state
+
+    @current_loop_state.setter
+    def current_loop_state(self, value: Optional[AgentLoopState]):
+        self._current_loop_state = value
 
     def can_transition(self, to_state: AgentState) -> bool:
         """检查是否可以转换到目标状态"""

@@ -192,7 +192,7 @@ class Act:
     def _record_error(self, state, call_id, tool_name, error_msg):
         """记录错误"""
         state.tool_calls.append(ToolCallRecord(tool_name=tool_name, tool_input={}, error=error_msg))
-        return tool_result_message(call_id, f"Error: {error_msg}", is_error=True)
+        return tool_result_message(call_id, f"Error: {error_msg}")
 
 
 @dataclass
@@ -219,7 +219,9 @@ class Observe:
 
         state.add_tool_results(tool_results)
 
-        has_errors = any(r.get("is_error") for r in tool_results)
+        has_errors = any(
+            str(r.get("content", "")).startswith("Error:") for r in tool_results
+        )
         if has_errors:
             state.consecutive_tool_errors += 1
         else:

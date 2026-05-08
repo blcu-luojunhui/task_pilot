@@ -1,7 +1,12 @@
 """
 统一调度入口 - 协调 executor 和 router
+
+.. deprecated::
+    此模块尚未接入主执行链路，暂不可用。当前的编排路径是：
+    Agent.run() -> AgentLoopRunner -> AgentLoopHarness。
 """
 
+import warnings
 from typing import Any, Dict, List, Optional
 from dataclasses import dataclass
 
@@ -10,7 +15,12 @@ from .result import ExecutionResult, ExecutionStatus
 
 @dataclass
 class Dispatcher:
-    """统一调度器"""
+    """
+    统一调度器（待接入主链路）
+
+    .. deprecated::
+        当前未接入主执行路径。编排由 AgentLoopRunner + AgentLoopHarness 完成。
+    """
 
     def __init__(self, executor=None, router=None):
         self.executor = executor

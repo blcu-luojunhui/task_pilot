@@ -5,6 +5,7 @@ Skill 执行器
 """
 
 import asyncio
+import inspect
 import logging
 from typing import Any, Dict, Optional
 
@@ -25,7 +26,7 @@ class SkillExecutionError(Exception):
 
 
 class SkillExecutor:
-    """Skill 执行器"""
+    """Skill 执行器（含参数校验 + 权限守卫 + 超时 + 重试）"""
 
     def __init__(
         self,
@@ -33,6 +34,7 @@ class SkillExecutor:
         retry: int = 0,
         retry_delay: float = 1.0,
         validate_params: bool = True,
+        permission_guard=None,
     ):
         """
         初始化执行器
@@ -42,11 +44,13 @@ class SkillExecutor:
             retry: 重试次数
             retry_delay: 重试延迟（秒）
             validate_params: 是否验证参数
+            permission_guard: 可选 PermissionGuard 实例
         """
         self.timeout = timeout
         self.retry = retry
         self.retry_delay = retry_delay
         self.validate_params = validate_params
+        self.permission_guard = permission_guard
         self.validator = ParameterValidator()
 
     async def execute(self, skill: Skill, ctx: SkillContext, **params) -> Any:
@@ -65,6 +69,14 @@ class SkillExecutor:
             SkillValidationError: 参数验证失败
             SkillExecutionError: 执行失败
         """
+        # 权限检查
+        if self.permission_guard:
+            denial = self.permission_guard.check(skill)
+            if denial:
+                from ....exceptions import ToolPermissionError
+
+                raise ToolPermissionError(skill.name, denial)
+
         # 参数验证
         if self.validate_params:
             try:
@@ -109,8 +121,6 @@ class SkillExecutor:
         params: Dict[str, Any],
     ) -> Any:
         """带超时的执行（兼容同步和异步 handler）"""
-        import inspect
-
         try:
             if inspect.iscoroutinefunction(skill.handler):
                 result = await asyncio.wait_for(
@@ -118,8 +128,12 @@ class SkillExecutor:
                     timeout=self.timeout,
                 )
             else:
-                # 同步函数直接调用
-                result = skill.handler(ctx, **params)
+                # 同步函数通过线程池执行，避免阻塞事件循环
+                loop = asyncio.get_running_loop()
+                result = await asyncio.wait_for(
+                    loop.run_in_executor(None, skill.handler, ctx, **params),
+                    timeout=self.timeout,
+                )
             return result
         except asyncio.TimeoutError:
             logger.error(f"Skill '{skill.name}' execution timeout after {self.timeout}s")

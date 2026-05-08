@@ -2,6 +2,7 @@
 Claude Provider 实现
 """
 
+import json
 import aiohttp
 from typing import List, Dict, Optional, AsyncIterator
 from ..base import LLMProvider, LLMMessage, LLMResponse, LLMConfig, FinishReason
@@ -44,8 +45,8 @@ class ClaudeProvider(LLMProvider):
         payload = {
             "model": self.config.model,
             "messages": user_messages,
-            "temperature": temperature or self.config.temperature,
-            "max_tokens": max_tokens or self.config.max_tokens or 4096,
+            "temperature": temperature if temperature is not None else self.config.temperature,
+            "max_tokens": max_tokens if max_tokens is not None else (self.config.max_tokens or 4096),
         }
 
         if system_message:
@@ -85,10 +86,22 @@ class ClaudeProvider(LLMProvider):
                             }
                         )
 
+                stop_reason = data.get("stop_reason", "stop")
+                # Claude 的 stop_reason 值映射到内部统一枚举
+                _CLAUDE_REASON_MAP = {
+                    "end_turn": FinishReason.STOP,
+                    "max_tokens": FinishReason.LENGTH,
+                    "tool_use": FinishReason.TOOL_CALLS,
+                    "stop_sequence": FinishReason.STOP,
+                }
+                finish_reason = _CLAUDE_REASON_MAP.get(stop_reason)
+                if finish_reason is None:
+                    finish_reason = FinishReason.STOP
+
                 return LLMResponse(
                     content=text_content,
                     tool_calls=tool_calls if tool_calls else None,
-                    finish_reason=FinishReason(data.get("stop_reason", "stop")),
+                    finish_reason=finish_reason,
                     usage=data.get("usage"),
                     raw_response=data,
                 )
@@ -136,14 +149,12 @@ class ClaudeProvider(LLMProvider):
                     if line.startswith("data: "):
                         data_str = line[6:]
                         try:
-                            import json
-
                             data = json.loads(data_str)
                             if data.get("type") == "content_block_delta":
                                 delta = data.get("delta", {})
                                 if delta.get("type") == "text_delta":
                                     yield delta.get("text", "")
-                        except:
+                        except (json.JSONDecodeError, KeyError):
                             continue
 
     def _convert_message(self, message: LLMMessage) -> Dict:

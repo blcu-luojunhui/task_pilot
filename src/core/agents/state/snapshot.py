@@ -49,6 +49,7 @@ class StateSnapshot:
         snapshot_path = self.storage_dir / f"{snapshot_id}.json"
 
         snapshot_data = {
+            "schema_version": 2,
             "snapshot_id": snapshot_id,
             "agent_id": agent_id,
             "lifecycle_state": lifecycle_state.value,
@@ -59,13 +60,34 @@ class StateSnapshot:
                 "messages": loop_state.messages,
                 "tool_calls": [
                     {
-                        "name": tc.name,
-                        "arguments": tc.arguments,
-                        "result": str(tc.result) if tc.result else None,
+                        "tool_name": tc.tool_name,
+                        "tool_input": tc.tool_input,
+                        "tool_output": tc.tool_output,
                         "error": tc.error,
                         "duration_ms": tc.duration_ms,
                     }
                     for tc in loop_state.tool_calls
+                ],
+                "steps": [
+                    {
+                        "step_number": s.step_number,
+                        "thought": {
+                            "type": s.thought.type.value if s.thought else None,
+                            "content": s.thought.content if s.thought else "",
+                        } if s.thought else None,
+                        "action": {
+                            "type": s.action.type.value if s.action else None,
+                            "target": s.action.target if s.action else "",
+                            "parameters": s.action.parameters if s.action else {},
+                        } if s.action else None,
+                        "observation": {
+                            "result": s.observation.result if s.observation else None,
+                            "success": s.observation.success if s.observation else False,
+                            "error": s.observation.error if s.observation else None,
+                            "duration_ms": s.observation.duration_ms if s.observation else 0.0,
+                        } if s.observation else None,
+                    }
+                    for s in loop_state.steps
                 ],
                 "final_answer": loop_state.final_answer,
                 "stop_reason": loop_state.stop_reason.value if loop_state.stop_reason else None,
@@ -115,15 +137,52 @@ class StateSnapshot:
         if loop_data.get("stop_reason"):
             loop_state.stop_reason = StopReason(loop_data["stop_reason"])
 
+        # 恢复 steps
+        from ..engine.types import Thought, Action, Observation, Step, ThoughtType, ActionType
+
+        for s_data in loop_data.get("steps", []):
+            thought = None
+            if s_data.get("thought"):
+                t = s_data["thought"]
+                thought_type = ThoughtType(t["type"]) if t.get("type") else ThoughtType.REASONING
+                thought = Thought(type=thought_type, content=t.get("content", ""))
+            action = None
+            if s_data.get("action"):
+                a = s_data["action"]
+                action_type = ActionType(a["type"]) if a.get("type") else ActionType.TOOL_CALL
+                action = Action(
+                    type=action_type,
+                    target=a.get("target", ""),
+                    parameters=a.get("parameters", {}),
+                )
+            observation = None
+            if s_data.get("observation"):
+                o = s_data["observation"]
+                observation = Observation(
+                    action=action,
+                    result=o.get("result"),
+                    success=o.get("success", False),
+                    error=o.get("error"),
+                    duration_ms=o.get("duration_ms", 0.0),
+                )
+            loop_state.steps.append(
+                Step(
+                    step_number=s_data["step_number"],
+                    thought=thought,
+                    action=action,
+                    observation=observation,
+                )
+            )
+
         # 恢复 tool_calls
         from .models import ToolCallRecord
 
         for tc_data in loop_data.get("tool_calls", []):
             loop_state.tool_calls.append(
                 ToolCallRecord(
-                    name=tc_data["name"],
-                    arguments=tc_data["arguments"],
-                    result=tc_data.get("result"),
+                    tool_name=tc_data.get("tool_name", tc_data.get("name", "")),
+                    tool_input=tc_data.get("tool_input", tc_data.get("arguments", {})),
+                    tool_output=tc_data.get("tool_output", tc_data.get("result")),
                     error=tc_data.get("error"),
                     duration_ms=tc_data.get("duration_ms", 0.0),
                 )
@@ -163,7 +222,7 @@ class StateSnapshot:
                         "step": data["loop_state"]["step"],
                     }
                 )
-            except:
+            except (json.JSONDecodeError, KeyError, OSError):
                 continue
 
         # 按时间倒序排序

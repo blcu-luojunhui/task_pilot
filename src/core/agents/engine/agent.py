@@ -42,9 +42,9 @@ _PROVIDER_MAP = {
 
 # 各 Provider 的默认配置
 _PROVIDER_DEFAULTS = {
-    "openai": {"model": "gpt-4", "base_url": "https://api.openai.com/v1"},
+    "openai": {"model": "gpt-4o", "base_url": "https://api.openai.com/v1"},
     "claude": {
-        "model": "claude-3-opus-20240229",
+        "model": "claude-sonnet-4-6",
         "base_url": "https://api.anthropic.com/v1",
     },
     "deepseek": {"model": "deepseek-chat", "base_url": "https://api.deepseek.com"},
@@ -338,6 +338,9 @@ class Agent:
 
         如果 Agent 正在 run() 中执行，调用此方法后 Agent 会在当前 step 完成后暂停，
         run() 协程不会返回，而是阻塞等待 resume()。
+
+        Raises:
+            RuntimeError: 当前状态不允许暂停
         """
         try:
             self._lifecycle.transition_to(AgentState.PAUSED, reason="user paused")
@@ -346,12 +349,16 @@ class Agent:
         except ValueError as e:
             _logger = logging.getLogger("agent.loop")
             _logger.warning(f"无法暂停 Agent（当前状态: {self._lifecycle.state}）: {e}")
+            raise RuntimeError(f"Cannot pause agent in state {self._lifecycle.state}") from e
 
     def resume(self):
         """
         恢复 Agent 执行。
 
         恢复之前被 pause() 暂停的 Agent，run() 协程将继续从暂停点执行。
+
+        Raises:
+            RuntimeError: 当前状态不允许恢复
         """
         try:
             self._lifecycle.transition_to(AgentState.RUNNING, reason="user resumed")
@@ -360,12 +367,16 @@ class Agent:
         except ValueError as e:
             _logger = logging.getLogger("agent.loop")
             _logger.warning(f"无法恢复 Agent（当前状态: {self._lifecycle.state}）: {e}")
+            raise RuntimeError(f"Cannot resume agent in state {self._lifecycle.state}") from e
 
     def stop(self):
         """
         停止 Agent 执行。
 
         调用后 run() 将在当前 step 完成后返回，stop_reason 为 USER_CANCELLED。
+
+        Raises:
+            RuntimeError: 当前状态不允许停止
         """
         try:
             self._lifecycle.transition_to(AgentState.STOPPED, reason="user stopped")
@@ -374,6 +385,7 @@ class Agent:
         except ValueError as e:
             _logger = logging.getLogger("agent.loop")
             _logger.warning(f"无法停止 Agent（当前状态: {self._lifecycle.state}）: {e}")
+            raise RuntimeError(f"Cannot stop agent in state {self._lifecycle.state}") from e
 
     # ── 快照管理 ──────────────────────────────────────────
 
@@ -405,7 +417,7 @@ class Agent:
             _logger.warning("未设置 snapshot_dir，无法保存快照。请先调用 set_snapshot_dir()")
             return None
 
-        loop_state = self._lifecycle._current_loop_state
+        loop_state = self._lifecycle.current_loop_state
         if loop_state is None:
             _logger = logging.getLogger("agent.loop")
             _logger.warning("没有当前执行状态，无法保存快照")
@@ -413,7 +425,7 @@ class Agent:
 
         snapshot = StateSnapshot(self._snapshot_dir)
         snapshot_id = snapshot.save(
-            agent_id=self._lifecycle._current_loop_state.trace_id,
+            agent_id=self._lifecycle.current_loop_state.trace_id,
             loop_state=loop_state,
             lifecycle_state=self._lifecycle.state,
             metadata=metadata,
@@ -463,7 +475,7 @@ class Agent:
             # 非 paused 状态，直接开始运行
             self._lifecycle.state = AgentState.IDLE
 
-        self._lifecycle._current_loop_state = loop_state
+        self._lifecycle.current_loop_state = loop_state
 
         _logger = logging.getLogger("agent.loop")
         _logger.info(f"从快照恢复: {snapshot_id}, step={loop_state.step}")

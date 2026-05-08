@@ -34,6 +34,12 @@ class PromptAssembler:
             sections.append(knowledge)
 
         content = "\n\n".join(section for section in sections if section)
+
+        # 截断到 max_system_tokens（按 ~4 chars/token 估算）
+        max_chars = self.max_system_tokens * 4
+        if len(content) > max_chars:
+            content = content[:max_chars]
+
         return {
             "role": "system",
             "content": content,

@@ -1,4 +1,4 @@
-"""Task router implementation"""
+"""Task router implementation — goal decomposition for the Think stage."""
 
 import json
 from dataclasses import dataclass
@@ -9,7 +9,7 @@ from src.core.agents.engine.loop import AssistantPlanner
 
 @dataclass
 class TaskRouter:
-    """Route a goal into one or more sub-goals."""
+    """Route a goal into one or more sub-goals via LLM-based decomposition."""
 
     planner: AssistantPlanner
     enabled: bool = True

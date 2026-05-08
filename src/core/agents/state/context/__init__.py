@@ -8,7 +8,9 @@ This module manages agent context window:
 """
 
 from .manager import ContextWindowManager
+from .tokenizer import TokenCounter
 
 __all__ = [
     "ContextWindowManager",
+    "TokenCounter",
 ]

@@ -47,6 +47,18 @@ class ParameterValidator:
                     f"Missing required parameter '{param_name}' for skill '{skill.name}'"
                 )
 
+        # 验证参数类型
+        for param_name, param_value in params.items():
+            if param_name in skill.parameters:
+                param_spec = skill.parameters[param_name]
+                expected_type = param_spec.get("type", "string")
+                if not ParameterValidator.validate_type(param_value, expected_type):
+                    actual_type = type(param_value).__name__
+                    raise SkillValidationError(
+                        f"Parameter '{param_name}' for skill '{skill.name}' "
+                        f"expected type '{expected_type}', got '{actual_type}'"
+                    )
+
         # 验证未知参数
         defined_params = set(skill.parameters.keys())
         provided_params = set(params.keys())

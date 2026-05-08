@@ -5,6 +5,7 @@
 """
 
 import asyncio
+import time
 from typing import Any, Dict, List, Callable, Awaitable, Optional
 from collections import defaultdict
 import logging
@@ -42,6 +43,9 @@ class MessageBus:
             "messages_by_type": defaultdict(int),
             "messages_by_agent": defaultdict(int),
         }
+
+        # 优先级过滤时暂存的低优消息
+        self._deferred: Dict[str, List[Message]] = defaultdict(list)
 
     def register_agent(self, agent_id: str) -> asyncio.Queue:
         """
@@ -172,18 +176,29 @@ class MessageBus:
         if not queue:
             raise ValueError(f"Agent {agent_id} not registered")
 
+        # 循环取消息直到满足优先级条件或超时
+        deadline = None
         if timeout:
-            message = await asyncio.wait_for(queue.get(), timeout=timeout)
-        else:
-            message = await queue.get()
+            deadline = time.monotonic() + timeout
 
-        # 优先级过滤
-        if priority_filter and message.priority < priority_filter:
-            # 放回队列，继续等待
-            await queue.put(message)
-            return await self.receive(agent_id, timeout, priority_filter)
+        while True:
+            remaining = None
+            if deadline is not None:
+                remaining = deadline - time.monotonic()
+                if remaining <= 0:
+                    raise asyncio.TimeoutError
+            try:
+                message = await asyncio.wait_for(queue.get(), timeout=remaining)
+            except asyncio.TimeoutError:
+                raise
 
-        return message
+            if priority_filter is None or message.priority >= priority_filter:
+                return message
+
+            # 优先级不满足，放入低优暂存列表而非重新入队
+            # 避免破坏 FIFO 顺序
+            self._deferred[agent_id] = self._deferred.get(agent_id, [])
+            self._deferred[agent_id].append(message)
 
     def get_history(
         self,

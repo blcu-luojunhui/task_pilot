@@ -4,10 +4,29 @@ HTTP Tools - HTTP 客户端工具
 封装 AsyncHttpClient 为 Agent 可调用的技能
 """
 
+from urllib.parse import urlparse
 from typing import Any, Dict, Optional
 
 from src.core.agents.capabilities.skills import skill, SkillContext
 from src.infra.shared import AsyncHttpClient
+
+# 默认允许的 URL scheme
+_ALLOWED_SCHEMES = {"http", "https"}
+
+
+def _validate_url(url: str) -> None:
+    """校验 URL，防止 SSRF"""
+    parsed = urlparse(url)
+    if parsed.scheme not in _ALLOWED_SCHEMES:
+        raise PermissionError(f"URL scheme '{parsed.scheme}' not allowed, only http/https")
+    hostname = (parsed.hostname or "").lower()
+    if not hostname:
+        raise ValueError(f"Invalid URL: no hostname in '{url}'")
+    # 禁止访问内网地址
+    if hostname in ("localhost", "127.0.0.1", "::1", "0.0.0.0"):
+        raise PermissionError(f"URL host '{hostname}' is blocked")
+    if hostname.startswith("10.") or hostname.startswith("172.16.") or hostname.startswith("192.168."):
+        raise PermissionError(f"URL host '{hostname}' is in private range")
 
 
 @skill(
@@ -18,7 +37,7 @@ from src.infra.shared import AsyncHttpClient
     parameters={
         "url": {
             "type": "string",
-            "description": "请求 URL",
+            "description": "请求 URL（仅限 http/https 公网地址）",
             "required": True,
         },
         "params": {
@@ -40,6 +59,7 @@ async def http_get(
     headers: Optional[Dict[str, str]] = None,
 ) -> Any:
     """发送 GET 请求"""
+    _validate_url(url)
     await ctx.log.log(
         {
             "event": "http_get",
@@ -61,7 +81,7 @@ async def http_get(
     parameters={
         "url": {
             "type": "string",
-            "description": "请求 URL",
+            "description": "请求 URL（仅限 http/https 公网地址）",
             "required": True,
         },
         "json": {
@@ -89,6 +109,7 @@ async def http_post(
     headers: Optional[Dict[str, str]] = None,
 ) -> Any:
     """发送 POST 请求"""
+    _validate_url(url)
     await ctx.log.log(
         {
             "event": "http_post",

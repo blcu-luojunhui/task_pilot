@@ -6,6 +6,7 @@ from typing import Any, Callable, Dict, List, Optional
 from dataclasses import dataclass, field
 
 from .skills import Skill, SkillRegistry as BaseSkillRegistry, SkillType, RiskLevel
+from .skills.registry import get_global_registry
 
 
 @dataclass
@@ -13,10 +14,11 @@ class CapabilityRegistry:
     """
     统一的能力注册器
 
-    整合 tools 和 skills 的注册，提供统一的接口
+    整合 tools 和 skills 的注册，提供统一的接口。
+    默认使用全局 SkillRegistry，确保 skill 注册不重复。
     """
 
-    _skill_registry: BaseSkillRegistry = field(default_factory=BaseSkillRegistry)
+    _skill_registry: BaseSkillRegistry = field(default_factory=get_global_registry)
     _tools: Dict[str, Callable] = field(default_factory=dict)
 
     def register_skill(self, skill: Skill):

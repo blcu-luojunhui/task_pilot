@@ -6,8 +6,8 @@ from typing import Any, Callable, Dict, List, Mapping, Optional
 # state
 from src.core.agents.state import AgentLoopResult, StopReason, ContextWindowManager
 
-# agent execution
-from src.core.agents.execution import TaskRouter
+# task routing (decomposition)
+from .prompting import TaskRouter
 
 # agent harness
 from src.core.agents.runtime.harness import (
@@ -165,7 +165,7 @@ class AgentLoopRunner:
 
         accumulated_messages = list(messages or [])
         results: List[str] = []
-        last_result: AgentLoopResult = None  # type: ignore[assignment]
+        last_result: Optional[AgentLoopResult] = None
 
         for index, sub_goal in enumerate(sub_goals, start=1):
             run_messages = list(accumulated_messages)

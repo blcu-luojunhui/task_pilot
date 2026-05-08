@@ -82,6 +82,9 @@ class ClaudeAdapter:
                 "description": param_spec.get("description", ""),
             }
 
+            if "default" in param_spec:
+                prop["default"] = param_spec["default"]
+
             if "enum" in param_spec:
                 prop["enum"] = param_spec["enum"]
 

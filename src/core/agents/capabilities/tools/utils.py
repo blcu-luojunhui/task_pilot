@@ -128,7 +128,23 @@ async def util_current_time(ctx: SkillContext) -> str:
     },
 )
 async def write_file(ctx: SkillContext, file_path: str, content: str) -> str:
-    path = Path(file_path)
+    path = Path(file_path).resolve()
+
+    # 安全检查：禁止写入系统关键路径
+    blocked_prefixes = ("/etc/", "/sys/", "/proc/", "/dev/", "/boot/", "C:\\Windows\\")
+    path_str = str(path)
+    for prefix in blocked_prefixes:
+        if path_str.startswith(prefix):
+            raise PermissionError(f"write_file denied: {path_str} is in a protected location")
+
+    # 检查路径遍历攻击
+    if ".." in path_str.replace("\\", "/").split("/"):
+        raise PermissionError("write_file denied: path traversal detected")
+
+    # 大小限制
+    if len(content) > 10 * 1024 * 1024:  # 10 MB
+        raise ValueError("write_file denied: content exceeds 10 MB limit")
+
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(content, encoding="utf-8")
-    return f"文件已写入: {path.resolve()} ({len(content)} 字符)"
+    return f"文件已写入: {path} ({len(content)} 字符)"

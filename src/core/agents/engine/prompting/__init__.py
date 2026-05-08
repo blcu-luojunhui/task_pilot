@@ -8,8 +8,10 @@ Prompting module - Prompt 工程组件
 
 from .assembler import PromptAssembler
 from .knowledge_selector import KnowledgeSelector
+from .router import TaskRouter
 
 __all__ = [
     "PromptAssembler",
     "KnowledgeSelector",
+    "TaskRouter",
 ]

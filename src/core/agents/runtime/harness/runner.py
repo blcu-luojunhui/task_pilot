@@ -1,7 +1,12 @@
 """
-Harness Runner - 主运行入口
+Harness Runner - 主运行入口（DEPRECATED）
+
+.. deprecated::
+    此类是早期备选 runner 实现，未接入主链路。
+    当前主链路使用 AgentLoopRunner + AgentLoopHarness。
 """
 
+import warnings
 from typing import Any, Dict, List, Optional
 from dataclasses import dataclass
 
@@ -21,16 +26,18 @@ class RunnerConfig:
 
 class HarnessRunner:
     """
-    Harness 主运行器
+    Harness 主运行器（DEPRECATED）
 
-    负责：
-    1. 初始化运行环境
-    2. 执行 Agent 循环
-    3. 收集执行结果
-    4. 触发 hooks
+    .. deprecated::
+        使用 AgentLoopRunner + AgentLoopHarness 代替。
     """
 
     def __init__(self, config: Optional[RunnerConfig] = None):
+        warnings.warn(
+            "HarnessRunner is deprecated, use AgentLoopRunner + AgentLoopHarness instead",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         self.config = config or RunnerConfig()
         self.steps: List[Step] = []
         self.hooks = []

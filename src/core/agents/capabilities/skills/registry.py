@@ -106,7 +106,7 @@ def skill(
     scope: str = "agent:*",
     domain: str = "general",
     tags: Optional[List[str]] = None,
-    risk_level: str | RiskLevel = RiskLevel.READ,
+    risk_level: "str | RiskLevel" = RiskLevel.READ,
     examples: Optional[List[Dict[str, Any]]] = None,
 ):
     """

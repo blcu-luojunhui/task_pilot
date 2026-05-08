@@ -1,9 +1,12 @@
 """State models for agent execution"""
 
 from enum import Enum
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, TYPE_CHECKING
 from dataclasses import dataclass, field
 from datetime import datetime
+
+if TYPE_CHECKING:
+    from ..engine.types import Step
 
 
 class AgentState(str, Enum):
@@ -76,6 +79,9 @@ class AgentLoopState:
 
     # 生命周期状态
     lifecycle_state: "AgentState | None" = None
+
+    # 结构化步骤记录
+    steps: List["Step"] = field(default_factory=list)
 
     # 元数据
     metadata: Dict[str, Any] = field(default_factory=dict)

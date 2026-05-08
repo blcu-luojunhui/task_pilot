@@ -6,8 +6,9 @@
 
 import asyncio
 import json
+import time
 from typing import Dict, List, Optional, Any
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 import logging
 
 from .bus import MessageBus
@@ -15,6 +16,9 @@ from .protocol import Message, MessageType
 from ..engine.agent import Agent
 
 logger = logging.getLogger(__name__)
+
+# Agent 心跳超时（秒）
+_HEARTBEAT_TIMEOUT = 60.0
 
 
 @dataclass
@@ -42,6 +46,13 @@ class MultiAgentCoordinator:
         self.bus = bus or MessageBus()
         self.agents: Dict[str, Agent] = {}
         self.assignments: Dict[str, TaskAssignment] = {}
+
+        # Agent 健康追踪
+        self._last_heartbeat: Dict[str, float] = {}
+        self._agent_healthy: Dict[str, bool] = {}
+
+        # 结果回调
+        self._pending_results: Dict[str, asyncio.Event] = {}
 
         # 订阅消息
         self.bus.subscribe(MessageType.RESULT, self._handle_result)
@@ -230,7 +241,7 @@ class MultiAgentCoordinator:
 
     async def _execute_dynamic(self, assignments: List[TaskAssignment]) -> List[TaskAssignment]:
         """
-        动态执行任务（根据依赖关系）
+        动态执行任务：逐个启动，完成一个后再启动下一个（流水线模式）
 
         Args:
             assignments: 任务分配列表
@@ -238,9 +249,31 @@ class MultiAgentCoordinator:
         Returns:
             完成的任务分配列表
         """
-        # TODO: 实现基于依赖关系的动态调度
-        # 目前使用并行执行
-        return await self._execute_parallel(assignments)
+        completed: List[TaskAssignment] = []
+        pending = list(assignments)
+
+        while pending:
+            # 取一个未启动的任务
+            assignment = pending.pop(0)
+            agent = self.agents[assignment.agent_id]
+            assignment.status = "running"
+
+            try:
+                await self._execute_assignment(agent, assignment)
+                completed.append(assignment)
+            except Exception as e:
+                logger.error(f"Dynamic task {assignment.task_id} failed: {e}")
+                assignment.status = "failed"
+                assignment.error = str(e)
+                completed.append(assignment)
+                # 动态模式：使用已完成结果影响后续任务（将结果注入为 context）
+                if assignment.result:
+                    for remaining in pending:
+                        remaining.task = (
+                            f"[Previous result: {assignment.result[:200]}] {remaining.task}"
+                        )
+
+        return completed
 
     async def _execute_assignment(self, agent: Agent, assignment: TaskAssignment):
         """
@@ -299,18 +332,58 @@ class MultiAgentCoordinator:
         return results
 
     async def _handle_result(self, message: Message):
-        """处理结果消息"""
-        logger.info(f"Received result from {message.sender}")
-        # TODO: 处理 Agent 返回的结果
+        """处理异步结果回调"""
+        logger.info(f"Received result from {message.sender}: {message.content}")
+
+        # 根据 correlation_id 匹配 pending result
+        correlation_id = message.correlation_id
+        if correlation_id and correlation_id in self._pending_results:
+            event = self._pending_results.pop(correlation_id)
+            # 将结果写入对应的 assignment
+            for assignment in self.assignments.values():
+                if assignment.task_id == correlation_id:
+                    assignment.result = message.content
+                    assignment.status = "completed"
+                    break
+            event.set()
+        else:
+            logger.warning(f"No pending result found for correlation_id: {correlation_id}")
 
     async def _handle_heartbeat(self, message: Message):
-        """处理心跳消息"""
-        logger.debug(f"Heartbeat from {message.sender}")
+        """处理心跳消息，追踪 Agent 健康状态"""
+        agent_id = message.sender
+        now = time.monotonic()
+        self._last_heartbeat[agent_id] = now
+
+        was_unhealthy = not self._agent_healthy.get(agent_id, True)
+        self._agent_healthy[agent_id] = True
+
+        if was_unhealthy:
+            logger.info(f"Agent {agent_id} recovered (heartbeat received)")
+
+    def check_agent_health(self) -> List[str]:
+        """
+        检查所有 Agent 健康状态
+
+        Returns:
+            超时的 Agent ID 列表
+        """
+        now = time.monotonic()
+        timed_out = []
+        for agent_id in self.agents:
+            last_hb = self._last_heartbeat.get(agent_id, 0)
+            if now - last_hb > _HEARTBEAT_TIMEOUT:
+                self._agent_healthy[agent_id] = False
+                timed_out.append(agent_id)
+        return timed_out
 
     def get_status(self) -> Dict[str, Any]:
         """获取协调器状态"""
         return {
             "agents": list(self.agents.keys()),
+            "agent_health": {
+                aid: self._agent_healthy.get(aid, True) for aid in self.agents
+            },
             "active_tasks": len([a for a in self.assignments.values() if a.status == "running"]),
             "completed_tasks": len(
                 [a for a in self.assignments.values() if a.status == "completed"]

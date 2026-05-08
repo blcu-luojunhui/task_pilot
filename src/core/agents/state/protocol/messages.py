@@ -17,13 +17,12 @@ def assistant_message(content: str, tool_calls: Optional[List[ToolCall]] = None)
     return message
 
 
-def tool_result_message(tool_call_id: str, content: str, is_error: bool = False) -> Dict[str, Any]:
-    """Create a tool result message"""
+def tool_result_message(tool_call_id: str, content: str) -> Dict[str, Any]:
+    """Create a tool result message (OpenAI-compatible format)"""
     return {
         "role": "tool",
         "tool_call_id": tool_call_id,
         "content": content,
-        "is_error": is_error,
     }
 
 

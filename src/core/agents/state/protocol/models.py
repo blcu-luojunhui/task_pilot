@@ -79,12 +79,20 @@ class ToolCall:
         """
         raw_type = raw.get("type", "")
 
-        if raw_type == "function" or "function" in raw:
+        # 严格按 type 字段判断
+        if raw_type == "function":
             return cls.from_openai_format(raw)
-        elif raw_type == "tool_use" or "input" in raw:
+        elif raw_type == "tool_use":
             return cls.from_claude_format(raw)
-        elif "name" in raw and "arguments" in raw:
-            # 已经是标准格式
+
+        # 无 type 字段时回退到 key-presence 启发式
+        if "function" in raw and "name" in raw.get("function", {}):
+            return cls.from_openai_format(raw)
+        if "input" in raw and "name" in raw:
+            return cls.from_claude_format(raw)
+
+        # 已经是标准格式
+        if "name" in raw and "arguments" in raw:
             arguments = raw.get("arguments", {})
             if isinstance(arguments, str):
                 try:
@@ -96,6 +104,9 @@ class ToolCall:
                 name=raw["name"],
                 arguments=arguments if isinstance(arguments, dict) else {},
             )
-        else:
-            # 兜底
-            return cls(id=raw.get("id", ""), name=raw.get("name", ""), arguments={})
+
+        # 兜底：按已知 key 尽力提取
+        name = raw.get("name", "")
+        if not name and "function" in raw:
+            name = raw.get("function", {}).get("name", "")
+        return cls(id=raw.get("id", ""), name=name, arguments={})

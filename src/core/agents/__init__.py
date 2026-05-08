@@ -80,8 +80,8 @@ from .runtime.harness.debugger import Debugger, TraceEvent
 from .runtime.harness.evaluator import Evaluator, EvaluationResult, EvaluationMetric
 from .runtime.harness.fixtures import FixtureManager, MockTool
 
-# 多 Agent - 从 multi_agent 导出
-from .multi_agent import (
+# 多 Agent - 从 multi_agents 导出
+from .multi_agents import (
     MultiAgentCoordinator,
     MessageType,
     MessagePriority,

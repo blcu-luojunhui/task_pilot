@@ -1,10 +1,11 @@
 """Context window manager implementation"""
 
-import json
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
 
 import logging
+
+from .tokenizer import TokenCounter
 
 logger = logging.getLogger(__name__)
 
@@ -18,11 +19,13 @@ class ContextWindowManager:
     1. 保留 system 消息（不截断）
     2. 保留最近 N 条消息
     3. 中间消息按时间从旧到新截断
+
+    使用 TokenCounter 进行精确 token 计数（优先 tiktoken，回退字符估算）。
     """
 
     max_tokens: int = 60000
-    chars_per_token: float = 4.0  # 粗略估算
     reserve_ratio: float = 0.1  # 为响应预留 10% 空间
+    token_counter: TokenCounter = field(default_factory=TokenCounter)
 
     def compact_if_needed(
         self,
@@ -75,30 +78,19 @@ class ContextWindowManager:
 
     def estimate_tokens(self, text: str) -> int:
         """
-        估算文本的 token 数
+        计算文本的精确 token 数
 
         Args:
             text: 文本内容
 
         Returns:
-            估算的 token 数
+            token 数
         """
-        return max(1, int(len(text) / self.chars_per_token))
+        return self.token_counter.count(text)
 
     def _estimate_messages_tokens(self, messages: List[Dict[str, Any]]) -> int:
-        """估算消息列表的总 token 数"""
-        total = 0
-        for msg in messages:
-            content = msg.get("content", "")
-            if isinstance(content, str):
-                total += self.estimate_tokens(content)
-            # tool_calls 也占 token
-            tool_calls = msg.get("tool_calls")
-            if tool_calls:
-                total += self.estimate_tokens(json.dumps(tool_calls, ensure_ascii=False))
-            # 每条消息有固定开销（role, formatting）
-            total += 4
-        return total
+        """计算消息列表的总 token 数"""
+        return self.token_counter.count_messages(messages)
 
     def _truncate_middle(
         self, messages: List[Dict[str, Any]], max_tokens: int

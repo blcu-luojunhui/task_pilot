@@ -2,6 +2,7 @@
 DeepSeek Provider 实现（重构现有实现）
 """
 
+import json
 import aiohttp
 from typing import List, Dict, Optional, AsyncIterator
 from ..base import LLMProvider, LLMMessage, LLMResponse, LLMConfig, FinishReason
@@ -33,14 +34,15 @@ class DeepSeekProvider(LLMProvider):
         payload = {
             "model": self.config.model,
             "messages": [self._convert_message(m) for m in messages],
-            "temperature": temperature or self.config.temperature,
+            "temperature": temperature if temperature is not None else self.config.temperature,
         }
 
         if tools:
             payload["tools"] = tools
 
-        if max_tokens or self.config.max_tokens:
-            payload["max_tokens"] = max_tokens or self.config.max_tokens
+        resolved_max_tokens = max_tokens if max_tokens is not None else self.config.max_tokens
+        if resolved_max_tokens:
+            payload["max_tokens"] = resolved_max_tokens
 
         async with aiohttp.ClientSession() as session:
             async with session.post(
@@ -101,13 +103,11 @@ class DeepSeekProvider(LLMProvider):
                         if data == "[DONE]":
                             break
                         try:
-                            import json
-
                             chunk = json.loads(data)
                             delta = chunk["choices"][0]["delta"]
                             if "content" in delta:
                                 yield delta["content"]
-                        except:
+                        except (json.JSONDecodeError, KeyError, IndexError):
                             continue
 
     def _convert_message(self, message: LLMMessage) -> Dict:

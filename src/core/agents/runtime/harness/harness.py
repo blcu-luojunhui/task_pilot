@@ -17,6 +17,14 @@ logger = logging.getLogger(__name__)
 from typing import TYPE_CHECKING
 
 from src.core.agents.engine.loop import Act
+from src.core.agents.engine.types import (
+    ActionType,
+    ThoughtType,
+    Thought,
+    Action,
+    Observation,
+    Step,
+)
 from src.core.agents.runtime.harness.budget import AgentBudget, BudgetViolation
 from src.core.agents.runtime.harness.constraints import ConstraintSet, ConstraintViolation
 from src.core.agents.runtime.harness.feedback import FeedbackLoop
@@ -120,7 +128,7 @@ class AgentLoopHarness:
 
             # 同步 lifecycle 初始状态
             if self.lifecycle:
-                self.lifecycle._current_loop_state = state
+                self.lifecycle.current_loop_state = state
                 if self.lifecycle.state == AgentState.IDLE:
                     self.lifecycle.transition_to(AgentState.RUNNING, reason="harness start")
                 # 如果已在 RUNNING 状态（Agent.run() 可能预先设置了），不再重复转换
@@ -129,7 +137,7 @@ class AgentLoopHarness:
             while not state.is_terminated():
                 # 生命周期检查：暂停 / 停止
                 if self.lifecycle:
-                    self.lifecycle._current_loop_state = state
+                    self.lifecycle.current_loop_state = state
                     state.lifecycle_state = self.lifecycle.state
                     await self.lifecycle.wait_if_paused()
                     if self.lifecycle.is_stop_requested():
@@ -188,6 +196,10 @@ class AgentLoopHarness:
                 if decision:
                     await self._apply_workflow_decision(state, decision)
 
+                # 构建结构化 Step 记录
+                step_record = self._build_step_record(state, assistant_message, tool_results)
+                state.steps.append(step_record)
+
                 await self._emit(
                     "step_end",
                     state,
@@ -206,7 +218,7 @@ class AgentLoopHarness:
             await self._emit("run_error", state, {"error": str(e)})
 
         if self.lifecycle:
-            self.lifecycle._current_loop_state = state
+            self.lifecycle.current_loop_state = state
             state.lifecycle_state = self.lifecycle.state
         result = self._build_result(context)
         improvement_record = await self.continuous_improvement.capture(
@@ -255,15 +267,82 @@ class AgentLoopHarness:
     ) -> None:
         self.observer.run(state, assistant_message, tool_results)
 
+    def _build_step_record(
+        self,
+        state: AgentLoopState,
+        assistant_message: Dict[str, Any],
+        tool_results: List[Dict[str, Any]],
+    ) -> Step:
+        """从 Think-Act-Observe 数据构建结构化 Step 记录"""
+        content = assistant_message.get("content") or ""
+        tool_calls = get_tool_calls(assistant_message)
+
+        # 判断思考类型
+        if content and tool_calls:
+            thought_type = ThoughtType.PLANNING
+        elif content:
+            thought_type = ThoughtType.REASONING
+        else:
+            thought_type = ThoughtType.REASONING
+
+        thought = Thought(type=thought_type, content=content)
+
+        action = None
+        observation = None
+
+        if tool_calls:
+            # 取首个 tool call 作为 Step 的主 Action
+            tc = tool_calls[0]
+            action = Action(
+                type=ActionType.TOOL_CALL,
+                target=tc.name,
+                parameters=tc.arguments,
+            )
+            # 匹配 tool result
+            matching = next(
+                (r for r in tool_results if r.get("tool_call_id") == tc.id), {}
+            )
+            result_content = str(matching.get("content", ""))
+            is_error = result_content.startswith("Error:")
+            observation = Observation(
+                action=action,
+                result=result_content,
+                success=not is_error,
+                error=result_content if is_error else None,
+            )
+        elif content:
+            # 没有 tool calls = 回答
+            action = Action(
+                type=ActionType.ANSWER,
+                target="final",
+                parameters={"content": content},
+            )
+            observation = Observation(
+                action=action,
+                result=content,
+                success=True,
+            )
+
+        return Step(
+            step_number=state.step,
+            thought=thought,
+            action=action,
+            observation=observation,
+        )
+
     def _build_result(self, context: AgentRunContext) -> AgentLoopResult:
         state = context.state
+        # 从结构化 Step 记录中统计 tool calls
+        tool_call_steps = [
+            s for s in state.steps if s.action and s.action.type == ActionType.TOOL_CALL
+        ]
         return AgentLoopResult(
             trace_id=state.trace_id,
             success=state.stop_reason == StopReason.MODEL_FINAL,
             final_answer=state.final_answer,
             stop_reason=state.stop_reason,
             total_steps=state.step,
-            tool_calls_count=len(state.tool_call_history),
+            tool_calls_count=len(tool_call_steps),
             duration_seconds=time.monotonic() - context.started_at,
         )
 

@@ -1,5 +1,8 @@
 """
-DeepSeek chat planner.
+DeepSeek chat planner (DEPRECATED).
+
+This module is deprecated. Use ``DeepSeekProvider`` from
+``src.core.agents.capabilities.llm.providers.deepseek`` instead.
 
 DeepSeek exposes an OpenAI-compatible chat completions API, so this planner
 serializes registered skills as tools and normalizes returned tool calls into
@@ -8,6 +11,7 @@ the internal AgentLoopRunner message shape.
 
 import json
 import os
+import warnings
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, List, Optional
@@ -84,6 +88,11 @@ class DeepSeekPlanner:
         messages: List[Dict[str, Any]],
         step: int,
     ) -> Dict[str, Any]:
+        warnings.warn(
+            "DeepSeekPlanner is deprecated, use DeepSeekProvider instead",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         forced_tool_done = self._has_tool_result(messages, self.force_first_tool_name)
         payload = {
             "model": self.settings.model,
