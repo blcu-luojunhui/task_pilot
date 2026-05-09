@@ -131,7 +131,7 @@ class HarnessEventLogger:
             results = payload.get("tool_results", [])
             for r in results:
                 content = r.get("content", "")
-                is_error = r.get("is_error", False)
+                is_error = str(content).startswith("Error:")
                 display = content[:150] + "..." if len(content) > 150 else content
                 if is_error:
                     logger.error("[%s] Act    | FAILED: %s", trace, display)
@@ -195,7 +195,10 @@ class HarnessEventLogger:
             ]
         if "tool_results" in payload:
             summary["tool_results"] = [
-                {"tool_call_id": r.get("tool_call_id"), "is_error": r.get("is_error")}
+                {
+                    "tool_call_id": r.get("tool_call_id"),
+                    "is_error": str(r.get("content", "")).startswith("Error:"),
+                }
                 for r in payload["tool_results"]
             ]
         if "result" in payload:

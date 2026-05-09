@@ -67,7 +67,7 @@ class WorkflowController:
 
         if self.is_cancelled and self.is_cancelled():
             return WorkflowDecision(
-                stop_reason=StopReason.CANCELLED,
+                stop_reason=StopReason.USER_CANCELLED,
                 event_name="run_cancelled",
             )
 

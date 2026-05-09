@@ -55,9 +55,11 @@ class StateSnapshot:
             "lifecycle_state": lifecycle_state.value,
             "loop_state": {
                 "goal": loop_state.goal,
+                "trace_id": loop_state.trace_id,
                 "step": loop_state.step,
                 "max_steps": loop_state.max_steps,
                 "messages": loop_state.messages,
+                "metadata": loop_state.metadata,
                 "tool_calls": [
                     {
                         "tool_name": tc.tool_name,
@@ -128,11 +130,16 @@ class StateSnapshot:
 
         # 恢复 loop state
         loop_data = data["loop_state"]
-        loop_state = AgentLoopState(goal=loop_data["goal"], max_steps=loop_data["max_steps"])
+        loop_state = AgentLoopState(
+            goal=loop_data["goal"],
+            max_steps=loop_data["max_steps"],
+            trace_id=loop_data.get("trace_id", ""),
+        )
         loop_state.step = loop_data["step"]
         loop_state.messages = loop_data["messages"]
         loop_state.final_answer = loop_data.get("final_answer")
         loop_state.consecutive_tool_errors = loop_data.get("consecutive_tool_errors", 0)
+        loop_state.metadata = loop_data.get("metadata", {})
 
         if loop_data.get("stop_reason"):
             loop_state.stop_reason = StopReason(loop_data["stop_reason"])

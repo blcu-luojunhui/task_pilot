@@ -161,6 +161,9 @@ class AgentLoopHarness:
 
                 decision = self.workflow.after_think(state, assistant_message)
                 if decision:
+                    # 记录 Step 后再终止
+                    step_records = self._build_step_records(state, assistant_message, [])
+                    state.steps.extend(step_records)
                     await self._apply_workflow_decision(state, decision)
                     break
 
@@ -168,7 +171,11 @@ class AgentLoopHarness:
                 decision = self.workflow.before_act(state, assistant_message)
                 if decision:
                     self._observe(state, assistant_message, tool_results)
+                    # 记录 Step（工具调用被约束阻止）
+                    step_records = self._build_step_records(state, assistant_message, tool_results)
+                    state.steps.extend(step_records)
                     await self._apply_workflow_decision(state, decision)
+                    break
                 else:
                     tool_results = await self._act(state, assistant_message)
                     self._observe(state, assistant_message, tool_results)
@@ -196,9 +203,9 @@ class AgentLoopHarness:
                 if decision:
                     await self._apply_workflow_decision(state, decision)
 
-                # 构建结构化 Step 记录
-                step_record = self._build_step_record(state, assistant_message, tool_results)
-                state.steps.append(step_record)
+                # 构建结构化 Step 记录（并行工具调用各自一个 Step）
+                step_records = self._build_step_records(state, assistant_message, tool_results)
+                state.steps.extend(step_records)
 
                 await self._emit(
                     "step_end",
@@ -267,13 +274,13 @@ class AgentLoopHarness:
     ) -> None:
         self.observer.run(state, assistant_message, tool_results)
 
-    def _build_step_record(
+    def _build_step_records(
         self,
         state: AgentLoopState,
         assistant_message: Dict[str, Any],
         tool_results: List[Dict[str, Any]],
-    ) -> Step:
-        """从 Think-Act-Observe 数据构建结构化 Step 记录"""
+    ) -> List[Step]:
+        """从 Think-Act-Observe 数据构建结构化 Step 记录（支持并行工具调用）"""
         content = assistant_message.get("content") or ""
         tool_calls = get_tool_calls(assistant_message)
 
@@ -286,32 +293,35 @@ class AgentLoopHarness:
             thought_type = ThoughtType.REASONING
 
         thought = Thought(type=thought_type, content=content)
-
-        action = None
-        observation = None
+        steps: List[Step] = []
 
         if tool_calls:
-            # 取首个 tool call 作为 Step 的主 Action
-            tc = tool_calls[0]
-            action = Action(
-                type=ActionType.TOOL_CALL,
-                target=tc.name,
-                parameters=tc.arguments,
-            )
-            # 匹配 tool result
-            matching = next(
-                (r for r in tool_results if r.get("tool_call_id") == tc.id), {}
-            )
-            result_content = str(matching.get("content", ""))
-            is_error = result_content.startswith("Error:")
-            observation = Observation(
-                action=action,
-                result=result_content,
-                success=not is_error,
-                error=result_content if is_error else None,
-            )
+            for tc in tool_calls:
+                action = Action(
+                    type=ActionType.TOOL_CALL,
+                    target=tc.name,
+                    parameters=tc.arguments,
+                )
+                matching = next(
+                    (r for r in tool_results if r.get("tool_call_id") == tc.id), {}
+                )
+                result_content = str(matching.get("content", ""))
+                is_error = result_content.startswith("Error:")
+                observation = Observation(
+                    action=action,
+                    result=result_content,
+                    success=not is_error,
+                    error=result_content if is_error else None,
+                )
+                steps.append(
+                    Step(
+                        step_number=state.step,
+                        thought=thought if len(steps) == 0 else None,
+                        action=action,
+                        observation=observation,
+                    )
+                )
         elif content:
-            # 没有 tool calls = 回答
             action = Action(
                 type=ActionType.ANSWER,
                 target="final",
@@ -322,13 +332,16 @@ class AgentLoopHarness:
                 result=content,
                 success=True,
             )
+            steps.append(
+                Step(
+                    step_number=state.step,
+                    thought=thought,
+                    action=action,
+                    observation=observation,
+                )
+            )
 
-        return Step(
-            step_number=state.step,
-            thought=thought,
-            action=action,
-            observation=observation,
-        )
+        return steps
 
     def _build_result(self, context: AgentRunContext) -> AgentLoopResult:
         state = context.state

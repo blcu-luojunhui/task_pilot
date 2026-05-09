@@ -22,11 +22,21 @@ def _validate_url(url: str) -> None:
     hostname = (parsed.hostname or "").lower()
     if not hostname:
         raise ValueError(f"Invalid URL: no hostname in '{url}'")
-    # 禁止访问内网地址
-    if hostname in ("localhost", "127.0.0.1", "::1", "0.0.0.0"):
+    # 禁止访问内网/保留地址
+    if hostname in ("localhost", "127.0.0.1", "::1", "0.0.0.0", "[::1]", "[0:0:0:0:0:0:0:0]"):
         raise PermissionError(f"URL host '{hostname}' is blocked")
-    if hostname.startswith("10.") or hostname.startswith("172.16.") or hostname.startswith("192.168."):
+    # RFC 1918 私有 IP: 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16
+    if hostname.startswith("10.") or hostname.startswith("192.168."):
         raise PermissionError(f"URL host '{hostname}' is in private range")
+    if hostname.startswith("172."):
+        parts = hostname.split(".")
+        if len(parts) >= 2 and parts[1].isdigit():
+            second = int(parts[1])
+            if 16 <= second <= 31:
+                raise PermissionError(f"URL host '{hostname}' is in private range (172.16-31)")
+    # 链路本地 169.254.0.0/16
+    if hostname.startswith("169.254."):
+        raise PermissionError(f"URL host '{hostname}' is in link-local range")
 
 
 @skill(

@@ -130,16 +130,25 @@ async def util_current_time(ctx: SkillContext) -> str:
 async def write_file(ctx: SkillContext, file_path: str, content: str) -> str:
     path = Path(file_path).resolve()
 
-    # 安全检查：禁止写入系统关键路径
-    blocked_prefixes = ("/etc/", "/sys/", "/proc/", "/dev/", "/boot/", "C:\\Windows\\")
+    # 安全检查：禁止写入系统关键路径（含 macOS 实际路径）
+    blocked_prefixes = (
+        "/etc/", "/private/etc/",
+        "/sys/", "/proc/", "/dev/",
+        "/boot/", "/usr/", "/bin/", "/sbin/",
+        "/var/", "/private/var/",
+        "C:\\Windows\\",
+    )
     path_str = str(path)
     for prefix in blocked_prefixes:
         if path_str.startswith(prefix):
             raise PermissionError(f"write_file denied: {path_str} is in a protected location")
 
-    # 检查路径遍历攻击
-    if ".." in path_str.replace("\\", "/").split("/"):
-        raise PermissionError("write_file denied: path traversal detected")
+    # 检查写入 ~/.ssh, ~/.aws 等敏感用户路径
+    home = str(Path.home())
+    sensitive_home_paths = (f"{home}/.ssh", f"{home}/.aws", f"{home}/.config", f"{home}/.gnupg")
+    for sp in sensitive_home_paths:
+        if path_str.startswith(sp):
+            raise PermissionError(f"write_file denied: {sp} is protected")
 
     # 大小限制
     if len(content) > 10 * 1024 * 1024:  # 10 MB

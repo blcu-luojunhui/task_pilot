@@ -193,6 +193,12 @@ class MessageBus:
                 raise
 
             if priority_filter is None or message.priority >= priority_filter:
+                # 返回消息前，将之前暂存的低优消息重新入队
+                deferred = self._deferred.get(agent_id)
+                if deferred:
+                    for m in deferred:
+                        await queue.put(m)
+                    self._deferred[agent_id] = []
                 return message
 
             # 优先级不满足，放入低优暂存列表而非重新入队
@@ -239,6 +245,14 @@ class MessageBus:
             },
         }
 
+    def drain_deferred(self, agent_id: str):
+        """将暂存的低优消息重新入队"""
+        deferred = self._deferred.pop(agent_id, [])
+        queue = self._queues.get(agent_id)
+        if queue and deferred:
+            for m in deferred:
+                queue.put_nowait(m)
+
     def clear_history(self):
         """清空消息历史"""
         self._history.clear()
@@ -250,6 +264,7 @@ class MessageBus:
             "messages_by_type": defaultdict(int),
             "messages_by_agent": defaultdict(int),
         }
+        self._deferred.clear()
 
 
 __all__ = ["MessageBus", "MessageHandler"]

@@ -180,6 +180,14 @@ class Agent:
         resolved_model = llm_model or defaults["model"]
         resolved_base_url = llm_base_url or defaults["base_url"]
 
+        # 校验 kwargs 仅含 AgentConfig 已知字段，避免拼写错误被静默吞掉
+        known_fields = {f.name for f in getattr(AgentConfig, '__dataclass_fields__', {}).values()}
+        for key in kwargs:
+            if key not in known_fields:
+                raise AgentConfigError(
+                    f"Unknown config key '{key}'. Did you mean one of: {sorted(known_fields)}?"
+                )
+
         config = AgentConfig(
             llm_provider=llm_provider,
             llm_api_key=llm_api_key,
@@ -425,7 +433,7 @@ class Agent:
 
         snapshot = StateSnapshot(self._snapshot_dir)
         snapshot_id = snapshot.save(
-            agent_id=self._lifecycle.current_loop_state.trace_id,
+            agent_id=loop_state.trace_id,
             loop_state=loop_state,
             lifecycle_state=self._lifecycle.state,
             metadata=metadata,
@@ -466,14 +474,11 @@ class Agent:
         # 合并元数据
         merged_metadata = {**(snap_metadata or {}), **(metadata or {})}
 
-        # 更新生命周期管理器状态
+        # 更新生命周期管理器状态（通过 transition_to 确保状态机完整）
+        self._lifecycle.reset()
         if lifecycle_state == AgentState.PAUSED:
-            self._lifecycle.state = AgentState.PAUSED
-            self._lifecycle._pause_event.clear()
-            self._lifecycle._stop_requested = False
-        else:
-            # 非 paused 状态，直接开始运行
-            self._lifecycle.state = AgentState.IDLE
+            self._lifecycle.transition_to(AgentState.PAUSED, reason="snapshot restored (paused)")
+        # 如果是其他状态，reset 已回到 IDLE，后续 run() 会 transition_to(RUNNING)
 
         self._lifecycle.current_loop_state = loop_state
 

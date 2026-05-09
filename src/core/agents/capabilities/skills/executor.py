@@ -131,7 +131,7 @@ class SkillExecutor:
                 # 同步函数通过线程池执行，避免阻塞事件循环
                 loop = asyncio.get_running_loop()
                 result = await asyncio.wait_for(
-                    loop.run_in_executor(None, skill.handler, ctx, **params),
+                    loop.run_in_executor(None, lambda: skill.handler(ctx, **params)),
                     timeout=self.timeout,
                 )
             return result
