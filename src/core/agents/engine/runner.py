@@ -46,6 +46,7 @@ class AgentLoopRunner:
     max_tool_result_length: int = 2000
     max_consecutive_errors: int = 3
     max_context_tokens: int = 60000
+    llm_model: str = "gpt-4o"
     permission_guard: Optional[PermissionGuard] = None
     router: Optional[TaskRouter] = None
     is_cancelled: Optional[Callable[[], bool]] = None
@@ -79,6 +80,7 @@ class AgentLoopRunner:
         if self.thinker is None:
             context_manager = ContextWindowManager(
                 max_tokens=self.max_context_tokens,
+                model=self.llm_model,
             )
             knowledge_selector = KnowledgeSelector(self.registry)
             prompt_assembler = PromptAssembler(knowledge_selector=knowledge_selector)
@@ -86,6 +88,7 @@ class AgentLoopRunner:
                 self.planner,
                 context_manager=context_manager,
                 prompt_assembler=prompt_assembler,
+                is_cancelled=self.is_cancelled,
             )
 
         if self.actor is None:
@@ -95,7 +98,7 @@ class AgentLoopRunner:
                 tool_dependencies=self.tool_dependencies,
                 context_builder=self.context_builder,
                 max_tool_result_length=self.max_tool_result_length,
-                permission_guard=self.permission_guard,
+                is_cancelled=self.is_cancelled,
             )
 
         if self.observer is None:
@@ -163,11 +166,22 @@ class AgentLoopRunner:
                 goal=goal, messages=messages, metadata=metadata, trace_id=trace_id
             )
 
+        import time as _time
+
+        total_started = _time.monotonic()
         accumulated_messages = list(messages or [])
         results: List[str] = []
         last_result: Optional[AgentLoopResult] = None
+        total_steps = 0
+        total_tool_calls = 0
+
+        # 共享预算：子调用间传递剩余 steps
+        remaining_steps = self.max_steps
 
         for index, sub_goal in enumerate(sub_goals, start=1):
+            if remaining_steps <= 0:
+                break
+
             run_messages = list(accumulated_messages)
             if results:
                 run_messages.append(
@@ -182,13 +196,23 @@ class AgentLoopRunner:
                     "content": f"Current sub-goal {index}/{len(sub_goals)}: {sub_goal}",
                 }
             )
+
+            # 为子调用设置剩余预算
+            saved_max_steps = self.max_steps
+            self.max_steps = min(remaining_steps, self.max_steps)
+            self.budget = None  # 强制下次 __post_init__ 重建 budget
             last_result = await self.run(
                 goal=sub_goal,
                 messages=run_messages,
                 metadata=metadata,
                 trace_id=trace_id,
             )
+            self.max_steps = saved_max_steps
+
             results.append(last_result.final_answer or "")
+            remaining_steps -= last_result.total_steps
+            total_steps += last_result.total_steps
+            total_tool_calls += last_result.tool_calls_count
 
             if not last_result.success:
                 return last_result
@@ -199,7 +223,7 @@ class AgentLoopRunner:
             success=True,
             final_answer="\n\n".join(result for result in results if result),
             stop_reason=StopReason.MODEL_FINAL,
-            total_steps=sum(1 for _ in sub_goals),
-            tool_calls_count=last_result.tool_calls_count,
-            duration_seconds=last_result.duration_seconds,
+            total_steps=total_steps,
+            tool_calls_count=total_tool_calls,
+            duration_seconds=_time.monotonic() - total_started,
         )

@@ -4,8 +4,8 @@ Knowledge selector for dynamic prompt injection.
 Selects relevant knowledge skills based on current goal and tool usage.
 """
 
-from dataclasses import dataclass
-from typing import List, Set
+from dataclasses import dataclass, field
+from typing import Dict, List, Set
 
 from ...state import AgentLoopState
 from ...capabilities.skills import SkillRegistry
@@ -39,11 +39,37 @@ _DOMAIN_KEYWORDS = {
 
 @dataclass
 class KnowledgeSelector:
-    """Select relevant knowledge text for the current agent state."""
+    """Select relevant knowledge text for the current agent state.
+
+    domain_keywords 可通过构造参数覆盖，也支持从 skill.tags 自动汇总：
+      1. 显式传入 dict → 完全替换内置默认值
+      2. 调用 auto_collect_domains(registry) 从已注册 skill 的 domain/tags 汇总
+    """
 
     registry: SkillRegistry
     max_knowledge_tokens: int = 4000
     chars_per_token: float = 4.0
+    domain_keywords: Dict[str, List[str]] = field(default_factory=lambda: dict(_DOMAIN_KEYWORDS))
+
+    @staticmethod
+    def auto_collect_domains(registry: SkillRegistry) -> Dict[str, List[str]]:
+        """从 registry 中已注册 skill 汇总 domain 关键词映射"""
+        collected: Dict[str, List[str]] = {}
+        for skill in registry.filter(lambda _: True):
+            domain = skill.domain or "general"
+            if domain not in collected:
+                collected[domain] = []
+            keywords = list(skill.tags or [])
+            keywords.append(skill.name)
+            keywords.extend(skill.description.split())
+            collected[domain].extend(keywords)
+        # 去重并合并内置默认值
+        merged = dict(_DOMAIN_KEYWORDS)
+        for domain, keywords in collected.items():
+            existing = set(merged.get(domain, []))
+            existing.update(k.lower() for k in keywords if len(k) > 2)
+            merged[domain] = list(existing)
+        return merged
 
     def select(self, state: AgentLoopState) -> str:
         domains = self._infer_domains(state)
@@ -88,7 +114,7 @@ class KnowledgeSelector:
                 seen.add(domain)
 
         goal_text = (state.goal or "").lower()
-        for domain, keywords in _DOMAIN_KEYWORDS.items():
+        for domain, keywords in self.domain_keywords.items():
             if any(keyword.lower() in goal_text for keyword in keywords):
                 add(domain)
 
@@ -97,7 +123,7 @@ class KnowledgeSelector:
             skill = self.registry.get(tool_name)
             if skill and skill.domain and skill.domain != "general":
                 add(skill.domain)
-            for domain, keywords in _DOMAIN_KEYWORDS.items():
+            for domain, keywords in self.domain_keywords.items():
                 if any(keyword.lower() in tool_name.lower() for keyword in keywords):
                     add(domain)
 

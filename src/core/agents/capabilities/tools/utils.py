@@ -4,6 +4,7 @@ Utility Tools - 通用工具函数
 封装常用工具为 Agent 可调用的技能
 """
 
+import os
 from datetime import datetime
 from typing import List
 from pathlib import Path
@@ -45,7 +46,7 @@ async def util_md5(ctx: SkillContext, text: str) -> str:
             "description": "Unix 时间戳（秒）",
             "required": True,
         },
-        "format": {
+        "date_format": {
             "type": "string",
             "description": "时间格式字符串（默认 %Y-%m-%d %H:%M:%S）",
             "default": "%Y-%m-%d %H:%M:%S",
@@ -130,7 +131,25 @@ async def util_current_time(ctx: SkillContext) -> str:
 async def write_file(ctx: SkillContext, file_path: str, content: str) -> str:
     path = Path(file_path).resolve()
 
-    # 安全检查：禁止写入系统关键路径（含 macOS 实际路径）
+    # 大小限制
+    if len(content) > 10 * 1024 * 1024:  # 10 MB
+        raise ValueError("write_file denied: content exceeds 10 MB limit")
+
+    # 安全校验：使用 realpath 后再判断
+    real = Path(os.path.realpath(path))
+    real_str = str(real)
+
+    # 项目根目录白名单（仅允许在项目目录下写入）
+    allowed_roots = [
+        os.path.realpath(os.getcwd()),
+    ]
+    is_allowed = any(
+        os.path.commonpath([real_str, root]) == root for root in allowed_roots
+    )
+    if not is_allowed:
+        raise PermissionError(f"write_file denied: {real_str} is outside allowed directories")
+
+    # 禁止写入系统关键路径
     blocked_prefixes = (
         "/etc/", "/private/etc/",
         "/sys/", "/proc/", "/dev/",
@@ -138,21 +157,20 @@ async def write_file(ctx: SkillContext, file_path: str, content: str) -> str:
         "/var/", "/private/var/",
         "C:\\Windows\\",
     )
-    path_str = str(path)
     for prefix in blocked_prefixes:
-        if path_str.startswith(prefix):
-            raise PermissionError(f"write_file denied: {path_str} is in a protected location")
+        if real_str.startswith(prefix):
+            raise PermissionError(f"write_file denied: {real_str} is in a protected location")
 
     # 检查写入 ~/.ssh, ~/.aws 等敏感用户路径
     home = str(Path.home())
-    sensitive_home_paths = (f"{home}/.ssh", f"{home}/.aws", f"{home}/.config", f"{home}/.gnupg")
+    sensitive_home_paths = (
+        f"{home}/.ssh", f"{home}/.aws", f"{home}/.config",
+        f"{home}/.gnupg", f"{home}/.kube", f"{home}/.docker",
+        f"{home}/.npmrc", f"{home}/.bash_history", f"{home}/.zsh_history",
+    )
     for sp in sensitive_home_paths:
-        if path_str.startswith(sp):
+        if real_str.startswith(sp):
             raise PermissionError(f"write_file denied: {sp} is protected")
-
-    # 大小限制
-    if len(content) > 10 * 1024 * 1024:  # 10 MB
-        raise ValueError("write_file denied: content exceeds 10 MB limit")
 
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(content, encoding="utf-8")

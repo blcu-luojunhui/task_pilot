@@ -4,6 +4,8 @@ HTTP Tools - HTTP 客户端工具
 封装 AsyncHttpClient 为 Agent 可调用的技能
 """
 
+import ipaddress
+import socket
 from urllib.parse import urlparse
 from typing import Any, Dict, Optional
 
@@ -14,29 +16,49 @@ from src.infra.shared import AsyncHttpClient
 _ALLOWED_SCHEMES = {"http", "https"}
 
 
+def _is_private_ip(hostname: str) -> bool:
+    """通过 DNS 解析后判断 IP 是否为内网/环回/链路本地地址"""
+    try:
+        addr = ipaddress.ip_address(hostname)
+    except ValueError:
+        # 非 IP 字面量，尝试 DNS 解析
+        try:
+            resolved = socket.gethostbyname(hostname)
+        except socket.gaierror:
+            return True  # 无法解析则拒绝
+        addr = ipaddress.ip_address(resolved)
+
+    return addr.is_private or addr.is_loopback or addr.is_link_local or addr.is_unspecified
+
+
 def _validate_url(url: str) -> None:
-    """校验 URL，防止 SSRF"""
+    """校验 URL，防止 SSRF（含 DNS rebinding / IPv6 私网 / 数字 host 防护）"""
     parsed = urlparse(url)
     if parsed.scheme not in _ALLOWED_SCHEMES:
         raise PermissionError(f"URL scheme '{parsed.scheme}' not allowed, only http/https")
     hostname = (parsed.hostname or "").lower()
     if not hostname:
         raise ValueError(f"Invalid URL: no hostname in '{url}'")
-    # 禁止访问内网/保留地址
-    if hostname in ("localhost", "127.0.0.1", "::1", "0.0.0.0", "[::1]", "[0:0:0:0:0:0:0:0]"):
+
+    # 移除 IPv6 地址的方括号
+    raw_host = hostname.strip("[]")
+
+    # 字符串层面的快速拒绝
+    if raw_host in ("localhost", "127.0.0.1", "::1", "0.0.0.0"):
         raise PermissionError(f"URL host '{hostname}' is blocked")
-    # RFC 1918 私有 IP: 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16
-    if hostname.startswith("10.") or hostname.startswith("192.168."):
-        raise PermissionError(f"URL host '{hostname}' is in private range")
-    if hostname.startswith("172."):
-        parts = hostname.split(".")
-        if len(parts) >= 2 and parts[1].isdigit():
-            second = int(parts[1])
-            if 16 <= second <= 31:
-                raise PermissionError(f"URL host '{hostname}' is in private range (172.16-31)")
-    # 链路本地 169.254.0.0/16
-    if hostname.startswith("169.254."):
-        raise PermissionError(f"URL host '{hostname}' is in link-local range")
+
+    # 使用 ipaddress 模块全面判断私网/环回/链路本地
+    try:
+        ip = ipaddress.ip_address(raw_host)
+        if ip.is_private or ip.is_loopback or ip.is_link_local or ip.is_unspecified:
+            raise PermissionError(f"URL host '{hostname}' is in a reserved IP range")
+    except ValueError:
+        pass  # 非 IP 字面量，进一步通过 DNS 检查
+
+    # DNS 解析检查（防 DNS rebinding / 域名指向内网）
+    if _is_private_ip(raw_host):
+        raise PermissionError(f"URL host '{hostname}' resolves to a private/reserved address")
+
 
 
 @skill(

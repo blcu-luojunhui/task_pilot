@@ -7,13 +7,21 @@ Skill 执行器
 import asyncio
 import inspect
 import logging
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, Tuple, Type
 
 from .context import SkillContext
 from .model import Skill
 from .validator import ParameterValidator, SkillValidationError
 
 logger = logging.getLogger(__name__)
+
+# 仅这些异常类型会触发重试，其余直接抛出
+_RETRYABLE_EXCEPTIONS: Tuple[Type[BaseException], ...] = (
+    asyncio.TimeoutError,
+    ConnectionError,
+    TimeoutError,
+    OSError,
+)
 
 
 class SkillExecutionError(Exception):
@@ -98,14 +106,16 @@ class SkillExecutor:
                 )
                 if attempt < self.retry:
                     await asyncio.sleep(self.retry_delay)
-            except Exception as e:
+            except _RETRYABLE_EXCEPTIONS as e:
                 last_error = e
-                logger.error(
-                    f"Skill '{skill.name}' execution error (attempt {attempt + 1}/{self.retry + 1}): {e}",
-                    exc_info=True,
+                logger.warning(
+                    f"Skill '{skill.name}' execution error (attempt {attempt + 1}/{self.retry + 1}): {e}"
                 )
                 if attempt < self.retry:
                     await asyncio.sleep(self.retry_delay)
+            except Exception:
+                # 非可重试异常直接抛出，不浪费重试次数
+                raise
 
         # 所有重试都失败
         raise SkillExecutionError(

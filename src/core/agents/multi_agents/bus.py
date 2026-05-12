@@ -47,6 +47,9 @@ class MessageBus:
         # 优先级过滤时暂存的低优消息
         self._deferred: Dict[str, List[Message]] = defaultdict(list)
 
+        # 保持 handler 任务的强引用，防止被 GC
+        self._handler_tasks: set = set()
+
     def register_agent(self, agent_id: str) -> asyncio.Queue:
         """
         注册 Agent
@@ -120,7 +123,9 @@ class MessageBus:
         # 触发处理器
         for handler in self._handlers.get(message.type, []):
             try:
-                asyncio.create_task(handler(message))
+                task = asyncio.create_task(handler(message))
+                self._handler_tasks.add(task)
+                task.add_done_callback(self._handler_tasks.discard)
             except Exception as e:
                 logger.error(f"Handler error: {e}")
 

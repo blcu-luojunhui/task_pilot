@@ -17,7 +17,7 @@ from ..state import AgentLoopState, StopReason, ToolCallRecord
 from ..state.protocol import ToolCall, get_tool_calls, tool_result_message
 from ..state.context import ContextWindowManager
 from ..capabilities.skills import SkillContext, SkillExecutor, SkillRegistry, MappingResolver
-from ..capabilities.skills.guard import PermissionGuard
+from ..exceptions import ToolNotFoundError, ToolExecutionError
 from .prompting import PromptAssembler
 
 logger = logging.getLogger("agent.loop")
@@ -33,8 +33,8 @@ class Think:
     planner: AssistantPlanner
     context_manager: Optional[ContextWindowManager] = None
     prompt_assembler: Optional[PromptAssembler] = None
-    stream_sink: Optional[Callable[[Dict[str, Any]], Awaitable[None] | None]] = None
     show_prompt: bool = False  # 是否打印发给 LLM 的完整 prompt
+    is_cancelled: Optional[Callable[[], bool]] = None  # 暂停/停止检查回调
 
     async def run(self, state: AgentLoopState) -> Optional[Dict[str, Any]]:
         """执行思考阶段"""
@@ -78,9 +78,20 @@ class Think:
                 len(messages),
             )
 
+        # 调用 planner 前检查是否已取消
+        if self.is_cancelled and self.is_cancelled():
+            state.stop_reason = StopReason.USER_CANCELLED
+            return None
+
         # 调用 planner
         try:
-            return await self.planner(messages, state.step)
+            result = await self.planner(messages, state.step)
+            # 累积 token 使用量
+            if result and "_usage" in result:
+                usage = result.pop("_usage")
+                for key in ("prompt", "completion", "total"):
+                    state.token_usage[key] = state.token_usage.get(key, 0) + usage.get(key, 0)
+            return result
         except Exception:
             logger.exception("Agent planner failed at step %s", state.step)
             state.stop_reason = StopReason.LLM_ERROR_ABORT
@@ -134,7 +145,12 @@ class Act:
     tool_dependencies: Optional[Mapping[str, Any]] = None
     context_builder: Optional[Callable[[Any], SkillContext]] = None
     max_tool_result_length: int = 2000
-    permission_guard: Optional[PermissionGuard] = None
+    max_concurrency: int = 5
+    is_cancelled: Optional[Callable[[], bool]] = None  # 暂停/停止检查回调
+
+    def __post_init__(self):
+        if self.max_concurrency > 0:
+            self._semaphore = asyncio.Semaphore(self.max_concurrency)
 
     async def run(self, state: AgentLoopState, tool_calls: List[ToolCall]) -> List[Dict[str, Any]]:
         """执行工具调用"""
@@ -146,7 +162,17 @@ class Act:
         return list(await asyncio.gather(*tasks))
 
     async def _execute_one(self, state: AgentLoopState, call: ToolCall) -> Dict[str, Any]:
+        if hasattr(self, "_semaphore"):
+            async with self._semaphore:
+                return await self._execute_one_impl(state, call)
+        return await self._execute_one_impl(state, call)
+
+    async def _execute_one_impl(self, state: AgentLoopState, call: ToolCall) -> Dict[str, Any]:
         """执行单个工具调用"""
+        # 工具执行前检查是否已取消
+        if self.is_cancelled and self.is_cancelled():
+            return tool_result_message(call.id, "Cancelled: agent stopped by user")
+
         started = time.monotonic()
         call_id = call.id
         tool_name = call.name
@@ -157,13 +183,9 @@ class Act:
         # 查找 skill
         skill = self.registry.get(tool_name)
         if not skill:
-            return self._record_error(state, call_id, tool_name, f"Unknown tool: {tool_name}")
+            raise ToolNotFoundError(tool_name)
 
-        # 权限检查
-        if self.permission_guard:
-            denial = self.permission_guard.check(skill)
-            if denial:
-                return self._record_error(state, call_id, tool_name, denial)
+        # 权限检查由 SkillExecutor 统一处理
 
         # 构建上下文
         if self.context_builder:
@@ -185,9 +207,17 @@ class Act:
                 )
             )
             return tool_result_message(call_id, str(result)[: self.max_tool_result_length])
-        except Exception as e:
-            logger.warning(f"Tool '{tool_name}' execution failed: {e}")
+        except asyncio.CancelledError:
+            raise
+        except ToolNotFoundError as e:
+            logger.warning("Tool not found: %s", e.tool_name)
             return self._record_error(state, call_id, tool_name, str(e))
+        except ToolExecutionError as e:
+            logger.warning("Tool '%s' execution failed: %s", tool_name, e)
+            return self._record_error(state, call_id, tool_name, str(e))
+        except Exception as e:
+            logger.warning("Tool '%s' unexpected error: %s", tool_name, e)
+            return self._record_error(state, call_id, tool_name, f"{type(e).__name__}: {e}")
 
     def _record_error(self, state, call_id, tool_name, error_msg):
         """记录错误"""
@@ -213,19 +243,25 @@ class Observe:
 
         tool_calls = get_tool_calls(assistant_message)
         if not tool_calls:
-            state.final_answer = assistant_message.get("content")
+            content = assistant_message.get("content")
+            if not content or not str(content).strip():
+                state.stop_reason = StopReason.LLM_ERROR_ABORT
+                return
+            state.final_answer = content
             state.stop_reason = StopReason.MODEL_FINAL
             return
 
         state.add_tool_results(tool_results)
 
-        has_errors = any(
-            str(r.get("content", "")).startswith("Error:") for r in tool_results
+        error_count = sum(
+            1 for r in tool_results if str(r.get("content", "")).startswith("Error:")
         )
-        if has_errors:
+        if error_count == len(tool_results) and tool_results:
+            # 本步全部工具都失败才累加
             state.consecutive_tool_errors += 1
-        else:
+        elif error_count == 0:
             state.consecutive_tool_errors = 0
+        # 部分失败不累加也不清零，保留之前的状态
 
         if self.abort_on_tool_error and has_errors:
             state.stop_reason = StopReason.TOOL_ERROR_ABORT

@@ -26,43 +26,44 @@ def _build_description_with_examples(skill: Skill) -> str:
     return "\n".join(parts)
 
 
+def _build_json_schema(skill: Skill) -> Dict[str, Any]:
+    """从 skill.parameters 构建标准 JSON Schema（共享逻辑）"""
+    properties = {}
+    required = []
+
+    for param_name, param_spec in skill.parameters.items():
+        prop = {
+            "type": param_spec.get("type", "string"),
+            "description": param_spec.get("description", ""),
+        }
+
+        if "default" in param_spec:
+            prop["default"] = param_spec["default"]
+
+        if "enum" in param_spec:
+            prop["enum"] = param_spec["enum"]
+
+        properties[param_name] = prop
+
+        is_required = param_spec.get("required", "default" not in param_spec)
+        if is_required:
+            required.append(param_name)
+
+    return {
+        "type": "object",
+        "properties": properties,
+        "required": required,
+    }
+
+
 class OpenAIAdapter:
     """OpenAI function calling 格式适配器"""
 
     def to_spec(self, skill: Skill) -> Dict[str, Any]:
-        """
-        转换为 OpenAI function calling 格式
-        """
-        properties = {}
-        required = []
-
-        for param_name, param_spec in skill.parameters.items():
-            prop = {
-                "type": param_spec.get("type", "string"),
-                "description": param_spec.get("description", ""),
-            }
-
-            if "default" in param_spec:
-                prop["default"] = param_spec["default"]
-
-            if "enum" in param_spec:
-                prop["enum"] = param_spec["enum"]
-
-            properties[param_name] = prop
-
-            # 判断必填
-            is_required = param_spec.get("required", "default" not in param_spec)
-            if is_required:
-                required.append(param_name)
-
         return {
             "name": skill.name,
             "description": _build_description_with_examples(skill),
-            "parameters": {
-                "type": "object",
-                "properties": properties,
-                "required": required,
-            },
+            "parameters": _build_json_schema(skill),
         }
 
 
@@ -70,38 +71,10 @@ class ClaudeAdapter:
     """Anthropic Claude tool use 格式适配器"""
 
     def to_spec(self, skill: Skill) -> Dict[str, Any]:
-        """
-        转换为 Claude tool use 格式
-        """
-        properties = {}
-        required = []
-
-        for param_name, param_spec in skill.parameters.items():
-            prop = {
-                "type": param_spec.get("type", "string"),
-                "description": param_spec.get("description", ""),
-            }
-
-            if "default" in param_spec:
-                prop["default"] = param_spec["default"]
-
-            if "enum" in param_spec:
-                prop["enum"] = param_spec["enum"]
-
-            properties[param_name] = prop
-
-            is_required = param_spec.get("required", "default" not in param_spec)
-            if is_required:
-                required.append(param_name)
-
         return {
             "name": skill.name,
             "description": _build_description_with_examples(skill),
-            "input_schema": {
-                "type": "object",
-                "properties": properties,
-                "required": required,
-            },
+            "input_schema": _build_json_schema(skill),
         }
 
 

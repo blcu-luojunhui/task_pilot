@@ -1,30 +1,24 @@
-# Agent 系统使用指南
+# Agent 使用指南
 
 ## 概述
 
-Agent 系统提供了一个完整的 AI Agent 框架，基于 Think-Act-Observe 循环，支持自定义技能和工具扩展。
+TaskPilot Agent 系统提供完整的 AI Agent 框架，基于 Think → Act → Observe 循环，支持多 LLM Provider、自定义 Skills、Multi-Agent 协作和状态快照。
 
-## 架构分层
+## 架构
 
 ```
 src/core/agents/
-├── agent.py            # 统一的 Agent 接口
-├── foundation/         # 基础层 - 核心抽象
-│   ├── state/          状态管理
-│   ├── protocol/       消息协议
-│   └── context/        上下文管理
-├── loop/               # 循环层 - 核心执行循环
-│   ├── think/          思考阶段
-│   ├── act/            执行阶段
-│   └── observe/        观察阶段
-├── capabilities/       # 能力层 - 技能和工具
-│   ├── skills/         技能系统
-│   ├── tools/          工具集合
-│   └── llm/            LLM 集成
-└── orchestration/      # 编排层 - 执行控制
-    ├── executor/       执行器
-    ├── runtime/        运行时控制
-    └── routing/        任务路由
+├── engine/           # Agent Loop / Runner / Planner / Lifecycle
+│   └── prompting/    #   Prompt 组装、路由、知识选择
+├── capabilities/     # 能力层
+│   ├── llm/          #   LLM Provider 抽象 + DeepSeek/OpenAI/Claude
+│   │   └── providers/
+│   ├── tools/        #   内置工具：database / http / task / utils
+│   └── skills/       #   Skill 注册、校验、执行、序列化、Guard
+├── runtime/          # 运行时：Hook / Harness（Budget/Constraint/Feedback）
+├── state/            # 状态管理 / 快照 / 上下文窗口 / 记忆
+├── multi_agents/     # 多智能体协作
+└── execution/        # 执行调度
 ```
 
 ## 快速开始
@@ -34,15 +28,16 @@ src/core/agents/
 ```python
 from src.core.agents import Agent
 
-# 创建 Agent 实例
 agent = Agent.create(
-    llm_api_key="your-deepseek-api-key",
-    max_steps=10,
+    llm_api_key="your-api-key",
+    llm_provider="deepseek",     # deepseek / openai / claude
 )
 
-# 运行任务
 result = await agent.run("帮我分析系统状态")
-print(result.final_answer)
+print(result.final_answer)       # 最终回答
+print(result.success)            # 是否成功
+print(result.total_steps)        # 执行步数
+print(result.tool_calls_count)   # 工具调用次数
 ```
 
 ### 2. 加载内置工具
@@ -50,211 +45,210 @@ print(result.final_answer)
 ```python
 agent = Agent.create(
     llm_api_key="your-api-key",
-    tool_areas=["database", "http", "utils"],  # 加载工具区域
+    tool_areas=["utils"],                        # 默认，无 infra 依赖
+    # tool_areas=["database", "http", "task"],   # 按需启用
 )
 ```
 
-可用的工具区域：
-- `database`: 数据库操作工具
-- `http`: HTTP 请求工具
-- `task`: 任务管理工具
-- `utils`: 通用工具
+| 工具区域 | 能力 | 需要依赖注入 |
+|----------|------|------------|
+| `utils` | 时间、哈希、批处理 | 否 |
+| `database` | 数据库查询/写入 | 是 (`db_client`) |
+| `http` | HTTP 请求 | 是 (`http_client`) |
+| `task` | 任务状态/取消 | 是 |
 
-### 3. 注册自定义 Skill
+### 3. 注入依赖
 
-#### 方式 1: 使用装饰器
+```python
+agent = Agent.create(
+    llm_api_key="your-api-key",
+    tool_areas=["database", "http"],
+    tool_dependencies={
+        "db_client": db_client,
+        "http_client": http_client,
+    },
+)
+```
+
+### 4. 注册自定义 Skill
+
+**装饰器方式：**
 
 ```python
 @agent.skill(
-    name="calculate_sum",
-    description="计算两个数字的和",
+    name="fetch_weather",
+    description="获取指定城市的天气信息",
     parameters={
-        "a": {"type": "number", "description": "第一个数字"},
-        "b": {"type": "number", "description": "第二个数字"},
+        "city": {"type": "string", "description": "城市名称"},
     },
 )
-def calculate_sum(a: float, b: float) -> float:
-    return a + b
+async def fetch_weather(city: str) -> dict:
+    return {"city": city, "temp": 25}
 ```
 
-#### 方式 2: 使用 Skill 对象
+**直接注册 Skill 对象：**
 
 ```python
 from src.core.agents import Skill, SkillType
 
-def my_function(param: str) -> str:
-    return f"Processed: {param}"
-
 skill = Skill(
+    skill_id="my_tool_001",
     name="my_tool",
     description="My custom tool",
-    skill_type=SkillType.PYTHON_FUNCTION,
-    implementation=my_function,
-    parameters={
-        "param": {"type": "string", "description": "Input"}
-    },
+    skill_type=SkillType.EXECUTABLE,
+    handler=my_function,
+    parameters={"param": {"type": "string", "description": "Input"}},
 )
-
 agent.register_skill(skill)
 ```
 
-### 4. 注入依赖
+---
+
+## LLM Provider 配置
+
+### 切换 Provider
 
 ```python
-from src.infra.database import DatabaseClient
+# DeepSeek（默认）
+agent = Agent.create(llm_api_key="sk-xxx", llm_provider="deepseek")
 
-# 创建依赖
-db_client = DatabaseClient(connection_string="...")
+# OpenAI
+agent = Agent.create(llm_api_key="sk-xxx", llm_provider="openai")
 
-# 注入到 Agent
-agent = Agent.create(
-    llm_api_key="your-api-key",
-    tool_areas=["database"],
-    tool_dependencies={
-        "db_client": db_client,
-    },
-)
+# Claude
+agent = Agent.create(llm_api_key="sk-xxx", llm_provider="claude")
 ```
 
-## 高级功能
-
-### 任务路由
-
-启用任务路由可以自动将复杂任务拆分为多个子任务：
+### 自定义参数
 
 ```python
 agent = Agent.create(
     llm_api_key="your-api-key",
-    enable_routing=True,  # 启用路由
-)
-
-result = await agent.run(
-    "分析日志、生成报告、发送邮件"
+    llm_provider="deepseek",
+    llm_model="deepseek-chat",           # 模型名（None 用 provider 默认值）
+    llm_base_url="https://api.deepseek.com",  # API 地址
+    llm_temperature=0.2,                 # 温度 [0, 2]
 )
 ```
 
-### 完整配置
+---
+
+## 完整配置
 
 ```python
 agent = Agent.create(
     # LLM 配置
     llm_api_key="your-api-key",
-    llm_model="deepseek-chat",
-    llm_base_url="https://api.deepseek.com/chat/completions",
+    llm_provider="deepseek",
+    llm_model=None,                # None = 使用 provider 默认值
+    llm_base_url=None,             # None = 使用 provider 默认值
     llm_temperature=0.2,
-    
+
     # 执行配置
-    max_steps=10,
+    max_steps=8,
     max_context_tokens=60000,
     max_tool_result_length=2000,
     abort_on_tool_error=False,
     max_consecutive_errors=3,
-    
+
     # 工具配置
-    tool_areas=["database", "http"],
-    tool_dependencies={...},
-    
-    # 其他
-    enable_routing=True,
+    tool_areas=["utils"],
+    tool_dependencies={},
+
+    # 调试配置
+    verbose=False,                 # 打印执行流程日志
+    show_prompt=False,             # 打印发给 LLM 的完整 prompt
 )
 ```
 
-### 运行配置
+---
+
+## 生命周期控制
+
+Agent 有独立于任务状态机的生命周期：
 
 ```python
-result = await agent.run(
-    goal="Complete the task",
-    messages=[...],           # 初始消息
-    metadata={...},           # 元数据
-    trace_id="custom-id",     # 追踪 ID
-)
-
-# 结果
-print(result.success)         # 是否成功
-print(result.final_answer)    # 最终答案
-print(result.total_steps)     # 执行步数
-print(result.tool_calls_count) # 工具调用次数
+agent.pause()      # 暂停 — 当前 step 完成后挂起，run() 协程不返回
+agent.resume()     # 恢复 — 从暂停点继续执行
+agent.stop()       # 停止 — 当前 step 完成后以 USER_CANCELLED 返回
 ```
 
-## API 参考
+状态查询：
 
-### Agent.create()
+```python
+agent.lifecycle_state   # AgentState: IDLE / RUNNING / PAUSED / STOPPED / ERROR
+agent.is_paused         # bool
+agent.is_running        # bool
+```
 
-创建 Agent 实例。
+---
 
-**参数：**
-- `llm_api_key` (str): LLM API 密钥
-- `llm_model` (str): 模型名称，默认 "deepseek-chat"
-- `llm_base_url` (str): API 地址
-- `llm_temperature` (float): 温度参数，默认 0.2
-- `max_steps` (int): 最大执行步数，默认 8
-- `tool_areas` (List[str]): 要加载的工具区域
-- `tool_dependencies` (Mapping): 工具依赖注入
-- `enable_routing` (bool): 是否启用任务路由
+## 状态快照
 
-**返回：**
-- `Agent`: Agent 实例
+支持暂停后持久化，后续从快照恢复：
 
-### agent.skill()
+```python
+# 设置快照目录
+agent.set_snapshot_dir("./snapshots")
 
-装饰器，注册自定义 skill。
+# 暂停并保存
+agent.pause()
+snapshot_id = agent.save_snapshot(metadata={"task_id": "xxx"})
 
-**参数：**
-- `name` (str): Skill 名称
-- `description` (str): Skill 描述
-- `parameters` (Dict): 参数定义
+# 从快照恢复执行
+result = await agent.run_from_snapshot(snapshot_id)
+```
 
-### agent.run()
+---
 
-运行 Agent 执行任务。
+## 任务路由
 
-**参数：**
-- `goal` (str): 任务目标
-- `messages` (List[Dict]): 初始消息列表
-- `metadata` (Dict): 元数据
-- `trace_id` (str): 追踪 ID
+启用 `enable_routing=True`，复杂目标会被自动拆分为子任务按序执行：
 
-**返回：**
-- `AgentLoopResult`: 执行结果
+```python
+agent = Agent.create(
+    llm_api_key="your-api-key",
+    enable_routing=True,
+)
 
-## 示例
+result = await agent.run("分析日志，生成报告，发送邮件")
+# Agent 会将目标拆分为 3 个子任务依次执行
+```
 
-完整示例请参考：
-- `examples/agent_usage_examples.py` - 各种使用场景示例
-- `examples/minimal_goal_agent.py` - 最小化示例
-- `examples/deepseek_goal_agent.py` - DeepSeek 集成示例
+---
 
-## 扩展开发
+## run() 返回值
 
-### 创建自定义工具区域
+```python
+result: AgentLoopResult = await agent.run(goal="...")
 
-1. 在 `src/core/agents/capabilities/tools/` 下创建新文件
-2. 使用 `@skill` 装饰器定义工具
-3. 在 `loader.py` 中注册工具区域
+result.success            # bool — 是否成功
+result.final_answer       # str | None — 最终回答
+result.stop_reason        # StopReason — 停止原因
+result.total_steps        # int — 总步数
+result.tool_calls_count   # int — 工具调用次数
+result.duration_seconds   # float — 执行耗时
+result.trace_id           # str — 追踪 ID
+```
 
-### 创建自定义 LLM 集成
+StopReason 枚举：
 
-1. 在 `src/core/agents/capabilities/llm/` 下创建新文件
-2. 实现 `AssistantPlanner` 接口
-3. 在创建 Agent 时使用自定义 planner
+| 值 | 含义 |
+|---|------|
+| `MODEL_FINAL` | LLM 判断任务完成 |
+| `MAX_STEPS` | 达到 max_steps 上限 |
+| `BUDGET_EXHAUSTED` | 时间或 tool call 预算耗尽 |
+| `USER_CANCELLED` | 用户调用 stop() |
+| `CONSTRAINT_VIOLATION` | 违反约束策略 |
+| `ERROR` | 执行异常 |
+
+---
 
 ## 最佳实践
 
-1. **合理设置 max_steps**：根据任务复杂度调整
-2. **使用依赖注入**：避免在 skill 中硬编码依赖
-3. **错误处理**：设置合适的 `max_consecutive_errors`
-4. **工具选择**：只加载需要的工具区域
-5. **任务拆分**：复杂任务启用 routing
-
-## 故障排查
-
-### 常见问题
-
-1. **导入错误**：确保正确安装依赖
-2. **API 密钥错误**：检查 LLM API 密钥配置
-3. **工具未找到**：确认工具区域已加载
-4. **依赖注入失败**：检查依赖名称是否匹配
-
-## 贡献
-
-欢迎贡献新的工具、技能和改进！
+1. **合理设置 max_steps**：简单任务 3-4 步，复杂分析 8-12 步
+2. **按需加载工具**：只加载需要的 tool_areas，减少 token 消耗
+3. **使用依赖注入**：避免在 Skill 中硬编码 infra 依赖
+4. **设置风险级别**：为 Skill 指定 `RiskLevel.READ / WRITE / DESTRUCTIVE`，配合 PermissionGuard 做权限控制
+5. **开启 verbose**：调试时设置 `verbose=True` 观察每一步的 think/act/observe 输出
+6. **善用快照**：长时间运行的 Agent 任务定期保存快照，避免意外中断后从头开始

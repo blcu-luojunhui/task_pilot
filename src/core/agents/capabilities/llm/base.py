@@ -4,10 +4,15 @@ LLM Provider 抽象接口
 定义统一的 LLM 调用接口，支持多种 LLM 实现
 """
 
+import asyncio
+import json as _json
+import aiohttp
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, AsyncIterator
 from enum import Enum
+
+from ...exceptions import LLMTimeoutError, LLMResponseError, LLMRateLimitError, LLMProviderError
 
 
 class FinishReason(str, Enum):
@@ -58,6 +63,36 @@ class LLMProvider(ABC):
 
     def __init__(self, config: LLMConfig):
         self.config = config
+        self._session: Optional[aiohttp.ClientSession] = None
+
+    def _get_session(self) -> aiohttp.ClientSession:
+        """获取或创建持久化 ClientSession（复用连接池）"""
+        if self._session is None or self._session.closed:
+            connector = aiohttp.TCPConnector(limit=10, ttl_dns_cache=300)
+            timeout = aiohttp.ClientTimeout(total=self.config.timeout)
+            self._session = aiohttp.ClientSession(connector=connector, timeout=timeout)
+        return self._session
+
+    async def close(self):
+        """关闭内部 session"""
+        if self._session and not self._session.closed:
+            await self._session.close()
+
+    async def _safe_json_response(self, coro) -> Dict[str, Any]:
+        """包装 HTTP 请求，将超时和格式错误转为框架异常"""
+        try:
+            async with coro as resp:
+                text = await resp.text()
+                if resp.status != 200:
+                    if resp.status == 429:
+                        raise LLMRateLimitError(self.name)
+                    raise LLMProviderError(self.name, text, resp.status)
+                try:
+                    return _json.loads(text)
+                except _json.JSONDecodeError as e:
+                    raise LLMResponseError(f"{self.name} returned invalid JSON: {e}")
+        except asyncio.TimeoutError:
+            raise LLMTimeoutError(f"{self.name} request timed out after {self.config.timeout}s")
 
     @abstractmethod
     async def chat(

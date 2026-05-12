@@ -11,8 +11,8 @@ turn those events into concise logs without making the harness own formatting.
 
 import json
 import logging
-from dataclasses import dataclass
-from typing import Any, Dict, Optional
+from dataclasses import dataclass, field
+from typing import Any, Callable, Dict, Optional
 
 logger = logging.getLogger("agent.loop")
 
@@ -52,9 +52,13 @@ class HarnessEventLogger:
 
     verbose=False: 结构化单行日志（生产环境）
     verbose=True:  详细可读日志（开发调试）
+
+    sanitizer: 可选的内容脱敏回调，签名为 (text: str) -> str
+               用于掩码 API key、PII 等敏感信息
     """
 
     verbose: bool = False
+    sanitizer: Optional[Callable[[str], str]] = None
 
     warning_events: frozenset = frozenset(
         {
@@ -70,6 +74,12 @@ class HarnessEventLogger:
             self._log_verbose(event)
         else:
             self._log_compact(event)
+
+    def _sanitize(self, text: str) -> str:
+        """对敏感文本做脱敏处理"""
+        if self.sanitizer is None:
+            return text
+        return self.sanitizer(text)
 
     # ==================== Verbose 模式 ====================
     @staticmethod
@@ -107,11 +117,12 @@ class HarnessEventLogger:
                         _format_tool_calls(tool_calls),
                     )
                     if content:
-                        short = content[:80] + "..." if len(content) > 80 else content
+                        short = self._sanitize(content[:80] + "..." if len(content) > 80 else content)
                         logger.debug("[%s] Think  | note: %s", trace, short)
                 elif content:
                     logger.info("[%s] Think  | final_answer (%d chars)", trace, len(content))
                     display = content[:200] + "..." if len(content) > 200 else content
+                    display = self._sanitize(display)
                     for line in display.split("\n")[:8]:
                         logger.debug("[%s]          %s", trace, line)
             else:
@@ -130,9 +141,10 @@ class HarnessEventLogger:
         elif name == "act_end":
             results = payload.get("tool_results", [])
             for r in results:
-                content = r.get("content", "")
-                is_error = str(content).startswith("Error:")
+                content = str(r.get("content", ""))
+                is_error = content.startswith("Error:")
                 display = content[:150] + "..." if len(content) > 150 else content
+                display = self._sanitize(display)
                 if is_error:
                     logger.error("[%s] Act    | FAILED: %s", trace, display)
                 else:
@@ -174,6 +186,9 @@ class HarnessEventLogger:
     def _log_compact(self, event: Any) -> None:
         """结构化单行日志（生产环境）"""
         detail = self._summarize_payload(event.payload)
+        # 对 summary 中的 content 字段做脱敏
+        if self.sanitizer and isinstance(detail, dict):
+            detail = self._sanitize_detail(detail)
         log_method = logger.warning if event.name in self.warning_events else logger.info
         log_method(
             "agent_loop trace_id=%s event=%s step=%s stop_reason=%s detail=%s",
@@ -211,6 +226,27 @@ class HarnessEventLogger:
             }
 
         return summary
+
+    def _sanitize_detail(self, detail: Dict[str, Any]) -> Dict[str, Any]:
+        """递归对 detail dict 中的字符串做脱敏"""
+        if not self.sanitizer:
+            return detail
+        result = {}
+        for key, value in detail.items():
+            if isinstance(value, str):
+                result[key] = self.sanitizer(value)
+            elif isinstance(value, dict):
+                result[key] = self._sanitize_detail(value)
+            elif isinstance(value, list):
+                result[key] = [
+                    self._sanitize_detail(v) if isinstance(v, dict)
+                    else self.sanitizer(v) if isinstance(v, str)
+                    else v
+                    for v in value
+                ]
+            else:
+                result[key] = value
+        return result
 
     @staticmethod
     def _summarize_message(message: Optional[Dict[str, Any]]) -> Optional[Dict[str, Any]]:

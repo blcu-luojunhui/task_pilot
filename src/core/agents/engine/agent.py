@@ -28,6 +28,7 @@ from src.core.agents.capabilities.llm.providers import (
     ClaudeProvider,
     DeepSeekProvider,
 )
+from src.core.agents.capabilities.skills.serializer import _build_json_schema
 from src.core.agents.exceptions import AgentConfigError
 from .lifecycle import LifecycleManager
 from .runner import AgentLoopRunner
@@ -39,6 +40,29 @@ _PROVIDER_MAP = {
     "claude": ClaudeProvider,
     "deepseek": DeepSeekProvider,
 }
+
+def _skills_to_tools(skills: List[Skill]) -> List[Dict[str, Any]]:
+    """将 Skill 列表转换为 OpenAI function-calling 工具描述"""
+    tools = []
+    for skill in skills:
+        params = skill.parameters or {}
+        if params and params.get("type") == "object":
+            schema = params
+        elif params:
+            schema = _build_json_schema(skill)
+        else:
+            schema = {"type": "object", "properties": {}}
+
+        tools.append({
+            "type": "function",
+            "function": {
+                "name": skill.name,
+                "description": skill.description,
+                "parameters": schema,
+            },
+        })
+    return tools
+
 
 # 各 Provider 的默认配置
 _PROVIDER_DEFAULTS = {
@@ -201,118 +225,113 @@ class Agent:
             **kwargs,
         )
 
-        # 加载工具
+        # 加载工具到 bootstrap registry（全局共享的只读源）
         if tool_areas:
             load_agentic_tools(tool_areas)
 
-        # 创建 registry 和 executor
-        registry = get_global_registry()
+        registry = cls._build_registry()
         executor = SkillExecutor()
+        provider = cls._build_provider(llm_provider, resolved_model, resolved_base_url, config)
+        planner_factory = cls._build_planner(registry, provider, config)
+        runner = cls._build_runner(
+            planner_factory=planner_factory,
+            registry=registry,
+            executor=executor,
+            config=config,
+            **kwargs,
+        )
 
-        # 打印系统注册的 tools
+        if verbose:
+            runner.harness.event_logger.verbose = True
+        if show_prompt:
+            runner.thinker.show_prompt = True
+
+        lifecycle = LifecycleManager()
+        runner.lifecycle = lifecycle
+
+        return cls(runner, registry, config, provider, lifecycle=lifecycle)
+
+    # ── Builder helpers ───────────────────────────────────
+
+    @staticmethod
+    def _build_registry() -> SkillRegistry:
+        global_reg = get_global_registry()
+        registry = SkillRegistry(namespace=f"agent_{id(global_reg)}")
+        for skill in global_reg.filter(lambda _: True):
+            registry.register(skill)
         _logger = logging.getLogger("agent.loop")
         system_skills = registry.list_executable()
         if system_skills:
             _logger.info("系统注册了 %d 个 tools:", len(system_skills))
             for s in system_skills:
                 _logger.info("  • %s - %s", s.name, s.description[:50])
+        return registry
 
-        # 创建 LLM Provider
+    @staticmethod
+    def _build_provider(
+        llm_provider: str,
+        resolved_model: str,
+        resolved_base_url: str,
+        config: AgentConfig,
+    ) -> LLMProvider:
         provider_cls = _PROVIDER_MAP.get(llm_provider)
         if not provider_cls:
             raise ValueError(
                 f"Unknown LLM provider: {llm_provider}. Supported: {list(_PROVIDER_MAP.keys())}"
             )
-
         llm_config = LLMConfig(
             api_key=config.llm_api_key,
             model=resolved_model,
             base_url=resolved_base_url,
             temperature=config.llm_temperature,
         )
-        provider = provider_cls(llm_config)
+        return provider_cls(llm_config)
 
-        # 创建 planner 工厂函数
+    @staticmethod
+    def _build_planner(
+        registry: SkillRegistry,
+        provider: LLMProvider,
+        config: AgentConfig,
+    ) -> "AssistantPlanner":
         async def planner_factory(messages: List[Dict[str, Any]], step: int) -> Dict[str, Any]:
-            """
-            统一的 Planner 工厂函数
-
-            使用 LLMProvider 抽象层，支持任意 LLM
-            """
-
-            # 转换消息格式（保留 tool_calls 和 tool_call_id）
-            llm_messages = []
-            for m in messages:
-                llm_messages.append(
-                    LLMMessage(
-                        role=m["role"],
-                        content=m.get("content", ""),
-                        tool_calls=m.get("tool_calls"),
-                        tool_call_id=m.get("tool_call_id"),
-                    )
+            llm_messages = [
+                LLMMessage(
+                    role=m["role"],
+                    content=m.get("content", ""),
+                    tool_calls=m.get("tool_calls"),
+                    tool_call_id=m.get("tool_call_id"),
                 )
+                for m in messages
+            ]
 
-            # 构建工具列表
-            tools = []
-            for skill in registry.list_executable():
-                # 将 skill.parameters 包装为标准 JSON Schema
-                params = skill.parameters or {}
-                if params and params.get("type") == "object":
-                    # 已经是标准 JSON Schema
-                    schema = params
-                elif params:
-                    # 简单字段字典 → 标准 JSON Schema
-                    properties = {}
-                    required_fields = []
-                    for field_name, field_def in params.items():
-                        # 复制字段定义，移除非标准的 "required" 键
-                        clean_def = {k: v for k, v in field_def.items() if k != "required"}
-                        properties[field_name] = clean_def
-                        # 收集 required 字段
-                        if field_def.get("required", False):
-                            required_fields.append(field_name)
-                    schema = {
-                        "type": "object",
-                        "properties": properties,
-                    }
-                    if required_fields:
-                        schema["required"] = required_fields
-                else:
-                    schema = {"type": "object", "properties": {}}
+            tools = _skills_to_tools(registry.list_executable())
 
-                tools.append(
-                    {
-                        "type": "function",
-                        "function": {
-                            "name": skill.name,
-                            "description": skill.description,
-                            "parameters": schema,
-                        },
-                    }
-                )
-
-            # 调用 LLM
             response = await provider.chat(
                 messages=llm_messages,
                 tools=tools if tools else None,
                 temperature=config.llm_temperature,
             )
 
-            # 转换为内部格式（标准化 tool_calls）
-            result = {
-                "role": "assistant",
-                "content": response.content,
-            }
+            result: Dict[str, Any] = {"role": "assistant", "content": response.content}
             if response.tool_calls:
                 from src.core.agents.state.protocol import normalize_tool_calls
-
                 normalized = normalize_tool_calls(response.tool_calls)
                 result["tool_calls"] = [tc.to_dict() for tc in normalized]
-
+            if response.usage:
+                result["_usage"] = response.usage
             return result
 
-        # 创建 runner
-        runner = AgentLoopRunner(
+        return planner_factory
+
+    @staticmethod
+    def _build_runner(
+        planner_factory: "AssistantPlanner",
+        registry: SkillRegistry,
+        executor: SkillExecutor,
+        config: AgentConfig,
+        **kwargs,
+    ) -> AgentLoopRunner:
+        return AgentLoopRunner(
             planner=planner_factory,
             registry=registry,
             executor=executor,
@@ -321,22 +340,10 @@ class Agent:
             max_tool_result_length=config.max_tool_result_length,
             max_consecutive_errors=config.max_consecutive_errors,
             max_context_tokens=config.max_context_tokens,
+            llm_model=config.llm_model or "gpt-4o",
             tool_dependencies=config.tool_dependencies,
             is_cancelled=config.is_cancelled,
         )
-
-        # 如果开启 verbose，设置 harness 日志器为 verbose 模式
-        if verbose:
-            runner.harness.event_logger.verbose = True
-
-        # 如果开启 show_prompt，设置 thinker 打印完整 prompt
-        if show_prompt:
-            runner.thinker.show_prompt = True
-
-        lifecycle = LifecycleManager()
-        runner.lifecycle = lifecycle
-
-        return cls(runner, registry, config, provider, lifecycle=lifecycle)
 
     # ── 生命周期控制 ──────────────────────────────────────
 
@@ -596,8 +603,7 @@ class Agent:
         # 重置生命周期状态（允许从 STOPPED/ERROR 重新开始）
         if self._lifecycle.state in (AgentState.STOPPED, AgentState.ERROR):
             self._lifecycle.reset()
-        if self._lifecycle.state == AgentState.IDLE:
-            self._lifecycle.transition_to(AgentState.RUNNING, reason="run started")
+        # 注意：从 IDLE → RUNNING 的转换由 harness 统一管理，不在此处重复
 
         if self._config.enable_routing:
             return await self._runner.run_with_routing(

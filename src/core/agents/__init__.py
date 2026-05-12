@@ -62,20 +62,16 @@ from .capabilities import (
     DeepSeekPlanner,
     DeepSeekSettings,
 )
-from .capabilities.registry import CapabilityRegistry, get_global_capability_registry
-
 # 执行层 - 从 execution 导出
 from .execution import (
     ExecutionStatus,
     ExecutionResult,
     ToolExecutionResult,
     SkillExecutionResult,
-    Dispatcher,
 )
 
 # 运行时 - 从 runtime 导出
 from .runtime.hooks import Hook, LoggingHook, TracingHook, HookContext
-from .runtime.harness.runner import HarnessRunner, RunnerConfig
 from .runtime.harness.debugger import Debugger, TraceEvent
 from .runtime.harness.evaluator import Evaluator, EvaluationResult, EvaluationMetric
 from .runtime.harness.fixtures import FixtureManager, MockTool
@@ -140,21 +136,16 @@ __all__ = [
     "DEFAULT_TOOL_AREAS",
     "DeepSeekPlanner",
     "DeepSeekSettings",
-    "CapabilityRegistry",
-    "get_global_capability_registry",
     # Execution
     "ExecutionStatus",
     "ExecutionResult",
     "ToolExecutionResult",
     "SkillExecutionResult",
-    "Dispatcher",
     # Runtime
     "Hook",
     "LoggingHook",
     "TracingHook",
     "HookContext",
-    "HarnessRunner",
-    "RunnerConfig",
     "Debugger",
     "TraceEvent",
     "Evaluator",

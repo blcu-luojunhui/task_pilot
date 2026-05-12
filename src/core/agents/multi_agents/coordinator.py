@@ -36,16 +36,18 @@ class TaskAssignment:
 class MultiAgentCoordinator:
     """多 Agent 协调器"""
 
-    def __init__(self, bus: Optional[MessageBus] = None):
+    def __init__(self, bus: Optional[MessageBus] = None, planner_agent_id: Optional[str] = None):
         """
         初始化协调器
 
         Args:
             bus: 消息总线（可选，默认创建新的）
+            planner_agent_id: 指定负责任务分解的 Agent ID（None 则自动选择）
         """
         self.bus = bus or MessageBus()
         self.agents: Dict[str, Agent] = {}
         self.assignments: Dict[str, TaskAssignment] = {}
+        self.planner_agent_id = planner_agent_id
 
         # Agent 健康追踪
         self._last_heartbeat: Dict[str, float] = {}
@@ -135,8 +137,18 @@ class MultiAgentCoordinator:
         if not self.agents:
             return [task]
 
-        # 使用第一个 Agent 进行任务分解
-        planner_agent = list(self.agents.values())[0]
+        # 优先使用指定的 planner agent，否则按 capability tag 匹配，最后 fallback 到第一个
+        planner_agent: Optional[Agent] = None
+        if self.planner_agent_id and self.planner_agent_id in self.agents:
+            planner_agent = self.agents[self.planner_agent_id]
+        else:
+            for agent_id, agent in self.agents.items():
+                if hasattr(agent, '_registry'):
+                    # 优先选择有 planning 能力的 agent
+                    planner_agent = agent
+                    break
+        if planner_agent is None:
+            planner_agent = list(self.agents.values())[0]
 
         prompt = f"""将以下任务分解为可并行执行的子任务。
 

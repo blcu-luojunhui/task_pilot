@@ -26,6 +26,11 @@ class ContextWindowManager:
     max_tokens: int = 60000
     reserve_ratio: float = 0.1  # 为响应预留 10% 空间
     token_counter: TokenCounter = field(default_factory=TokenCounter)
+    model: str = "gpt-4o"
+
+    def __post_init__(self):
+        if self.model != "gpt-4o" and isinstance(self.token_counter, TokenCounter):
+            self.token_counter = TokenCounter(model=self.model)
 
     def compact_if_needed(
         self,
@@ -101,6 +106,7 @@ class ContextWindowManager:
         保留策略：
         - 第一条 system 消息（如果有）
         - 最近的消息（从后往前保留）
+        - tool-call 对（assistant(tool_calls) + tool(tool_call_id)）整组保留或丢弃
         """
         if not messages:
             return messages
@@ -120,20 +126,68 @@ class ContextWindowManager:
         remaining_budget = max_tokens - system_tokens
 
         if remaining_budget <= 0:
-            # system 消息本身就超了，只保留 system
             return system_msgs
 
-        # 从后往前保留消息
-        kept_msgs = []
+        # 为 tool 消息建立反向索引：tool_call_id → 消息位置
+        tool_msg_by_call_id: Dict[str, int] = {}
+        for i, msg in enumerate(other_msgs):
+            if msg.get("role") == "tool" and msg.get("tool_call_id"):
+                tool_msg_by_call_id[msg["tool_call_id"]] = i
+
+        # 从后往前保留消息，以 tool-call 对为原子单位
+        kept_indices: set = set()
         used_tokens = 0
+        i = len(other_msgs) - 1
 
-        for msg in reversed(other_msgs):
-            msg_tokens = self._estimate_messages_tokens([msg])
-            if used_tokens + msg_tokens > remaining_budget:
+        while i >= 0 and used_tokens < remaining_budget:
+            msg = other_msgs[i]
+            if i in kept_indices:
+                i -= 1
+                continue
+
+            # assistant 消息携带 tool_calls 时，需连带保留对应的 tool 结果
+            tool_call_ids: List[str] = []
+            if msg.get("role") == "assistant" and msg.get("tool_calls"):
+                for tc in msg["tool_calls"]:
+                    tc_id = tc.get("id")
+                    if tc_id:
+                        tool_call_ids.append(tc_id)
+
+            # 计算整组 token
+            group_indices = {i}
+            for tc_id in tool_call_ids:
+                tool_idx = tool_msg_by_call_id.get(tc_id)
+                if tool_idx is not None:
+                    group_indices.add(tool_idx)
+
+            # 估算整组 token（含 tool 结果）
+            group_msgs = [other_msgs[idx] for idx in sorted(group_indices)]
+            group_tokens = self._estimate_messages_tokens(group_msgs)
+            if used_tokens + group_tokens > remaining_budget:
                 break
-            kept_msgs.insert(0, msg)
-            used_tokens += msg_tokens
 
+            kept_indices.update(group_indices)
+            used_tokens += group_tokens
+            i = min(group_indices) - 1 if group_indices else i - 1
+
+        # 清理孤儿 tool 消息（其配对的 assistant(tool_calls) 已被丢弃）
+        for idx in list(kept_indices):
+            msg = other_msgs[idx]
+            if msg.get("role") == "tool":
+                tc_id = msg.get("tool_call_id")
+                if tc_id:
+                    # 查找配对的 assistant
+                    has_pair = any(
+                        j in kept_indices
+                        and other_msgs[j].get("role") == "assistant"
+                        and any(tc.get("id") == tc_id for tc in (other_msgs[j].get("tool_calls") or []))
+                        for j in kept_indices
+                        if j != idx
+                    )
+                    if not has_pair:
+                        kept_indices.discard(idx)
+
+        kept_msgs = [other_msgs[idx] for idx in sorted(kept_indices)]
         result = system_msgs + kept_msgs
 
         if len(result) < len(messages):

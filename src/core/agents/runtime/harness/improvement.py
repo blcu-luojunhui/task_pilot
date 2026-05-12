@@ -62,7 +62,7 @@ class InMemoryImprovementStore:
 class ContinuousImprovement:
     """Captures completed run summaries through an optional store."""
 
-    store: Optional[ImprovementStore] = None
+    store: Optional[ImprovementStore] = field(default_factory=InMemoryImprovementStore)
 
     async def capture(
         self,

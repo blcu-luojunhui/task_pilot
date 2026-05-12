@@ -5,9 +5,10 @@ Builds a per-step system message from current agent state and selected knowledge
 """
 
 from dataclasses import dataclass
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 
 from ...state import AgentLoopState
+from ...state.context.tokenizer import TokenCounter
 from .knowledge_selector import KnowledgeSelector
 
 
@@ -18,27 +19,41 @@ class PromptAssembler:
     base_instructions: str = "You are an agent that solves the user's goal step by step. Use tools when needed and answer directly when enough information is available."
     max_system_tokens: int = 8000
     knowledge_selector: Optional[KnowledgeSelector] = None
+    token_counter: Optional[TokenCounter] = None
+
+    def __post_init__(self):
+        if self.token_counter is None:
+            self.token_counter = TokenCounter()
 
     def assemble(self, state: AgentLoopState) -> Dict[str, Any]:
-        sections = [self.base_instructions.strip()]
-
-        sections.append(self._goal_section(state))
-        sections.append(self._budget_section(state))
+        sections = [
+            ("base", self.base_instructions.strip()),
+            ("goal", self._goal_section(state)),
+            ("budget", self._budget_section(state)),
+        ]
 
         error_hint = self._error_hint_section(state)
         if error_hint:
-            sections.append(error_hint)
+            sections.append(("error_hint", error_hint))
 
         knowledge = self._knowledge_section(state)
         if knowledge:
-            sections.append(knowledge)
+            sections.append(("knowledge", knowledge))
 
-        content = "\n\n".join(section for section in sections if section)
+        # 按优先级组装：低优先级的 section 先被丢弃
+        # 优先级: base > goal > budget > error_hint > knowledge
+        content_parts: List[str] = []
+        used_tokens = 0
+        assert self.token_counter is not None
 
-        # 截断到 max_system_tokens（按 ~4 chars/token 估算）
-        max_chars = self.max_system_tokens * 4
-        if len(content) > max_chars:
-            content = content[:max_chars]
+        for _name, text in sections:
+            part_tokens = self.token_counter.count(text) + 2  # 分隔符开销
+            if used_tokens + part_tokens > self.max_system_tokens:
+                break
+            content_parts.append(text)
+            used_tokens += part_tokens
+
+        content = "\n\n".join(content_parts)
 
         return {
             "role": "system",

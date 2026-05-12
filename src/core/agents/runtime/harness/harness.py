@@ -357,6 +357,7 @@ class AgentLoopHarness:
             total_steps=state.step,
             tool_calls_count=len(tool_call_steps),
             duration_seconds=time.monotonic() - context.started_at,
+            token_usage=dict(state.token_usage),
         )
 
     async def _apply_budget_violation(

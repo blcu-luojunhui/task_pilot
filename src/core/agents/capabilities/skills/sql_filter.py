@@ -11,12 +11,27 @@ from typing import List, Optional
 
 # 默认禁止的 SQL 模式（针对 db_execute）
 DEFAULT_BLOCKED_PATTERNS = [
-    r"\bDROP\s+(TABLE|DATABASE|INDEX|VIEW)\b",
-    r"\bTRUNCATE\s+TABLE\b",
-    r"\bALTER\s+(TABLE|DATABASE)\b",
+    r"\bDROP\s+(TABLE|DATABASE|INDEX|VIEW|SCHEMA|FUNCTION|PROCEDURE|TRIGGER|EVENT)\b",
+    r"\bTRUNCATE\s+(TABLE\s+)?",
+    r"\bALTER\s+(TABLE|DATABASE|SCHEMA|VIEW|FUNCTION|PROCEDURE)\b",
     r"\bGRANT\b",
     r"\bREVOKE\b",
-    r"\bCREATE\s+DATABASE\b",
+    r"\bCREATE\s+(DATABASE|SCHEMA|FUNCTION|PROCEDURE|TRIGGER|EVENT)\b",
+    r"\bCREATE\s+TEMPORARY\s+TABLE\b",
+    r"\bLOAD\s+DATA\s+(INFILE|OUTFILE)\b",
+    r"\bLOAD_FILE\b",
+    r"\bINTO\s+(OUTFILE|DUMPFILE)\b",
+    r"\bLOCK\s+TABLES?\b",
+    r"\bUNLOCK\s+TABLES?\b",
+    r"\bFLUSH\b",
+    r"\bRENAME\s+(TABLE|DATABASE|SCHEMA|USER)\b",
+    r"\bSHUTDOWN\b",
+    r"\bINSTALL\s+PLUGIN\b",
+    r"\bUNINSTALL\s+PLUGIN\b",
+    r"\bSET\s+(GLOBAL|SESSION|PERSIST)\b",
+    r"\bSLEEP\s*\(\s*\d+\s*\)",
+    r"\bBENCHMARK\s*\(.*\)",
+    r"\bWAITFOR\s+DELAY\b",
 ]
 
 

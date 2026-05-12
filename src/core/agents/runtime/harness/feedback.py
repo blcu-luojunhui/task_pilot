@@ -43,7 +43,7 @@ class FeedbackLoop:
         if output is None:
             return []
         if isinstance(output, str):
-            return [{"role": "system", "name": "feedback", "content": output}]
+            return [{"role": "user", "name": "feedback", "content": output}]
         if isinstance(output, dict):
             return [output]
         return list(output)

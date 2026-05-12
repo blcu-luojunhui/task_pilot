@@ -3,10 +3,8 @@ OpenAI Provider 实现
 """
 
 import json
-import aiohttp
 from typing import List, Dict, Optional, AsyncIterator
 from ..base import LLMProvider, LLMMessage, LLMResponse, LLMConfig, FinishReason
-from ....exceptions import LLMProviderError, LLMRateLimitError
 
 
 class OpenAIProvider(LLMProvider):
@@ -45,31 +43,25 @@ class OpenAIProvider(LLMProvider):
         if resolved_max_tokens:
             payload["max_tokens"] = resolved_max_tokens
 
-        async with aiohttp.ClientSession() as session:
-            async with session.post(
+        session = self._get_session()
+        data = await self._safe_json_response(
+            session.post(
                 f"{self.config.base_url}/chat/completions",
                 headers=headers,
                 json=payload,
-                timeout=aiohttp.ClientTimeout(total=self.config.timeout),
-            ) as resp:
-                if resp.status != 200:
-                    error_text = await resp.text()
-                    if resp.status == 429:
-                        raise LLMRateLimitError("openai")
-                    raise LLMProviderError("openai", error_text, resp.status)
+            )
+        )
 
-                data = await resp.json()
+        choice = data["choices"][0]
+        message = choice["message"]
 
-                choice = data["choices"][0]
-                message = choice["message"]
-
-                return LLMResponse(
-                    content=message.get("content") or "",
-                    tool_calls=message.get("tool_calls"),
-                    finish_reason=FinishReason(choice.get("finish_reason", "stop")),
-                    usage=data.get("usage"),
-                    raw_response=data,
-                )
+        return LLMResponse(
+            content=message.get("content") or "",
+            tool_calls=message.get("tool_calls"),
+            finish_reason=FinishReason(choice.get("finish_reason", "stop")),
+            usage=data.get("usage"),
+            raw_response=data,
+        )
 
     async def stream_chat(
         self, messages: List[LLMMessage], tools: Optional[List[Dict]] = None, **kwargs
@@ -90,12 +82,11 @@ class OpenAIProvider(LLMProvider):
         if tools:
             payload["tools"] = tools
 
-        async with aiohttp.ClientSession() as session:
-            async with session.post(
+        session = self._get_session()
+        async with session.post(
                 f"{self.config.base_url}/chat/completions",
                 headers=headers,
                 json=payload,
-                timeout=aiohttp.ClientTimeout(total=self.config.timeout),
             ) as resp:
                 async for line in resp.content:
                     line = line.decode("utf-8").strip()

@@ -86,6 +86,9 @@ class AgentLoopState:
     # 元数据
     metadata: Dict[str, Any] = field(default_factory=dict)
 
+    # 累计 token 使用量
+    token_usage: Dict[str, int] = field(default_factory=lambda: {"prompt": 0, "completion": 0, "total": 0})
+
     def __post_init__(self):
         if self.lifecycle_state is None:
             self.lifecycle_state = AgentState.RUNNING
@@ -120,4 +123,5 @@ class AgentLoopResult:
     total_steps: int = 0
     tool_calls_count: int = 0
     duration_seconds: float = 0.0
+    token_usage: Dict[str, int] = field(default_factory=lambda: {"prompt": 0, "completion": 0, "total": 0})
     metadata: Dict[str, Any] = field(default_factory=dict)

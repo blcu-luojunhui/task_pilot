@@ -2,6 +2,7 @@
 长期记忆 - 存储跨会话的知识和经验
 """
 
+import asyncio
 import json
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
@@ -33,7 +34,7 @@ class LongTermMemory:
         if storage_path and storage_path.exists():
             self._load()
 
-    def store(
+    async def store(
         self, key: str, value: Any, category: str = "general", importance: float = 0.5, **metadata
     ):
         """存储记忆"""
@@ -42,7 +43,7 @@ class LongTermMemory:
         )
         self.memories[key] = entry
         if self.storage_path:
-            self._save()
+            await self._save_async()
 
     def retrieve(self, key: str) -> Optional[MemoryEntry]:
         """按 key 精确检索"""
@@ -81,25 +82,25 @@ class LongTermMemory:
             entry.last_accessed = datetime.now(timezone.utc)
         return results[:limit]
 
-    def delete(self, key: str) -> bool:
+    async def delete(self, key: str) -> bool:
         """删除记忆"""
         if key in self.memories:
             del self.memories[key]
             if self.storage_path:
-                self._save()
+                await self._save_async()
             return True
         return False
 
-    def clear(self):
+    async def clear(self):
         """清空所有记忆"""
         self.memories.clear()
         if self.storage_path:
-            self._save()
+            await self._save_async()
 
     # ── 私有方法 ──────────────────────────────────────
 
-    def _save(self):
-        """持久化到 JSON 文件"""
+    async def _save_async(self):
+        """异步持久化到 JSON 文件（通过线程池避免阻塞事件循环）"""
         if not self.storage_path:
             return
         data = {
@@ -119,8 +120,12 @@ class LongTermMemory:
             },
         }
         self.storage_path.parent.mkdir(parents=True, exist_ok=True)
-        with open(self.storage_path, "w", encoding="utf-8") as f:
-            json.dump(data, f, indent=2, ensure_ascii=False)
+
+        def _write():
+            with open(self.storage_path, "w", encoding="utf-8") as f:
+                json.dump(data, f, indent=2, ensure_ascii=False)
+
+        await asyncio.to_thread(_write)
 
     def _load(self):
         """从 JSON 文件加载"""

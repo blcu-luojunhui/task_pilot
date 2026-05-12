@@ -16,15 +16,25 @@ from .models import AgentState, AgentLoopState, StopReason
 class StateSnapshot:
     """状态快照管理器"""
 
-    def __init__(self, storage_dir: Path):
+    def __init__(self, storage_dir: Path, max_tool_result_length: int = 2000):
         """
         初始化快照管理器
 
         Args:
             storage_dir: 快照存储目录
+            max_tool_result_length: tool_output 最大字符数，超出截断
         """
         self.storage_dir = Path(storage_dir)
         self.storage_dir.mkdir(parents=True, exist_ok=True)
+        self.max_tool_result_length = max_tool_result_length
+
+    def _truncate(self, text: Optional[str]) -> Optional[str]:
+        """截断过长文本"""
+        if text is None:
+            return None
+        if len(text) > self.max_tool_result_length:
+            return text[:self.max_tool_result_length] + "... [truncated]"
+        return text
 
     def save(
         self,
@@ -64,7 +74,7 @@ class StateSnapshot:
                     {
                         "tool_name": tc.tool_name,
                         "tool_input": tc.tool_input,
-                        "tool_output": tc.tool_output,
+                        "tool_output": self._truncate(tc.tool_output),
                         "error": tc.error,
                         "duration_ms": tc.duration_ms,
                     }
