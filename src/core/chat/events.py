@@ -6,6 +6,7 @@ class ChatEventType:
     TURN_PAUSED = "chat.turn_paused"
     TURN_END = "chat.turn_end"
     TURN_ERROR = "chat.turn_error"
+    MODE_CHANGED = "chat.mode_changed"
 
 
 __all__ = ["ChatEventType"]

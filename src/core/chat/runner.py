@@ -79,6 +79,10 @@ class ChatTurnRunner:
         # confirm 续跑意味着之前已经升级到 agentic 模式
         if confirmed_tool_calls:
             self._mode = "agentic"
+            await self._publish(ChatEventType.MODE_CHANGED, {
+                "mode": "agentic",
+                "reason": "confirm 续跑",
+            })
             tool_results = await self._execute_tools(confirmed_tool_calls)
             messages = messages + [
                 {
@@ -102,6 +106,12 @@ class ChatTurnRunner:
                     total_usage[k] = total_usage.get(k, 0) + v
 
             if not tool_calls:
+                if self._mode == "agentic":
+                    self._mode = "chat"
+                    await self._publish(ChatEventType.MODE_CHANGED, {
+                        "mode": "chat",
+                        "reason": "turn 正常结束",
+                    })
                 await self._publish(ChatEventType.TURN_END, {
                     "content": full_content,
                     "token_usage": total_usage,
@@ -119,6 +129,17 @@ class ChatTurnRunner:
             ]
             if escalate_calls:
                 self._mode = "agentic"
+                escalate_reason = ""
+                try:
+                    escalate_reason = _json.loads(
+                        escalate_calls[0]["function"].get("arguments", "{}")
+                    ).get("reason", "")
+                except Exception:
+                    pass
+                await self._publish(ChatEventType.MODE_CHANGED, {
+                    "mode": "agentic",
+                    "reason": escalate_reason,
+                })
                 # 执行 escalate（结果只是占位），写 tool 消息让 LLM 知道已升级
                 tool_results = await self._execute_tools(tool_calls)
                 messages = messages + [
