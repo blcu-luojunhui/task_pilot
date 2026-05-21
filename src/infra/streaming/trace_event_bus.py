@@ -4,7 +4,10 @@ import asyncio
 from collections import deque
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
-from typing import Any, Deque, Dict, Optional
+from typing import Any, Deque, Dict, Optional, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from src.infra.streaming.event_persister import EventPersister
 
 
 @dataclass
@@ -30,11 +33,13 @@ class TraceEventBus:
         replay_limit: int = 200,
         subscriber_queue_size: int = 200,
         closed_ttl_seconds: int = 300,
+        persister: Optional["EventPersister"] = None,
     ):
         self._traces: Dict[str, _TraceStream] = {}
         self._replay_limit = replay_limit
         self._subscriber_queue_size = subscriber_queue_size
         self._closed_ttl_seconds = closed_ttl_seconds
+        self._persister = persister
 
     def ensure_trace(self, trace_id: str, metadata: Optional[Dict[str, Any]] = None) -> None:
         stream = self._traces.get(trace_id)
@@ -58,7 +63,13 @@ class TraceEventBus:
         data: Dict[str, Any],
         source: str,
         step: Optional[int] = None,
+        persist: bool = True,
     ) -> Dict[str, Any]:
+        """发布事件。
+
+        ``persist=False`` 时跳过 EventPersister 写库——给 chat.token_delta 这类
+        高频流式事件用，订阅者实时拿到，但不污染 agent_events 表。
+        """
         self.ensure_trace(trace_id)
         stream = self._traces[trace_id]
         stream.sequence += 1
@@ -84,6 +95,9 @@ class TraceEventBus:
 
         for queue in dead_subscribers:
             stream.subscribers.discard(queue)
+
+        if persist and self._persister:
+            self._persister.enqueue(event)
 
         return event
 

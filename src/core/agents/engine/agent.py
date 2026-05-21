@@ -28,7 +28,12 @@ from src.core.agents.capabilities.llm.providers import (
     ClaudeProvider,
     DeepSeekProvider,
 )
-from src.core.agents.capabilities.skills.serializer import _build_json_schema
+from src.core.agents.capabilities.skills.serializer import (
+    _build_json_schema,
+    OpenAIAdapter,
+    ClaudeAdapter,
+    ToolSpecSerializer,
+)
 from src.core.agents.exceptions import AgentConfigError
 from .lifecycle import LifecycleManager
 from .runner import AgentLoopRunner
@@ -41,27 +46,16 @@ _PROVIDER_MAP = {
     "deepseek": DeepSeekProvider,
 }
 
-def _skills_to_tools(skills: List[Skill]) -> List[Dict[str, Any]]:
-    """将 Skill 列表转换为 OpenAI function-calling 工具描述"""
-    tools = []
-    for skill in skills:
-        params = skill.parameters or {}
-        if params and params.get("type") == "object":
-            schema = params
-        elif params:
-            schema = _build_json_schema(skill)
-        else:
-            schema = {"type": "object", "properties": {}}
+def _skills_to_tools(skills: List[Skill], llm_provider: str = "openai") -> List[Dict[str, Any]]:
+    """将 Skill 列表转换为 LLM tool calling 格式，根据 provider 选择适配器"""
+    adapter = ClaudeAdapter() if llm_provider == "claude" else OpenAIAdapter()
+    serializer = ToolSpecSerializer(adapter=adapter)
+    specs = serializer.serialize_many(skills)
 
-        tools.append({
-            "type": "function",
-            "function": {
-                "name": skill.name,
-                "description": skill.description,
-                "parameters": schema,
-            },
-        })
-    return tools
+    # OpenAI/DeepSeek 需要 {"type": "function", "function": {...}} 包装
+    if llm_provider != "claude":
+        return [{"type": "function", "function": spec} for spec in specs]
+    return specs
 
 
 # 各 Provider 的默认配置
@@ -204,6 +198,11 @@ class Agent:
         resolved_model = llm_model or defaults["model"]
         resolved_base_url = llm_base_url or defaults["base_url"]
 
+        # 提取运行时参数（非 AgentConfig 字段，不需要校验）
+        stream_callback = kwargs.pop("stream_callback", None)
+        chat_mode = kwargs.pop("chat_mode", False)
+        hooks = kwargs.pop("hooks", None)
+
         # 校验 kwargs 仅含 AgentConfig 已知字段，避免拼写错误被静默吞掉
         known_fields = {f.name for f in getattr(AgentConfig, '__dataclass_fields__', {}).values()}
         for key in kwargs:
@@ -238,6 +237,9 @@ class Agent:
             registry=registry,
             executor=executor,
             config=config,
+            stream_callback=stream_callback,
+            chat_mode=chat_mode,
+            hooks=hooks,
             **kwargs,
         )
 
@@ -248,6 +250,7 @@ class Agent:
 
         lifecycle = LifecycleManager()
         runner.lifecycle = lifecycle
+        runner.harness.lifecycle = lifecycle
 
         return cls(runner, registry, config, provider, lifecycle=lifecycle)
 
@@ -293,7 +296,7 @@ class Agent:
         provider: LLMProvider,
         config: AgentConfig,
     ) -> "AssistantPlanner":
-        async def planner_factory(messages: List[Dict[str, Any]], step: int) -> Dict[str, Any]:
+        async def planner_factory(messages: List[Dict[str, Any]], step: int, **kwargs) -> Dict[str, Any]:
             llm_messages = [
                 LLMMessage(
                     role=m["role"],
@@ -304,7 +307,21 @@ class Agent:
                 for m in messages
             ]
 
-            tools = _skills_to_tools(registry.list_executable())
+            stream_callback = kwargs.get("stream_callback")
+
+            if stream_callback and provider.supports_streaming:
+                # ── 流式模式 ──
+                full_content = ""
+                async for token in provider.stream_chat(llm_messages, temperature=config.llm_temperature):
+                    full_content += token
+                    result = stream_callback(token)
+                    import inspect
+                    if inspect.isawaitable(result):
+                        await result
+                result: Dict[str, Any] = {"role": "assistant", "content": full_content}
+                return result
+
+            tools = _skills_to_tools(registry.list_executable(), llm_provider=config.llm_provider)
 
             response = await provider.chat(
                 messages=llm_messages,
@@ -318,7 +335,11 @@ class Agent:
                 normalized = normalize_tool_calls(response.tool_calls)
                 result["tool_calls"] = [tc.to_dict() for tc in normalized]
             if response.usage:
-                result["_usage"] = response.usage
+                result["_usage"] = {
+                    "prompt": response.usage.get("prompt_tokens", 0),
+                    "completion": response.usage.get("completion_tokens", 0),
+                    "total": response.usage.get("total_tokens", 0),
+                }
             return result
 
         return planner_factory
@@ -343,6 +364,9 @@ class Agent:
             llm_model=config.llm_model or "gpt-4o",
             tool_dependencies=config.tool_dependencies,
             is_cancelled=config.is_cancelled,
+            hooks=list(kwargs.get("hooks") or []),
+            stream_callback=kwargs.get("stream_callback"),
+            chat_mode=kwargs.get("chat_mode", False),
         )
 
     # ── 生命周期控制 ──────────────────────────────────────

@@ -1,11 +1,12 @@
 from dependency_injector import containers, providers
 
 from src.core.config import ProjectConfigSettings
+from src.core.chat.service import ChatService
 
 from src.infra.database import AsyncMySQLPool
 from src.infra.observability import LogService, AlertService
 from src.infra.shared import AsyncHttpClient
-from src.infra.streaming import TraceEventBus
+from src.infra.streaming import TraceEventBus, EventPersister
 from src.jobs.task_lifecycle import TaskLifecycleManager
 
 
@@ -38,7 +39,23 @@ class ServerContainer(containers.DeclarativeContainer):
         task_table=config.provided.task_table,
     )
 
-    trace_event_bus = providers.Singleton(TraceEventBus)
+    event_persister = providers.Singleton(
+        EventPersister,
+        mysql_pool=async_mysql_pool,
+    )
+
+    trace_event_bus = providers.Singleton(
+        TraceEventBus,
+        persister=event_persister,
+    )
+
+    chat_service = providers.Singleton(
+        ChatService,
+        db=async_mysql_pool,
+        log=log_service,
+        config=config,
+        event_bus=trace_event_bus,
+    )
 
 
 __all__ = ["ServerContainer"]

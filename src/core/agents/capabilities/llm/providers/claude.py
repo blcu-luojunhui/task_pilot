@@ -21,6 +21,7 @@ class ClaudeProvider(LLMProvider):
         tools: Optional[List[Dict]] = None,
         temperature: Optional[float] = None,
         max_tokens: Optional[int] = None,
+        response_format: Optional[Dict] = None,
         **kwargs,
     ) -> LLMResponse:
         """发送聊天请求"""
@@ -51,7 +52,7 @@ class ClaudeProvider(LLMProvider):
             payload["system"] = system_message
 
         if tools:
-            payload["tools"] = self._convert_tools(tools)
+            payload["tools"] = tools
 
         session = self._get_session()
         data = await self._safe_json_response(
@@ -180,21 +181,6 @@ class ClaudeProvider(LLMProvider):
         else:
             msg["content"] = message.content
         return msg
-
-    def _convert_tools(self, tools: List[Dict]) -> List[Dict]:
-        """转换工具格式为 Claude 格式"""
-        claude_tools = []
-        for tool in tools:
-            if tool.get("type") == "function":
-                func = tool["function"]
-                claude_tools.append(
-                    {
-                        "name": func["name"],
-                        "description": func.get("description", ""),
-                        "input_schema": func.get("parameters", {}),
-                    }
-                )
-        return claude_tools
 
     @property
     def name(self) -> str:

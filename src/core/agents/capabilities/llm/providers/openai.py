@@ -21,6 +21,7 @@ class OpenAIProvider(LLMProvider):
         tools: Optional[List[Dict]] = None,
         temperature: Optional[float] = None,
         max_tokens: Optional[int] = None,
+        response_format: Optional[Dict] = None,
         **kwargs,
     ) -> LLMResponse:
         """发送聊天请求"""
@@ -38,6 +39,9 @@ class OpenAIProvider(LLMProvider):
         if tools:
             payload["tools"] = tools
             payload["tool_choice"] = "auto"
+
+        if response_format:
+            payload["response_format"] = response_format
 
         resolved_max_tokens = max_tokens if max_tokens is not None else self.config.max_tokens
         if resolved_max_tokens:

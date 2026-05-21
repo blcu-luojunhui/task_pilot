@@ -1,7 +1,8 @@
 """Context window manager implementation"""
 
+import asyncio
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Optional
 
 import logging
 
@@ -16,33 +17,26 @@ class ContextWindowManager:
     管理上下文窗口大小和消息历史
 
     策略：
-    1. 保留 system 消息（不截断）
-    2. 保留最近 N 条消息
-    3. 中间消息按时间从旧到新截断
-
-    使用 TokenCounter 进行精确 token 计数（优先 tiktoken，回退字符估算）。
+    1. 优先使用 LLM 摘要压缩（compactor 可用时）
+    2. 回退到朴素截断（保留 system + 最近 N 条，丢弃中间）
     """
 
     max_tokens: int = 60000
     reserve_ratio: float = 0.1  # 为响应预留 10% 空间
     token_counter: TokenCounter = field(default_factory=TokenCounter)
     model: str = "gpt-4o"
+    compactor: Optional[Callable[[List[Dict[str, Any]]], Any]] = None  # 异步 LLM 摘要回调
 
     def __post_init__(self):
         if self.model != "gpt-4o" and isinstance(self.token_counter, TokenCounter):
             self.token_counter = TokenCounter(model=self.model)
 
-    def compact_if_needed(
+    async def compact_if_needed(
         self,
         messages: List[Dict[str, Any]],
     ) -> List[Dict[str, Any]]:
         """
         如果消息超过 token 限制，进行压缩
-
-        策略：
-        - 保留第一条 system 消息
-        - 保留最近的消息
-        - 从中间开始截断
 
         Args:
             messages: 消息列表
@@ -63,7 +57,55 @@ class ContextWindowManager:
             f"Context compaction triggered: {total_tokens} tokens > {effective_limit} limit"
         )
 
+        if self.compactor:
+            return await self._compact_with_summary(messages, effective_limit)
+
         return self._truncate_middle(messages, effective_limit)
+
+    async def _compact_with_summary(
+        self, messages: List[Dict[str, Any]], effective_limit: int
+    ) -> List[Dict[str, Any]]:
+        """用 LLM 摘要压缩中间段，保留最近消息和上下文摘要"""
+        system_msgs, other_msgs = self._split_messages(messages)
+
+        # 保留最近 10 条非 system 消息
+        keep_recent = other_msgs[-10:]
+        to_summarize = other_msgs[:-10]
+
+        if not to_summarize:
+            return messages
+
+        try:
+            summary = self.compactor(to_summarize)
+            if asyncio.iscoroutine(summary):
+                summary = await summary
+
+            summary_msg = {
+                "role": "system",
+                "content": f"[Context Summary of earlier conversation]\n{summary}",
+            }
+            result = system_msgs + [summary_msg] + keep_recent
+            logger.info(
+                f"Context compacted via summary: {len(to_summarize)} messages → 1 summary, "
+                f"kept {len(keep_recent)} recent"
+            )
+            return result
+        except Exception:
+            logger.warning("Context summary compaction failed, falling back to truncation", exc_info=True)
+            return self._truncate_middle(messages, effective_limit)
+
+    def _split_messages(
+        self, messages: List[Dict[str, Any]]
+    ) -> tuple[List[Dict[str, Any]], List[Dict[str, Any]]]:
+        """分离 system 消息和其他消息"""
+        system_msgs = []
+        other_msgs = []
+        for msg in messages:
+            if msg.get("role") == "system" and not system_msgs:
+                system_msgs.append(msg)
+            else:
+                other_msgs.append(msg)
+        return system_msgs, other_msgs
 
     def truncate_messages(
         self, messages: List[Dict[str, Any]], max_tokens: Optional[int] = None
@@ -111,15 +153,7 @@ class ContextWindowManager:
         if not messages:
             return messages
 
-        # 分离 system 消息和其他消息
-        system_msgs = []
-        other_msgs = []
-
-        for msg in messages:
-            if msg.get("role") == "system" and not system_msgs:
-                system_msgs.append(msg)
-            else:
-                other_msgs.append(msg)
+        system_msgs, other_msgs = self._split_messages(messages)
 
         # 计算 system 消息占用的 token
         system_tokens = self._estimate_messages_tokens(system_msgs)

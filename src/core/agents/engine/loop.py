@@ -8,6 +8,8 @@ Agent Loop - 整合 Think-Act-Observe 循环
 """
 
 import asyncio
+import inspect
+import json
 import logging
 import time
 from dataclasses import dataclass
@@ -23,7 +25,7 @@ from .prompting import PromptAssembler
 logger = logging.getLogger("agent.loop")
 
 # Type alias for planner
-AssistantPlanner = Callable[[List[Dict[str, Any]], int], Awaitable[Dict[str, Any]]]
+AssistantPlanner = Callable[..., Awaitable[Dict[str, Any]]]
 
 
 @dataclass
@@ -33,14 +35,18 @@ class Think:
     planner: AssistantPlanner
     context_manager: Optional[ContextWindowManager] = None
     prompt_assembler: Optional[PromptAssembler] = None
+    memory_manager: Optional[Any] = None  # MemoryManager, 注入相关记忆
     show_prompt: bool = False  # 是否打印发给 LLM 的完整 prompt
     is_cancelled: Optional[Callable[[], bool]] = None  # 暂停/停止检查回调
+    publish_event: Optional[Callable[..., Any]] = None  # 发布 prompt_assembled 事件供前端检查器使用
+    stream_callback: Optional[Callable[[str], Any]] = None  # token 级别流式回调
 
     async def run(self, state: AgentLoopState) -> Optional[Dict[str, Any]]:
         """执行思考阶段"""
         messages = list(state.messages)
 
         # 组装 prompt
+        tools_spec = None
         if self.prompt_assembler:
             system_msg = self.prompt_assembler.assemble(state)
             messages = [system_msg] + messages
@@ -51,11 +57,34 @@ class Think:
                 len(content),
                 content,
             )
+            # 提取 tools spec（如果 prompt assembler 提供了）
+            if hasattr(self.prompt_assembler, "knowledge_selector") and hasattr(
+                self.prompt_assembler.knowledge_selector, "registry"
+            ):
+                try:
+                    tools_spec = self.prompt_assembler.knowledge_selector.registry.to_tool_specs()
+                except Exception:
+                    tools_spec = None
+
+        # 注入相关记忆（插在 system prompt 之后）
+        if self.memory_manager:
+            relevant = self.memory_manager.retrieve(query=state.goal, k=3)
+            if relevant:
+                memory_msg = {
+                    "role": "system",
+                    "content": "[Relevant memories from earlier steps]\n" + "\n".join(relevant),
+                }
+                messages.insert(1, memory_msg)
+                logger.debug(
+                    "[%s] Think  | injected %d relevant memories",
+                    state.trace_id,
+                    len(relevant),
+                )
 
         # 压缩上下文
         if self.context_manager:
             before_count = len(messages)
-            messages = self.context_manager.compact_if_needed(messages)
+            messages = await self.context_manager.compact_if_needed(messages)
             if len(messages) < before_count:
                 logger.debug(
                     "[%s] Think  | context compacted: %d → %d messages",
@@ -63,6 +92,22 @@ class Think:
                     before_count,
                     len(messages),
                 )
+
+        # 发布 prompt_assembled 事件（供前端 Prompt Inspector 使用）
+        if self.publish_event:
+            try:
+                result = self.publish_event(
+                    "prompt_assembled",
+                    {
+                        "messages": messages,
+                        "tools_spec": tools_spec,
+                    },
+                    step=state.step,
+                )
+                if inspect.isawaitable(result):
+                    await result
+            except Exception:
+                logger.debug("[%s] Think  | publish_event failed for prompt_assembled", state.trace_id)
 
         if self.show_prompt:
             logger.debug(
@@ -85,7 +130,7 @@ class Think:
 
         # 调用 planner
         try:
-            result = await self.planner(messages, state.step)
+            result = await self.planner(messages, state.step, stream_callback=self.stream_callback)
             # 累积 token 使用量
             if result and "_usage" in result:
                 usage = result.pop("_usage")
@@ -206,7 +251,7 @@ class Act:
                     duration_ms=duration * 1000,
                 )
             )
-            return tool_result_message(call_id, str(result)[: self.max_tool_result_length])
+            return tool_result_message(call_id, self._smart_truncate(result, self.max_tool_result_length))
         except asyncio.CancelledError:
             raise
         except ToolNotFoundError as e:
@@ -224,6 +269,28 @@ class Act:
         state.tool_calls.append(ToolCallRecord(tool_name=tool_name, tool_input={}, error=error_msg))
         return tool_result_message(call_id, f"Error: {error_msg}")
 
+    @staticmethod
+    def _smart_truncate(result: Any, max_length: int) -> str:
+        """结构化截断，保留 JSON 可解析性，防止硬截断破坏结构导致 LLM 解析错误"""
+        result_str = str(result)
+        if len(result_str) <= max_length:
+            return result_str
+
+        if isinstance(result, list):
+            truncated = result[:5]
+            suffix = f"\n[TRUNCATED: showing 5/{len(result)} items, {len(result_str)} chars]"
+            return json.dumps(truncated, ensure_ascii=False, default=str) + suffix
+
+        if isinstance(result, dict):
+            truncated = {}
+            for k, v in list(result.items())[:10]:
+                v_str = str(v)
+                truncated[k] = v if len(v_str) < 100 else v_str[:100] + "..."
+            suffix = f"\n[TRUNCATED: showing 10/{len(result)} keys, {len(result_str)} chars]"
+            return json.dumps(truncated, ensure_ascii=False, default=str) + suffix
+
+        return result_str[:max_length] + f"\n[TRUNCATED at {max_length} chars]"
+
 
 @dataclass
 class Observe:
@@ -231,6 +298,7 @@ class Observe:
 
     abort_on_tool_error: bool = False
     max_consecutive_errors: int = 3
+    memory_manager: Optional[Any] = None  # MemoryManager, 写入有用结果
 
     def run(
         self,
@@ -252,6 +320,17 @@ class Observe:
             return
 
         state.add_tool_results(tool_results)
+
+        # 写入记忆：成功的工具结果存入短期记忆
+        if self.memory_manager and tool_results:
+            for i, result in enumerate(tool_results):
+                content = str(result.get("content", ""))
+                if not content.startswith("Error:") and content.strip():
+                    tool_name = tool_calls[i].name if i < len(tool_calls) else "unknown"
+                    self.memory_manager.add(
+                        content=content,
+                        metadata={"step": state.step, "tool": tool_name},
+                    )
 
         error_count = sum(
             1 for r in tool_results if str(r.get("content", "")).startswith("Error:")

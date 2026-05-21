@@ -12,6 +12,13 @@ from ...state.context.tokenizer import TokenCounter
 from .knowledge_selector import KnowledgeSelector
 
 
+_CHAT_INSTRUCTIONS = (
+    "You are a helpful assistant. Reply concisely and naturally in a conversational tone. "
+    "Use tools only when the user explicitly asks you to perform an action — "
+    "most questions should be answered directly."
+)
+
+
 @dataclass
 class PromptAssembler:
     """Build dynamic system prompts for the current agent step."""
@@ -20,12 +27,18 @@ class PromptAssembler:
     max_system_tokens: int = 8000
     knowledge_selector: Optional[KnowledgeSelector] = None
     token_counter: Optional[TokenCounter] = None
+    chat_mode: bool = False
 
     def __post_init__(self):
         if self.token_counter is None:
             self.token_counter = TokenCounter()
 
     def assemble(self, state: AgentLoopState) -> Dict[str, Any]:
+        if self.chat_mode:
+            return self._assemble_chat(state)
+        return self._assemble_agent(state)
+
+    def _assemble_agent(self, state: AgentLoopState) -> Dict[str, Any]:
         sections = [
             ("base", self.base_instructions.strip()),
             ("goal", self._goal_section(state)),
@@ -58,6 +71,13 @@ class PromptAssembler:
         return {
             "role": "system",
             "content": content,
+        }
+
+    def _assemble_chat(self, state: AgentLoopState) -> Dict[str, Any]:
+        """Chat 模式：轻量 system prompt，无 budget/goal/step 计数。"""
+        return {
+            "role": "system",
+            "content": _CHAT_INSTRUCTIONS,
         }
 
     def _goal_section(self, state: AgentLoopState) -> str:
