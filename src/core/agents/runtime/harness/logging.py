@@ -178,6 +178,23 @@ class HarnessEventLogger:
                     result.stop_reason.value if result.stop_reason else "N/A",
                 )
 
+        elif name == "prompt_assembled":
+            msgs = payload.get("messages", [])
+            roles: dict = {}
+            total_chars = 0
+            for m in msgs:
+                role = m.get("role", "?")
+                roles[role] = roles.get(role, 0) + 1
+                total_chars += len(str(m.get("content", "")))
+            logger.info(
+                "[%s] Prompt | %d messages (%s), %d chars total, tools=%s",
+                trace,
+                len(msgs),
+                ", ".join(f"{r}={c}" for r, c in sorted(roles.items())),
+                total_chars,
+                bool(payload.get("tools_spec")),
+            )
+
         elif name == "run_error":
             logger.error("[%s] ERROR  | %s", trace, payload.get("error"))
 
@@ -201,6 +218,22 @@ class HarnessEventLogger:
 
     def _summarize_payload(self, payload: Dict[str, Any]) -> Dict[str, Any]:
         summary: Dict[str, Any] = {}
+
+        if "messages" in payload:
+            # prompt_assembled 事件：只记录消息数和角色分布
+            msgs = payload["messages"]
+            roles: Dict[str, int] = {}
+            total_chars = 0
+            for m in msgs:
+                role = m.get("role", "?")
+                roles[role] = roles.get(role, 0) + 1
+                total_chars += len(str(m.get("content", "")))
+            summary["prompt"] = {
+                "message_count": len(msgs),
+                "roles": roles,
+                "total_chars": total_chars,
+                "has_tools_spec": bool(payload.get("tools_spec")),
+            }
 
         if "assistant_message" in payload:
             summary["assistant_message"] = self._summarize_message(payload["assistant_message"])

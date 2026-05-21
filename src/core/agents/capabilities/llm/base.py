@@ -101,6 +101,7 @@ class LLMProvider(ABC):
         tools: Optional[List[Dict]] = None,
         temperature: Optional[float] = None,
         max_tokens: Optional[int] = None,
+        response_format: Optional[Dict] = None,
         **kwargs,
     ) -> LLMResponse:
         """
@@ -111,6 +112,7 @@ class LLMProvider(ABC):
             tools: 工具定义列表
             temperature: 温度参数
             max_tokens: 最大 token 数
+            response_format: 结构化输出格式（如 {"type": "json_schema", "json_schema": {...}}）
             **kwargs: 其他参数
 
         Returns:

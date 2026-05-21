@@ -1,6 +1,7 @@
 import logging
+import os
 from quart_cors import cors
-from quart import Quart
+from quart import Quart, send_from_directory
 
 from src.core.bootstrap import AppContext
 from src.core.dependency import ServerContainer
@@ -60,6 +61,41 @@ routes = server_routes(
     events,
 )
 app.register_blueprint(routes)
+
+# ── Frontend SPA 静态托管 ──────────────────────────────────────────
+_FRONTEND_DIST = os.environ.get(
+    "FRONTEND_DIST",
+    os.path.join(os.path.dirname(__file__), "frontend", "dist"),
+)
+_FRONTEND_ENABLED = os.environ.get("FRONTEND_DIST_ENABLED", "true").lower() not in ("0", "false", "no")
+
+
+def _static_enabled() -> bool:
+    return _FRONTEND_ENABLED and os.path.isdir(_FRONTEND_DIST)
+
+
+@app.route("/")
+async def frontend_index():
+    if not _static_enabled():
+        return "Frontend not built — run `npm run build` in frontend/", 503
+    return await send_from_directory(_FRONTEND_DIST, "index.html")
+
+
+@app.route("/assets/<path:filename>")
+async def frontend_assets(filename: str):
+    if not _static_enabled():
+        return "", 404
+    return await send_from_directory(_FRONTEND_DIST, f"assets/{filename}")
+
+
+@app.route("/<path:path>")
+async def frontend_spa(path: str):
+    if not _static_enabled():
+        return "", 404
+    full = os.path.join(_FRONTEND_DIST, path)
+    if os.path.isfile(full):
+        return await send_from_directory(_FRONTEND_DIST, path)
+    return await send_from_directory(_FRONTEND_DIST, "index.html")
 
 
 @app.before_serving

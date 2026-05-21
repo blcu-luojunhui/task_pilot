@@ -125,7 +125,7 @@ class MultiAgentCoordinator:
         self, task: str, context: Optional[Dict[str, Any]] = None
     ) -> List[str]:
         """
-        任务分解
+        任务分解（使用 structured output 约束 LLM 输出格式）
 
         Args:
             task: 任务描述
@@ -144,7 +144,6 @@ class MultiAgentCoordinator:
         else:
             for agent_id, agent in self.agents.items():
                 if hasattr(agent, '_registry'):
-                    # 优先选择有 planning 能力的 agent
                     planner_agent = agent
                     break
         if planner_agent is None:
@@ -156,23 +155,56 @@ class MultiAgentCoordinator:
 
 要求：
 1. 每个子任务应该独立且可并行执行
-2. 返回 JSON 格式的子任务列表
-3. 格式：["子任务1", "子任务2", ...]
-
-如果任务无法分解，返回包含原任务的列表。
+2. 如果任务无法分解，返回包含原任务的列表。
 """
 
+        # 优先使用 structured output
+        try:
+            sub_tasks = await self._decompose_with_schema(planner_agent, prompt)
+            if sub_tasks:
+                return sub_tasks
+        except Exception as e:
+            logger.warning(f"Structured decompose failed: {e}, falling back to default")
+
+        # 回退：使用完整的 agent.run()
         try:
             result = await planner_agent.run(prompt)
-            # 尝试解析 JSON
             sub_tasks = json.loads(result.final_answer)
             if isinstance(sub_tasks, list) and all(isinstance(t, str) for t in sub_tasks):
                 return sub_tasks
         except Exception as e:
-            logger.warning(f"Task decomposition failed: {e}")
+            logger.warning(f"Task decomposition fallback also failed: {e}")
 
-        # 分解失败，返回原任务
         return [task]
+
+    async def _decompose_with_schema(self, agent: Agent, prompt: str) -> Optional[List[str]]:
+        """使用 structured output schema 进行任务分解"""
+        from ..capabilities.llm.base import LLMMessage
+
+        schema = {
+            "type": "object",
+            "properties": {
+                "sub_tasks": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": "分解后的子任务列表",
+                }
+            },
+            "required": ["sub_tasks"],
+        }
+
+        response = await agent.provider.chat(
+            messages=[LLMMessage(role="user", content=prompt)],
+            temperature=0.2,
+            max_tokens=500,
+            response_format={"type": "json_schema", "json_schema": {"name": "sub_tasks", "schema": schema}},
+        )
+
+        data = json.loads(response.content)
+        sub_tasks = data.get("sub_tasks", [])
+        if isinstance(sub_tasks, list) and all(isinstance(t, str) for t in sub_tasks):
+            return sub_tasks
+        return None
 
     def _assign_tasks(self, tasks: List[str], strategy: str) -> List[TaskAssignment]:
         """

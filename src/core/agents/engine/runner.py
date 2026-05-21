@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from typing import Any, Callable, Dict, List, Mapping, Optional
 
 # state
-from src.core.agents.state import AgentLoopResult, StopReason, ContextWindowManager
+from src.core.agents.state import AgentLoopResult, StopReason, ContextWindowManager, MemoryManager
 
 # task routing (decomposition)
 from .prompting import TaskRouter
@@ -63,6 +63,9 @@ class AgentLoopRunner:
     feedback_loop: Optional[FeedbackLoop] = None
     continuous_improvement: Optional[ContinuousImprovement] = None
     workflow: Optional[WorkflowController] = None
+    memory_manager: Optional[MemoryManager] = None
+    stream_callback: Optional[Callable[[str], Any]] = None
+    chat_mode: bool = False
 
     def __post_init__(self) -> None:
         if self.budget is None:
@@ -77,18 +80,26 @@ class AgentLoopRunner:
         if self.continuous_improvement is None:
             self.continuous_improvement = ContinuousImprovement()
 
+        if self.memory_manager is None:
+            self.memory_manager = MemoryManager()
+
         if self.thinker is None:
             context_manager = ContextWindowManager(
                 max_tokens=self.max_context_tokens,
                 model=self.llm_model,
             )
             knowledge_selector = KnowledgeSelector(self.registry)
-            prompt_assembler = PromptAssembler(knowledge_selector=knowledge_selector)
+            prompt_assembler = PromptAssembler(
+                knowledge_selector=knowledge_selector,
+                chat_mode=self.chat_mode,
+            )
             self.thinker = Think(
                 self.planner,
                 context_manager=context_manager,
                 prompt_assembler=prompt_assembler,
+                memory_manager=self.memory_manager,
                 is_cancelled=self.is_cancelled,
+                stream_callback=self.stream_callback,
             )
 
         if self.actor is None:
@@ -105,6 +116,7 @@ class AgentLoopRunner:
             self.observer = Observe(
                 abort_on_tool_error=self.abort_on_tool_error,
                 max_consecutive_errors=self.max_consecutive_errors,
+                memory_manager=self.memory_manager,
             )
 
         if self.harness is None:
@@ -175,7 +187,6 @@ class AgentLoopRunner:
         total_steps = 0
         total_tool_calls = 0
 
-        # 共享预算：子调用间传递剩余 steps
         remaining_steps = self.max_steps
 
         for index, sub_goal in enumerate(sub_goals, start=1):
@@ -197,17 +208,29 @@ class AgentLoopRunner:
                 }
             )
 
-            # 为子调用设置剩余预算
-            saved_max_steps = self.max_steps
-            self.max_steps = min(remaining_steps, self.max_steps)
-            self.budget = None  # 强制下次 __post_init__ 重建 budget
-            last_result = await self.run(
+            # 为子任务创建独立 runner，避免共享预算竞态
+            sub_runner = AgentLoopRunner(
+                planner=self.planner,
+                registry=self.registry,
+                executor=self.executor,
+                max_steps=min(remaining_steps, self.max_steps),
+                abort_on_tool_error=self.abort_on_tool_error,
+                max_tool_result_length=self.max_tool_result_length,
+                max_consecutive_errors=self.max_consecutive_errors,
+                max_context_tokens=self.max_context_tokens,
+                llm_model=self.llm_model,
+                permission_guard=self.permission_guard,
+                is_cancelled=self.is_cancelled,
+                lifecycle=self.lifecycle,
+                tool_dependencies=self.tool_dependencies,
+                context_builder=self.context_builder,
+            )
+            last_result = await sub_runner.run(
                 goal=sub_goal,
                 messages=run_messages,
                 metadata=metadata,
                 trace_id=trace_id,
             )
-            self.max_steps = saved_max_steps
 
             results.append(last_result.final_answer or "")
             remaining_steps -= last_result.total_steps

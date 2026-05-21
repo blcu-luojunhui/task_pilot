@@ -29,6 +29,11 @@ class AppContext:
         await log_service.start()
         logger.info("Log service started")
 
+        logger.info("=== Phase 2.5: Starting event persister ===")
+        persister = self.container.event_persister()
+        await persister.start()
+        logger.info("Event persister started")
+
         logger.info("=== Phase 3: Starting alert service ===")
         alert_service = self.container.alert_service()
         await alert_service.start()
@@ -62,6 +67,11 @@ class AppContext:
         log_service = self.container.log_service()
         await log_service.stop(drain_timeout=10.0)
         logger.info("Log service stopped")
+
+        logger.info("=== Phase 3.5: Stopping event persister ===")
+        persister = self.container.event_persister()
+        await persister.stop(grace_seconds=5.0)
+        logger.info("Event persister stopped")
 
         logger.info("=== Phase 4: Closing database pools ===")
         pool = self.container.async_mysql_pool()

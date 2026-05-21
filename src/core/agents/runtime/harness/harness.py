@@ -99,6 +99,9 @@ class AgentLoopHarness:
                 is_cancelled=self.is_cancelled,
                 constraints=self.constraints,
             )
+        self._current_state: Optional[AgentLoopState] = None
+        if self.thinker.publish_event is None:
+            self.thinker.publish_event = self._emit_thinker_event
 
     async def run(
         self,
@@ -122,9 +125,10 @@ class AgentLoopHarness:
             metadata=run_metadata,
         )
         state = context.state
+        self._current_state = state
 
         try:
-            await self._emit("run_start", state, {"metadata": context.metadata})
+            await self._emit("run_start", state, {"metadata": context.metadata, "goal": goal})
 
             # 同步 lifecycle 初始状态
             if self.lifecycle:
@@ -378,6 +382,17 @@ class AgentLoopHarness:
 
     def _elapsed_seconds(self, context: AgentRunContext) -> float:
         return time.monotonic() - context.started_at
+
+    async def _emit_thinker_event(
+        self,
+        name: str,
+        payload: Optional[Dict[str, Any]] = None,
+        step: Optional[int] = None,
+    ) -> None:
+        """Think.publish_event 适配器：将 Think 的调用签转成 _emit(state, payload)。"""
+        if self._current_state is None:
+            return
+        await self._emit(name, self._current_state, payload)
 
     async def _emit(
         self,

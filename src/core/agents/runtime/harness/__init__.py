@@ -17,6 +17,7 @@ from .constraints import ConstraintSet, ConstraintViolation
 from .feedback import FeedbackLoop
 from .improvement import (
     ContinuousImprovement,
+    DBImprovementStore,
     ImprovementRecord,
     InMemoryImprovementStore,
 )
@@ -34,6 +35,7 @@ __all__ = [
     "ConstraintViolation",
     "FeedbackLoop",
     "ContinuousImprovement",
+    "DBImprovementStore",
     "ImprovementRecord",
     "InMemoryImprovementStore",
     "HarnessEventLogger",

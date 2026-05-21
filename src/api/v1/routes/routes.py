@@ -3,7 +3,17 @@ from __future__ import annotations
 from quart import Blueprint
 
 from src.api.v1.utils import ApiDependencies
-from src.api.v1.endpoints import create_health_bp, create_tasks_bp, create_metrics_bp
+from src.api.v1.endpoints import (
+    create_health_bp,
+    create_tasks_bp,
+    create_metrics_bp,
+    create_skills_bp,
+    create_system_bp,
+    create_runs_bp,
+    create_replay_bp,
+    create_chat_bp,
+    create_agent_bp,
+)
 from src.core.config import ProjectConfigSettings
 from src.infra.database import AsyncMySQLPool
 from src.infra.observability import LogService, AlertService
@@ -17,6 +27,12 @@ def register_v1_blueprints(deps: ApiDependencies) -> Blueprint:
     api.register_blueprint(create_health_bp(deps))
     api.register_blueprint(create_tasks_bp(deps))
     api.register_blueprint(create_metrics_bp(deps))
+    api.register_blueprint(create_skills_bp(deps))
+    api.register_blueprint(create_system_bp(deps))
+    api.register_blueprint(create_runs_bp(deps))
+    api.register_blueprint(create_replay_bp(deps))
+    api.register_blueprint(create_chat_bp(deps))
+    api.register_blueprint(create_agent_bp(deps))
 
     return api
 

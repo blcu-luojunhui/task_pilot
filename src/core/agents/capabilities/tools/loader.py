@@ -8,6 +8,7 @@ TOOL_AREAS = {
     "http": "src.core.agents.capabilities.tools.http",
     "task": "src.core.agents.capabilities.tools.task",
     "utils": "src.core.agents.capabilities.tools.utils",
+    "chat_ops": "src.core.agents.capabilities.tools.chat_ops",
 }
 DEFAULT_TOOL_AREAS = ("utils",)
 

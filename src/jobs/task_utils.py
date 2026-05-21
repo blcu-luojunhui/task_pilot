@@ -64,7 +64,7 @@ class TaskUtils:
     def validate_task_name(task_name: str) -> str:
         if not task_name or not isinstance(task_name, str):
             raise TaskValidationError("task_name must be a non-empty string")
-        if not re.match(r"^[a-zA-Z0-9_]+$", task_name):
+        if not re.match(r"^[a-zA-Z0-9_.]+$", task_name):
             raise TaskValidationError(f"Invalid task_name format: {task_name}")
         return task_name
 

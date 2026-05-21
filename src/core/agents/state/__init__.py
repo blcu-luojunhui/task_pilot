@@ -25,7 +25,7 @@ from .protocol import (
     normalize_tool_calls,
 )
 from .context import ContextWindowManager
-from .memory import ShortTermMemory, LongTermMemory, MemoryEntry
+from .memory import ShortTermMemory, LongTermMemory, MemoryEntry, MemoryManager
 from .snapshot import StateSnapshot
 
 __all__ = [
@@ -49,6 +49,7 @@ __all__ = [
     "ShortTermMemory",
     "LongTermMemory",
     "MemoryEntry",
+    "MemoryManager",
     # Snapshot
     "StateSnapshot",
 ]
