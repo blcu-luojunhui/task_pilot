@@ -38,3 +38,6 @@ ENV/
 tests/
 examples/
 scripts/
+CLAUDE.md
+package-lock.json
+node_modudles/
