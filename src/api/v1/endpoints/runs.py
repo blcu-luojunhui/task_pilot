@@ -6,6 +6,7 @@ from __future__ import annotations
 from quart import Blueprint, jsonify, request
 
 from src.api.v1.utils import ApiDependencies, decode_json_columns
+from src.core.auth import get_current_account_id
 
 
 def create_runs_bp(deps: ApiDependencies) -> Blueprint:
@@ -23,8 +24,9 @@ def create_runs_bp(deps: ApiDependencies) -> Blueprint:
         except (TypeError, ValueError):
             page_size = 20
 
-        conditions = []
-        params = []
+        account_id = get_current_account_id() or 0
+        conditions = ["account_id = %s"]
+        params = [account_id]
 
         success_filter = args.get("success")
         if success_filter is not None:
@@ -42,9 +44,7 @@ def create_runs_bp(deps: ApiDependencies) -> Blueprint:
             conditions.append("trace_id LIKE %s")
             params.append(f"%{trace_id_q}%")
 
-        where = ""
-        if conditions:
-            where = "WHERE " + " AND ".join(conditions)
+        where = "WHERE " + " AND ".join(conditions)
 
         total_row = await deps.mysql.async_fetch_one(
             f"SELECT COUNT(*) AS c FROM agent_run_summaries {where}", params=params

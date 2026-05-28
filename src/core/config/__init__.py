@@ -1,6 +1,7 @@
 from pydantic import Field, field_validator, ValidationInfo
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+from .auth_config import AuthConfig
 from .database import TaskPilotMySQLConfig
 from .observability import LogConfig, AlertConfig
 
@@ -48,6 +49,9 @@ class ProjectConfigSettings(BaseSettings):
 
     # ============ Agent / LLM 配置 ============
     llm: OpenAICompatibleLLMConfig = Field(default_factory=OpenAICompatibleLLMConfig)
+
+    # ============ 认证配置 ============
+    auth: AuthConfig = Field(default_factory=AuthConfig)
 
     # ============ 任务系统配置 ============
     task_table: str = Field(default="task_manager", description="任务管理表名")

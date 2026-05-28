@@ -13,6 +13,7 @@ from src.api.v1.utils import RunTaskRequest, CancelTaskRequest
 from src.api.v1.utils import parse_json, validation_error_response
 from src.api.v1.utils import decode_json_columns, decode_json_row
 from src.api.middleware.trace import get_current_trace_id
+from src.core.auth import get_current_account_id
 from src.infra.shared import ErrorCode
 
 
@@ -26,10 +27,11 @@ def _build_tasks_filter(
     task_name: str,
     date: str,
     trace_id_q: str,
+    account_id: int,
 ) -> Tuple[str, List]:
     """构建任务列表过滤 SQL 子句与参数列表（参数化查询，防 SQL 注入）"""
-    conditions: List[str] = []
-    params: List = []
+    conditions: List[str] = ["account_id = %s"]
+    params: List = [account_id]
 
     if status_filter:
         placeholders = ",".join(["%s"] * len(status_filter))
@@ -48,9 +50,7 @@ def _build_tasks_filter(
         conditions.append("trace_id LIKE %s")
         params.append(f"%{_escape_like(trace_id_q)}%")
 
-    sql = ""
-    if conditions:
-        sql = "WHERE " + " AND ".join(conditions)
+    sql = "WHERE " + " AND ".join(conditions)
     return sql, params
 
 
@@ -65,6 +65,7 @@ def create_tasks_bp(deps: ApiDependencies) -> Blueprint:
             ), 503
 
         trace_id = get_current_trace_id()
+        account_id = get_current_account_id() or 0
 
         try:
             _, body = await parse_json(RunTaskRequest)
@@ -72,7 +73,7 @@ def create_tasks_bp(deps: ApiDependencies) -> Blueprint:
             payload, status = validation_error_response(e)
             return jsonify(payload), status
 
-        scheduler = TaskScheduler(body, trace_id, deps)
+        scheduler = TaskScheduler(body, trace_id, deps, account_id=account_id)
         result = await scheduler.deal()
 
         # 适配前端 RunTaskResponse：把 trace_id 提到顶层
@@ -96,7 +97,8 @@ def create_tasks_bp(deps: ApiDependencies) -> Blueprint:
             return jsonify(payload), status
 
         trace_id = body["trace_id"]
-        scheduler = TaskScheduler(body, trace_id, deps)
+        account_id = get_current_account_id() or 0
+        scheduler = TaskScheduler(body, trace_id, deps, account_id=account_id)
         success = await scheduler.cancel_task(trace_id)
 
         return jsonify(
@@ -122,6 +124,7 @@ def create_tasks_bp(deps: ApiDependencies) -> Blueprint:
         task_name = args.get("task_name")
         date = args.get("date")
         trace_id_q = args.get("trace_id")
+        account_id = get_current_account_id() or 0
         try:
             page = max(1, int(args.get("page", 1)))
         except (TypeError, ValueError):
@@ -132,7 +135,7 @@ def create_tasks_bp(deps: ApiDependencies) -> Blueprint:
             page_size = 20
 
         filter_sql, filter_params = _build_tasks_filter(
-            status_filter, task_name, date, trace_id_q
+            status_filter, task_name, date, trace_id_q, account_id
         )
 
         total_row = await deps.mysql.async_fetch_one(
@@ -162,8 +165,10 @@ def create_tasks_bp(deps: ApiDependencies) -> Blueprint:
 
     @bp.route("/tasks/<trace_id>", methods=["GET"])
     async def get_task(trace_id: str):
+        account_id = get_current_account_id() or 0
         task = await deps.mysql.async_fetch_one(
-            "SELECT * FROM task_manager WHERE trace_id = %s", params=(trace_id,)
+            "SELECT * FROM task_manager WHERE trace_id = %s AND account_id = %s",
+            params=(trace_id, account_id),
         )
         if not task:
             return jsonify({"code": 404, "message": "task not found"}), 404
@@ -171,7 +176,7 @@ def create_tasks_bp(deps: ApiDependencies) -> Blueprint:
 
         from src.api.v1.utils.agent_metadata import build_agent_metadata
 
-        agent_meta = await build_agent_metadata(deps.mysql, trace_id)
+        agent_meta = await build_agent_metadata(deps.mysql, trace_id, account_id)
         return jsonify(
             {
                 "code": 0,
@@ -181,10 +186,11 @@ def create_tasks_bp(deps: ApiDependencies) -> Blueprint:
 
     @bp.route("/tasks/<trace_id>/events", methods=["GET"])
     async def get_task_events(trace_id: str):
+        account_id = get_current_account_id() or 0
         rows = await deps.mysql.async_fetch(
             "SELECT sequence, event_type, source, step, payload, created_at "
-            "FROM agent_events WHERE trace_id = %s ORDER BY sequence",
-            params=(trace_id,),
+            "FROM agent_events WHERE trace_id = %s AND account_id = %s ORDER BY sequence",
+            params=(trace_id, account_id),
         )
         closed = not deps.events.has_trace(trace_id) or deps.events.is_closed(trace_id)
 

@@ -13,8 +13,10 @@ from src.api.v1.endpoints import (
     create_replay_bp,
     create_chat_bp,
     create_agent_bp,
+    create_auth_bp,
 )
 from src.core.config import ProjectConfigSettings
+from src.core.auth import AuthService
 from src.infra.database import AsyncMySQLPool
 from src.infra.observability import LogService, AlertService
 from src.infra.streaming import TraceEventBus
@@ -25,6 +27,7 @@ def register_v1_blueprints(deps: ApiDependencies) -> Blueprint:
     api = Blueprint("api", __name__, url_prefix="/api")
 
     api.register_blueprint(create_health_bp(deps))
+    api.register_blueprint(create_auth_bp(deps))
     api.register_blueprint(create_tasks_bp(deps))
     api.register_blueprint(create_metrics_bp(deps))
     api.register_blueprint(create_skills_bp(deps))
@@ -44,6 +47,7 @@ def server_routes(
     alert_service: AlertService,
     lifecycle: TaskLifecycleManager,
     events: TraceEventBus,
+    auth_service: AuthService,
 ) -> Blueprint:
     deps = ApiDependencies(
         mysql=pools,
@@ -52,5 +56,6 @@ def server_routes(
         alert=alert_service,
         lifecycle=lifecycle,
         events=events,
+        auth=auth_service,
     )
     return register_v1_blueprints(deps)

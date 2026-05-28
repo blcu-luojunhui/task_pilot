@@ -10,7 +10,9 @@ class ErrorCode(IntEnum):
     # 4xxx: 客户端错误
     BAD_REQUEST = 4000
     UNKNOWN_TASK = 4001
+    UNAUTHORIZED = 4010
     VALIDATION_ERROR = 4003
+    QUOTA_EXCEEDED = 4020
     RATE_LIMITED = 4029
 
     # 5xxx: 服务端错误

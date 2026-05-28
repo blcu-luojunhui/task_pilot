@@ -8,6 +8,7 @@ from collections import Counter
 from quart import Blueprint, jsonify, request
 
 from src.api.v1.utils import ApiDependencies
+from src.core.auth import get_current_account_id
 
 logger = logging.getLogger(__name__)
 
@@ -17,12 +18,14 @@ _ALLOW_INVOKE = os.environ.get("TASK_PILOT_ALLOW_DIRECT_SKILL_INVOKE", "false").
 )
 
 
-async def _collect_24h_calls(deps: ApiDependencies) -> Counter:
+async def _collect_24h_calls(deps: ApiDependencies, account_id: int) -> Counter:
     """聚合近 24h 内每个 skill 被调用次数（按 act_start.payload.tool_calls[].name）"""
     rows = await deps.mysql.async_fetch(
         "SELECT payload FROM agent_events "
         "WHERE event_type = 'act_start' "
-        "AND created_at > NOW() - INTERVAL 1 DAY"
+        "AND account_id = %s "
+        "AND created_at > NOW() - INTERVAL 1 DAY",
+        params=(account_id,),
     )
     counter: Counter = Counter()
     for row in rows:
@@ -49,7 +52,8 @@ def create_skills_bp(deps: ApiDependencies) -> Blueprint:
         from src.core.agents.capabilities.skills import get_global_registry
 
         registry = get_global_registry()
-        counts = await _collect_24h_calls(deps)
+        account_id = get_current_account_id() or 0
+        counts = await _collect_24h_calls(deps, account_id)
         skills = []
         for skill in registry.filter(lambda _: True):
             skills.append(
@@ -75,13 +79,15 @@ def create_skills_bp(deps: ApiDependencies) -> Blueprint:
         except (TypeError, ValueError):
             limit = 50
 
+        account_id = get_current_account_id() or 0
         rows = await deps.mysql.async_fetch(
             "SELECT trace_id, sequence, step, payload, created_at "
             "FROM agent_events "
             "WHERE event_type = 'act_start' "
+            "AND account_id = %s "
             "AND JSON_CONTAINS(JSON_EXTRACT(payload, '$.tool_calls[*].name'), %s) "
             "ORDER BY created_at DESC LIMIT %s",
-            params=(f'"{skill_name}"', limit),
+            params=(account_id, f'"{skill_name}"', limit),
         )
 
         calls = []

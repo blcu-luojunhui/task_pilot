@@ -11,6 +11,7 @@ from quart import Blueprint, jsonify, request
 
 from src.api.middleware.trace import get_current_trace_id
 from src.api.v1.utils import ApiDependencies
+from src.core.auth import get_current_account_id
 from src.core.chat import ChatRepository, ConversationStatus
 from src.core.chat.service import ChatService
 
@@ -41,7 +42,8 @@ def create_chat_bp(deps: ApiDependencies) -> Blueprint:
     bp = Blueprint("chat", __name__)
 
     def _repo() -> ChatRepository:
-        return ChatRepository(deps.mysql)
+        account_id = get_current_account_id() or 0
+        return ChatRepository(deps.mysql, account_id=account_id)
 
     @bp.route("/chat/conversations", methods=["POST"])
     async def create_conversation():
@@ -164,10 +166,11 @@ def create_chat_bp(deps: ApiDependencies) -> Blueprint:
         # 用 middleware 注入的 trace_id 作为本轮 chat task 的 trace_id；
         # 前端可立即拿它订阅 SSE
         trace_id = get_current_trace_id()
+        account_id = get_current_account_id() or 0
         # 在 task 真正起步前就把 trace 占位到 event bus，
         # 避免前端 SSE 抢跑命中 404 后无限 backoff 重连
         try:
-            deps.events.ensure_trace(trace_id, metadata={"task_name": _CHAT_TASK_NAME})
+            deps.events.ensure_trace(trace_id, metadata={"task_name": _CHAT_TASK_NAME, "account_id": account_id})
         except Exception:
             pass
         scheduler_data = {
@@ -175,7 +178,7 @@ def create_chat_bp(deps: ApiDependencies) -> Blueprint:
             "conversation_id": conversation_id,
             "user_message": user_message,
         }
-        scheduler = TaskScheduler(scheduler_data, trace_id, deps)
+        scheduler = TaskScheduler(scheduler_data, trace_id, deps, account_id=account_id)
         result = await scheduler.deal()
 
         if isinstance(result, dict) and result.get("code") == 0:
@@ -201,8 +204,9 @@ def create_chat_bp(deps: ApiDependencies) -> Blueprint:
         if not trace_id:
             return _bad_request("trace_id is required")
 
+        account_id = get_current_account_id() or 0
         scheduler_data = {"task_name": _CHAT_TASK_NAME, "trace_id": trace_id}
-        scheduler = TaskScheduler(scheduler_data, trace_id, deps)
+        scheduler = TaskScheduler(scheduler_data, trace_id, deps, account_id=account_id)
         success = await scheduler.cancel_task(trace_id)
         return jsonify(
             {
@@ -229,11 +233,13 @@ def create_chat_bp(deps: ApiDependencies) -> Blueprint:
             return _bad_request("action must be 'confirm' or 'reject'")
 
         trace_id = get_current_trace_id()
+        account_id = get_current_account_id() or 0
         chat_service = ChatService(
             db=deps.mysql,
             log=deps.log,
             config=deps.config,
             event_bus=deps.events,
+            account_id=account_id,
         )
 
         new_trace_id = await chat_service.confirm_plan(

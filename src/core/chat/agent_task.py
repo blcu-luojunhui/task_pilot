@@ -95,8 +95,8 @@ def _start_cancel_poller(
             while not flag["stop"]:
                 try:
                     row = await scheduler.db_client.async_fetch_one(
-                        "SELECT task_status FROM task_manager WHERE trace_id = %s",
-                        params=(scheduler.trace_id,),
+                        "SELECT task_status FROM task_manager WHERE trace_id = %s AND account_id = %s",
+                        params=(scheduler.trace_id, scheduler.account_id),
                     )
                     if row and int(row.get("task_status", 0)) == _CANCEL_REQUESTED:
                         flag["requested"] = True
@@ -172,7 +172,7 @@ async def chat_agent_turn(scheduler: "TaskScheduler") -> int:
         )
         return TaskStatus.FAILED
 
-    repo = ChatRepository(scheduler.db_client)
+    repo = ChatRepository(scheduler.db_client, account_id=scheduler.account_id)
     conv = await repo.get_conversation(conversation_id)
     if not conv:
         await scheduler._log_task_event(
@@ -226,6 +226,7 @@ async def chat_agent_turn(scheduler: "TaskScheduler") -> int:
         "log": scheduler.log_service,
         "config": scheduler.config,
         "task_invoker": None,  # 由 chat_ops 的 run_task 使用，通过 MappingResolver 按需解析
+        "account_id": scheduler.account_id,
     }
     # 延迟导入 TaskInvoker 避免循环
     from src.core.chat.task_invoker import TaskInvoker
@@ -239,7 +240,7 @@ async def chat_agent_turn(scheduler: "TaskScheduler") -> int:
             lifecycle=scheduler.lifecycle,
             events=scheduler.events,
         )
-        task_invoker = TaskInvoker(api_deps)
+        task_invoker = TaskInvoker(api_deps, account_id=scheduler.account_id)
         tool_dependencies["task_invoker"] = task_invoker
     except Exception:
         logger.warning("Failed to construct TaskInvoker for tool dependencies")

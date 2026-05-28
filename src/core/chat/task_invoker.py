@@ -21,8 +21,9 @@ logger = logging.getLogger(__name__)
 class TaskInvoker:
     """启动 TaskPilot 业务任务的能力。"""
 
-    def __init__(self, deps: "ApiDependencies") -> None:
+    def __init__(self, deps: "ApiDependencies", account_id: int = 0) -> None:
         self._deps = deps
+        self._account_id = account_id
 
     async def run(
         self,
@@ -39,7 +40,7 @@ class TaskInvoker:
         if date_string:
             body["date_string"] = date_string
 
-        scheduler = TaskScheduler(body, sub_trace_id, self._deps)
+        scheduler = TaskScheduler(body, sub_trace_id, self._deps, account_id=self._account_id)
         try:
             result = await scheduler.deal()
         except Exception as exc:
