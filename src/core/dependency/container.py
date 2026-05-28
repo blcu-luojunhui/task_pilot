@@ -2,6 +2,7 @@ from dependency_injector import containers, providers
 
 from src.core.config import ProjectConfigSettings
 from src.core.chat.service import ChatService
+from src.core.auth import AuthService
 
 from src.infra.database import AsyncMySQLPool
 from src.infra.observability import LogService, AlertService
@@ -55,6 +56,12 @@ class ServerContainer(containers.DeclarativeContainer):
         log=log_service,
         config=config,
         event_bus=trace_event_bus,
+    )
+
+    auth_service = providers.Singleton(
+        AuthService,
+        db=async_mysql_pool,
+        config=config.provided.auth,
     )
 
 

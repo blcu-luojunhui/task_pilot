@@ -7,6 +7,7 @@ from .runs import create_runs_bp
 from .replay import create_replay_bp
 from .chat import create_chat_bp
 from .agent import create_agent_bp
+from .auth import create_auth_bp
 
 __all__ = [
     "create_health_bp",
@@ -18,4 +19,5 @@ __all__ = [
     "create_replay_bp",
     "create_chat_bp",
     "create_agent_bp",
+    "create_auth_bp",
 ]

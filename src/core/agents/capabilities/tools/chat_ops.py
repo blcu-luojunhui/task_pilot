@@ -160,7 +160,7 @@ async def run_task(
         "列出最近的任务（任意状态），按开始时间倒序。用于回答用户"
         "类似'最近跑了什么任务'、'有没有失败的任务'这类问题。"
     ),
-    dependencies=["db", "log"],
+    dependencies=["db", "log", "account_id"],
     risk_level="read",
     parameters={
         "limit": {
@@ -195,15 +195,15 @@ async def list_recent_tasks(
         ctx.config.task_table if ctx.config else "task_manager"
     )
 
-    conditions: List[str] = []
-    params: List[Any] = []
+    conditions: List[str] = ["account_id = %s"]
+    params: List[Any] = [ctx.account_id]
     if status is not None:
         conditions.append("task_status = %s")
         params.append(int(status))
     if task_name:
         conditions.append("task_name = %s")
         params.append(task_name)
-    where = ("WHERE " + " AND ".join(conditions)) if conditions else ""
+    where = "WHERE " + " AND ".join(conditions)
 
     await ctx.log.log(
         {"event": "chat_list_recent_tasks", "limit": safe_limit, "status": status, "task_name": task_name}

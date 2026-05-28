@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from src.core.auth import AuthService
 from src.core.config import ProjectConfigSettings
 from src.infra.database import AsyncMySQLPool
 from src.infra.observability import LogService, AlertService
@@ -19,6 +20,7 @@ class ApiDependencies:
     alert: AlertService
     lifecycle: TaskLifecycleManager
     events: TraceEventBus
+    auth: AuthService
 
     # 向后兼容别名
     @property

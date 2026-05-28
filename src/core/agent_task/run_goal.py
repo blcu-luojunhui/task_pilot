@@ -84,8 +84,8 @@ def _start_cancel_poller(
             while not flag["stop"]:
                 try:
                     row = await scheduler.db_client.async_fetch_one(
-                        "SELECT task_status FROM task_manager WHERE trace_id = %s",
-                        params=(scheduler.trace_id,),
+                        "SELECT task_status FROM task_manager WHERE trace_id = %s AND account_id = %s",
+                        params=(scheduler.trace_id, scheduler.account_id),
                     )
                     if row and int(row.get("task_status", 0)) == _CANCEL_REQUESTED:
                         flag["requested"] = True
@@ -155,6 +155,7 @@ async def run_agent_goal(scheduler: "TaskScheduler") -> int:
         "log": scheduler.log_service,
         "config": scheduler.config,
         "task_invoker": None,
+        "account_id": scheduler.account_id,
     }
 
     # 延迟导入 TaskInvoker
@@ -170,7 +171,7 @@ async def run_agent_goal(scheduler: "TaskScheduler") -> int:
             lifecycle=scheduler.lifecycle,
             events=scheduler.events,
         )
-        tool_dependencies["task_invoker"] = TaskInvoker(api_deps)
+        tool_dependencies["task_invoker"] = TaskInvoker(api_deps, account_id=scheduler.account_id)
     except Exception:
         logger.warning("Failed to construct TaskInvoker for run_goal task")
 
@@ -235,8 +236,8 @@ async def run_agent_goal(scheduler: "TaskScheduler") -> int:
             "tool_call_results": result.tool_call_results,
         }
         await scheduler.db_client.async_save(
-            "UPDATE task_manager SET data = %s WHERE trace_id = %s",
-            (_json.dumps(final_data, ensure_ascii=False), trace_id),
+            "UPDATE task_manager SET data = %s WHERE trace_id = %s AND account_id = %s",
+            (_json.dumps(final_data, ensure_ascii=False), trace_id, scheduler.account_id),
         )
     except Exception:
         logger.exception("Failed to persist run_goal result")

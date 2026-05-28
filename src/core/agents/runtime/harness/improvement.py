@@ -82,11 +82,12 @@ class DBImprovementStore:
     async def save(self, record: ImprovementRecord) -> None:
         import json
 
+        account_id = record.metadata.get("account_id", 0)
         sql = (
             "INSERT INTO agent_run_summaries "
             "(trace_id, goal, success, stop_reason, total_steps, tool_calls_count, "
-            "final_answer, failed_tool_calls, token_usage, prompt_version, metadata) "
-            "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s) "
+            "final_answer, failed_tool_calls, token_usage, prompt_version, metadata, account_id) "
+            "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s) "
             "ON DUPLICATE KEY UPDATE "
             "success=VALUES(success), stop_reason=VALUES(stop_reason), "
             "total_steps=VALUES(total_steps), tool_calls_count=VALUES(tool_calls_count), "
@@ -105,6 +106,7 @@ class DBImprovementStore:
             json.dumps(record.token_usage, ensure_ascii=False),
             record.prompt_version or "",
             json.dumps(record.metadata, ensure_ascii=False),
+            account_id,
         )
         await self.mysql_pool.async_save(sql, params)
 

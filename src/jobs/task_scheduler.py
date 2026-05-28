@@ -41,6 +41,7 @@ class TaskScheduler(TaskHandler):
         data: dict,
         trace_id: str,
         deps: "ApiDependencies",
+        account_id: int = 0,
     ):
         super().__init__(data, trace_id, deps.log, deps.db, deps.config)
         self.table = TaskUtils.validate_table_name(
@@ -49,6 +50,7 @@ class TaskScheduler(TaskHandler):
         self.alert_service = deps.alert
         self.lifecycle = deps.lifecycle
         self.events = getattr(deps, "events", None)
+        self.account_id = account_id
 
     async def _send_alert(self, title: str, detail: dict, dedup_key: str = None):
         if self.alert_service:
@@ -73,8 +75,8 @@ class TaskScheduler(TaskHandler):
     async def _insert_or_ignore_task(self, task_name: str, date_str: str) -> None:
         query = f"""
             INSERT IGNORE INTO {self.table}
-            (date_string, task_name, start_timestamp, task_status, trace_id, data)
-            VALUES (%s, %s, %s, %s, %s, %s)
+            (date_string, task_name, start_timestamp, task_status, trace_id, data, account_id)
+            VALUES (%s, %s, %s, %s, %s, %s, %s)
         """
         await self.db_client.async_save(
             query=query,
@@ -85,6 +87,7 @@ class TaskScheduler(TaskHandler):
                 TaskStatus.INIT,
                 self.trace_id,
                 json.dumps(self.data, ensure_ascii=False),
+                self.account_id,
             ),
         )
 
@@ -92,11 +95,11 @@ class TaskScheduler(TaskHandler):
         query = f"""
             UPDATE {self.table}
             SET task_status = %s
-            WHERE trace_id = %s AND task_status = %s
+            WHERE trace_id = %s AND task_status = %s AND account_id = %s
         """
         result = await self.db_client.async_save(
             query=query,
-            params=(TaskStatus.PROCESSING, self.trace_id, TaskStatus.INIT),
+            params=(TaskStatus.PROCESSING, self.trace_id, TaskStatus.INIT, self.account_id),
         )
         return bool(result)
 
@@ -104,7 +107,7 @@ class TaskScheduler(TaskHandler):
         query = f"""
             UPDATE {self.table}
             SET task_status = %s, finish_timestamp = %s
-            WHERE trace_id = %s AND task_status IN (%s, %s)
+            WHERE trace_id = %s AND task_status IN (%s, %s) AND account_id = %s
         """
         await self.db_client.async_save(
             query=query,
@@ -114,6 +117,7 @@ class TaskScheduler(TaskHandler):
                 self.trace_id,
                 TaskStatus.PROCESSING,
                 TaskStatus.CANCEL_REQUESTED,
+                self.account_id,
             ),
         )
 
@@ -121,11 +125,11 @@ class TaskScheduler(TaskHandler):
         query = f"""
             SELECT trace_id, start_timestamp, data
             FROM {self.table}
-            WHERE task_status = %s AND task_name = %s
+            WHERE task_status = %s AND task_name = %s AND account_id = %s
         """
         rows = await self.db_client.async_fetch(
             query=query,
-            params=(TaskStatus.PROCESSING, task_name),
+            params=(TaskStatus.PROCESSING, task_name, self.account_id),
         )
         return rows or []
 
@@ -224,6 +228,9 @@ class TaskScheduler(TaskHandler):
             return TaskScheduleResponse.fail_response(
                 ErrorCode.TASK_ALREADY_PROCESSING, "Task is already processing"
             )
+
+        if self.events:
+            self.events.ensure_trace(self.trace_id, metadata={"account_id": self.account_id, "task_name": task_name})
 
         self._publish_event(
             "task.accepted",
@@ -361,8 +368,8 @@ class TaskScheduler(TaskHandler):
 
     async def get_task_status(self, trace_id: Optional[str] = None) -> Optional[Dict[str, Any]]:
         trace_id = trace_id or self.trace_id
-        query = f"SELECT * FROM {self.table} WHERE trace_id = %s"
-        return await self.db_client.async_fetch_one(query, params=(trace_id,))
+        query = f"SELECT * FROM {self.table} WHERE trace_id = %s AND account_id = %s"
+        return await self.db_client.async_fetch_one(query, params=(trace_id, self.account_id))
 
     async def cancel_task(self, trace_id: Optional[str] = None) -> bool:
         trace_id = trace_id or self.trace_id
@@ -376,7 +383,7 @@ class TaskScheduler(TaskHandler):
                     WHEN task_status = %s THEN %s
                     ELSE finish_timestamp
                 END
-            WHERE trace_id = %s AND task_status IN (%s, %s)
+            WHERE trace_id = %s AND task_status IN (%s, %s) AND account_id = %s
         """
         result = await self.db_client.async_save(
             query,
@@ -390,6 +397,7 @@ class TaskScheduler(TaskHandler):
                 trace_id,
                 TaskStatus.INIT,
                 TaskStatus.PROCESSING,
+                self.account_id,
             ),
         )
 
@@ -406,11 +414,11 @@ class TaskScheduler(TaskHandler):
         query = f"""
             UPDATE {self.table}
             SET task_status = %s, finish_timestamp = %s
-            WHERE trace_id = %s
+            WHERE trace_id = %s AND account_id = %s
         """
         await self.db_client.async_save(
             query,
-            (status, int(time.time()), trace_id),
+            (status, int(time.time()), trace_id, self.account_id),
         )
         await self._log_task_event("task_force_released", trace_id=trace_id, status=status)
 

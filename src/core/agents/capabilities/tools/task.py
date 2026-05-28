@@ -14,7 +14,7 @@ from src.jobs.task_utils import TaskUtils
 @skill(
     name="task_query_status",
     description="查询任务状态",
-    dependencies=["db", "log"],
+    dependencies=["db", "log", "account_id"],
     risk_level="read",
     parameters={
         "trace_id": {
@@ -42,8 +42,8 @@ async def task_query_status(ctx: SkillContext, trace_id: str) -> Optional[Dict[s
     table = TaskUtils.validate_table_name(ctx.config.task_table if ctx.config else "task_manager")
 
     row = await ctx.db.async_fetch_one(
-        f"SELECT * FROM {table} WHERE trace_id = %s",
-        params=(trace_id,),
+        f"SELECT * FROM {table} WHERE trace_id = %s AND account_id = %s",
+        params=(trace_id, ctx.account_id),
     )
     return row
 
@@ -51,7 +51,7 @@ async def task_query_status(ctx: SkillContext, trace_id: str) -> Optional[Dict[s
 @skill(
     name="task_list_processing",
     description="列出指定任务名下所有正在执行的任务",
-    dependencies=["db", "log"],
+    dependencies=["db", "log", "account_id"],
     risk_level="read",
     parameters={
         "task_name": {
@@ -77,8 +77,8 @@ async def task_list_processing(ctx: SkillContext, task_name: str) -> List[Dict[s
 
     rows = await ctx.db.async_fetch(
         f"SELECT trace_id, start_timestamp, data FROM {table} "
-        f"WHERE task_status = 1 AND task_name = %s",
-        params=(task_name,),
+        f"WHERE task_status = 1 AND task_name = %s AND account_id = %s",
+        params=(task_name, ctx.account_id),
     )
     return rows or []
 
@@ -86,7 +86,7 @@ async def task_list_processing(ctx: SkillContext, task_name: str) -> List[Dict[s
 @skill(
     name="task_cancel",
     description="请求取消任务（设置取消信号，任务会在下次轮询时取消）",
-    dependencies=["db", "log"],
+    dependencies=["db", "log", "account_id"],
     risk_level="write",
     parameters={
         "trace_id": {
@@ -124,9 +124,9 @@ async def task_cancel(ctx: SkillContext, trace_id: str) -> bool:
                 WHEN task_status = 0 THEN UNIX_TIMESTAMP()
                 ELSE finish_timestamp
             END
-        WHERE trace_id = %s AND task_status IN (0, 1)
+        WHERE trace_id = %s AND task_status IN (0, 1) AND account_id = %s
         """,
-        params=(trace_id,),
+        params=(trace_id, ctx.account_id),
     )
 
     return bool(affected)
@@ -135,7 +135,7 @@ async def task_cancel(ctx: SkillContext, trace_id: str) -> bool:
 @skill(
     name="task_create",
     description="创建新任务记录",
-    dependencies=["db", "log"],
+    dependencies=["db", "log", "account_id"],
     risk_level="write",
     parameters={
         "task_name": {
@@ -186,10 +186,10 @@ async def task_create(
 
     await ctx.db.async_save(
         f"""
-        INSERT INTO {table} (date_string, task_name, task_status, start_timestamp, trace_id, data)
-        VALUES (%s, %s, 0, %s, %s, %s)
+        INSERT INTO {table} (date_string, task_name, task_status, start_timestamp, trace_id, data, account_id)
+        VALUES (%s, %s, 0, %s, %s, %s, %s)
         """,
-        params=(date_string, task_name, now, trace_id, data_json),
+        params=(date_string, task_name, now, trace_id, data_json, ctx.account_id),
     )
 
     return trace_id
@@ -206,7 +206,7 @@ _VALID_TRANSITIONS = {
 @skill(
     name="task_update_status",
     description="更新任务状态（带状态机校验，只允许合法的状态转换）",
-    dependencies=["db", "log"],
+    dependencies=["db", "log", "account_id"],
     risk_level="write",
     parameters={
         "trace_id": {
@@ -242,8 +242,8 @@ async def task_update_status(ctx: SkillContext, trace_id: str, new_status: int) 
 
     # 查询当前状态
     row = await ctx.db.async_fetch_one(
-        f"SELECT task_status FROM {table} WHERE trace_id = %s",
-        params=(trace_id,),
+        f"SELECT task_status FROM {table} WHERE trace_id = %s AND account_id = %s",
+        params=(trace_id, ctx.account_id),
     )
     if not row:
         raise ValueError(f"Task not found: {trace_id}")
@@ -262,8 +262,8 @@ async def task_update_status(ctx: SkillContext, trace_id: str, new_status: int) 
         finish_clause = ", finish_timestamp = UNIX_TIMESTAMP()"
 
     affected = await ctx.db.async_save(
-        f"UPDATE {table} SET task_status = %s{finish_clause} WHERE trace_id = %s",
-        params=(new_status, trace_id),
+        f"UPDATE {table} SET task_status = %s{finish_clause} WHERE trace_id = %s AND account_id = %s",
+        params=(new_status, trace_id, ctx.account_id),
     )
 
     return bool(affected)

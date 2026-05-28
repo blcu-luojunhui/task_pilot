@@ -97,7 +97,9 @@ class TraceEventBus:
             stream.subscribers.discard(queue)
 
         if persist and self._persister:
-            self._persister.enqueue(event)
+            event_with_account = {**event}
+            event_with_account["account_id"] = stream.metadata.get("account_id", 0)
+            self._persister.enqueue(event_with_account)
 
         return event
 

@@ -30,15 +30,17 @@ class ChatService:
         config: "ProjectConfigSettings",
         event_bus: "TraceEventBus",
         task_invoker_loader=None,
+        account_id: int = 0,
     ):
         self._db = db
         self._log = log
         self._config = config
         self._event_bus = event_bus
         self._task_invoker_loader = task_invoker_loader
+        self._account_id = account_id
 
     def _repo(self) -> ChatRepository:
-        return ChatRepository(self._db)
+        return ChatRepository(self._db, account_id=self._account_id)
 
     async def start_turn(
         self, conversation_id: str, user_message: str, trace_id: str, deps: "ApiDependencies"
@@ -51,7 +53,7 @@ class ChatService:
             "conversation_id": conversation_id,
             "user_message": user_message,
         }
-        scheduler = TaskScheduler(scheduler_data, trace_id, deps)
+        scheduler = TaskScheduler(scheduler_data, trace_id, deps, account_id=self._account_id)
         return await scheduler.deal()
 
     async def confirm_plan(
@@ -99,7 +101,7 @@ class ChatService:
 
         # 占位 trace 避免前端 SSE 抢跑 404
         try:
-            self._event_bus.ensure_trace(trace_id, metadata={"task_name": _CHAT_TASK_NAME})
+            self._event_bus.ensure_trace(trace_id, metadata={"task_name": _CHAT_TASK_NAME, "account_id": self._account_id})
         except Exception:
             pass
 
@@ -112,7 +114,7 @@ class ChatService:
             "user_message": "",  # confirm 续跑不需要新 user 消息
             "confirmed_tool_calls": tool_calls,
         }
-        scheduler = TaskScheduler(scheduler_data, trace_id, deps)
+        scheduler = TaskScheduler(scheduler_data, trace_id, deps, account_id=self._account_id)
         await scheduler.deal()
 
         await self._log.log({
@@ -128,7 +130,7 @@ class ChatService:
         from src.jobs import TaskScheduler
 
         scheduler_data = {"task_name": _CHAT_TASK_NAME, "trace_id": trace_id}
-        scheduler = TaskScheduler(scheduler_data, trace_id, deps)
+        scheduler = TaskScheduler(scheduler_data, trace_id, deps, account_id=self._account_id)
         return await scheduler.cancel_task(trace_id)
 
 
