@@ -10,6 +10,7 @@ from quart import Blueprint, jsonify, request
 
 from src.api.middleware.trace import get_current_trace_id
 from src.api.v1.utils import ApiDependencies
+from src.core.auth import get_current_account_id
 from src.infra.shared import ErrorCode
 from src.jobs import TaskScheduler
 
@@ -56,12 +57,13 @@ def create_agent_bp(deps: ApiDependencies) -> Blueprint:
             safe_areas = ["chat_ops", "task"]
 
         trace_id = get_current_trace_id()
+        account_id = get_current_account_id() or 0
 
         # 预创建 trace，避免前端 SSE 抢跑命中 404
         try:
             deps.events.ensure_trace(
                 trace_id,
-                metadata={"task_name": _AGENT_TASK_NAME, "goal": goal[:200]},
+                metadata={"task_name": _AGENT_TASK_NAME, "goal": goal[:200], "account_id": account_id},
             )
         except Exception:
             pass
@@ -71,7 +73,7 @@ def create_agent_bp(deps: ApiDependencies) -> Blueprint:
             "goal": goal,
             "tool_areas": safe_areas,
         }
-        scheduler = TaskScheduler(scheduler_data, trace_id, deps)
+        scheduler = TaskScheduler(scheduler_data, trace_id, deps, account_id=account_id)
         result = await scheduler.deal()
 
         if isinstance(result, dict) and result.get("code") == 0:

@@ -9,6 +9,7 @@ import logging
 from quart import Blueprint, jsonify, request
 
 from src.api.v1.utils import ApiDependencies
+from src.core.auth import get_current_account_id
 
 logger = logging.getLogger(__name__)
 
@@ -28,14 +29,15 @@ def create_replay_bp(deps: ApiDependencies) -> Blueprint:
         if not trace_id:
             return jsonify({"code": 400, "message": "trace_id is required"}), 400
 
+        account_id = get_current_account_id() or 0
         model = body.get("model")  # optional override
 
         # 1. 加载 prompt_assembled 事件
         events = await deps.mysql.async_fetch(
             "SELECT sequence, payload FROM agent_events "
-            "WHERE trace_id=%s AND event_type='prompt_assembled' "
+            "WHERE trace_id=%s AND event_type='prompt_assembled' AND account_id=%s "
             "ORDER BY sequence",
-            params=(trace_id,),
+            params=(trace_id, account_id),
         )
         if not events:
             return jsonify(
@@ -108,8 +110,8 @@ def create_replay_bp(deps: ApiDependencies) -> Blueprint:
 
         # 5. 获取原始运行结果
         original = await deps.mysql.async_fetch_one(
-            "SELECT * FROM agent_run_summaries WHERE trace_id=%s",
-            params=(trace_id,),
+            "SELECT * FROM agent_run_summaries WHERE trace_id=%s AND account_id=%s",
+            params=(trace_id, account_id),
         )
 
         original_answer = None

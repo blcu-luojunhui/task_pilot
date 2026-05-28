@@ -13,13 +13,14 @@ from src.infra.database import AsyncMySQLPool
 async def build_agent_metadata(
     mysql: AsyncMySQLPool,
     trace_id: str,
+    account_id: int = 0,
 ) -> Optional[Dict[str, Any]]:
     """从 agent_events 表重建 agent_metadata"""
     events = await mysql.async_fetch(
         "SELECT event_type, payload FROM agent_events "
-        "WHERE trace_id = %s AND event_type IN ('run_start', 'run_end') "
+        "WHERE trace_id = %s AND event_type IN ('run_start', 'run_end') AND account_id = %s "
         "ORDER BY sequence",
-        params=(trace_id,),
+        params=(trace_id, account_id),
     )
     if not events:
         return None
@@ -50,8 +51,8 @@ async def build_agent_metadata(
     # 兜底：历史 trace（run_start 没 goal 时从 agent_run_summaries 查）
     if not meta.get("goal"):
         row = await mysql.async_fetch_one(
-            "SELECT goal FROM agent_run_summaries WHERE trace_id = %s",
-            params=(trace_id,),
+            "SELECT goal FROM agent_run_summaries WHERE trace_id = %s AND account_id = %s",
+            params=(trace_id, account_id),
         )
         if row and row.get("goal"):
             meta["goal"] = row["goal"]

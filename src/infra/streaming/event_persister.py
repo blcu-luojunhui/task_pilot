@@ -22,8 +22,8 @@ logger = logging.getLogger(__name__)
 
 SQL_INSERT = (
     "INSERT IGNORE INTO agent_events "
-    "(trace_id, sequence, event_type, source, step, payload) "
-    "VALUES (%s, %s, %s, %s, %s, %s)"
+    "(trace_id, sequence, event_type, source, step, payload, account_id) "
+    "VALUES (%s, %s, %s, %s, %s, %s, %s)"
 )
 
 
@@ -35,6 +35,7 @@ class _EventRow:
     source: str
     step: Optional[int]
     payload: str  # JSON string
+    account_id: int = 0
 
 
 class EventPersister:
@@ -62,6 +63,7 @@ class EventPersister:
             source=event.get("source", "harness"),
             step=event.get("step"),
             payload=json.dumps(event.get("data", {}), ensure_ascii=False),
+            account_id=event.get("account_id", 0),
         )
         try:
             self._queue.put_nowait(row)
@@ -153,7 +155,7 @@ class EventPersister:
     async def _flush(self, batch: List[_EventRow]) -> None:
         """批量写入 MySQL。"""
         params = [
-            (r.trace_id, r.sequence, r.event_type, r.source, r.step, r.payload)
+            (r.trace_id, r.sequence, r.event_type, r.source, r.step, r.payload, r.account_id)
             for r in batch
         ]
         try:

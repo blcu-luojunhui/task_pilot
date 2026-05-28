@@ -65,15 +65,16 @@ class ChatRepository:
     MSG_TABLE = "chat_messages"
 
     _CONV_COLUMNS = (
-        "conversation_id, title, status, metadata, created_at, updated_at"
+        "conversation_id, title, status, metadata, account_id, created_at, updated_at"
     )
     _MSG_COLUMNS = (
         "id, conversation_id, role, content, tool_calls, tool_call_id, "
-        "trace_id, token_usage, status, created_at"
+        "trace_id, token_usage, status, account_id, created_at"
     )
 
-    def __init__(self, pool: "AsyncMySQLPool") -> None:
+    def __init__(self, pool: "AsyncMySQLPool", account_id: int = 0) -> None:
         self._pool = pool
+        self._account_id = account_id
 
     # ── 会话 ────────────────────────────────────────────────────────────────
 
@@ -85,12 +86,13 @@ class ChatRepository:
         conversation_id = generate_conversation_id()
         await self._pool.async_save(
             f"INSERT INTO {self.CONV_TABLE} "
-            "(conversation_id, title, status, metadata) VALUES (%s, %s, %s, %s)",
+            "(conversation_id, title, status, metadata, account_id) VALUES (%s, %s, %s, %s, %s)",
             params=(
                 conversation_id,
                 title,
                 ConversationStatus.ACTIVE.value,
                 _dump_json(metadata),
+                self._account_id,
             ),
         )
         row = await self.get_conversation(conversation_id)
@@ -101,8 +103,8 @@ class ChatRepository:
     async def get_conversation(self, conversation_id: str) -> Optional[Dict[str, Any]]:
         row = await self._pool.async_fetch_one(
             f"SELECT {self._CONV_COLUMNS} FROM {self.CONV_TABLE} "
-            "WHERE conversation_id = %s",
-            params=(conversation_id,),
+            "WHERE conversation_id = %s AND account_id = %s",
+            params=(conversation_id, self._account_id),
         )
         return _decode_json_fields(row, _CONV_JSON_FIELDS) if row else None
 
@@ -117,11 +119,11 @@ class ChatRepository:
         ``status=None`` 表示不过滤，包含所有非删除态；默认仅 ACTIVE。
         """
         if status is None:
-            where = "WHERE status != %s"
-            where_params: Tuple[Any, ...] = (ConversationStatus.DELETED.value,)
+            where = "WHERE status != %s AND account_id = %s"
+            where_params: Tuple[Any, ...] = (ConversationStatus.DELETED.value, self._account_id)
         else:
-            where = "WHERE status = %s"
-            where_params = (status,)
+            where = "WHERE status = %s AND account_id = %s"
+            where_params = (status, self._account_id)
 
         total_row = await self._pool.async_fetch_one(
             f"SELECT COUNT(*) AS c FROM {self.CONV_TABLE} {where}",
@@ -141,23 +143,23 @@ class ChatRepository:
         self, conversation_id: str, title: str
     ) -> bool:
         affected = await self._pool.async_save(
-            f"UPDATE {self.CONV_TABLE} SET title = %s WHERE conversation_id = %s",
-            params=(title, conversation_id),
+            f"UPDATE {self.CONV_TABLE} SET title = %s WHERE conversation_id = %s AND account_id = %s",
+            params=(title, conversation_id, self._account_id),
         )
         return bool(affected)
 
     async def archive_conversation(self, conversation_id: str) -> bool:
         affected = await self._pool.async_save(
-            f"UPDATE {self.CONV_TABLE} SET status = %s WHERE conversation_id = %s",
-            params=(ConversationStatus.ARCHIVED.value, conversation_id),
+            f"UPDATE {self.CONV_TABLE} SET status = %s WHERE conversation_id = %s AND account_id = %s",
+            params=(ConversationStatus.ARCHIVED.value, conversation_id, self._account_id),
         )
         return bool(affected)
 
     async def delete_conversation(self, conversation_id: str) -> bool:
         """软删：status=99，记录保留以便审计。"""
         affected = await self._pool.async_save(
-            f"UPDATE {self.CONV_TABLE} SET status = %s WHERE conversation_id = %s",
-            params=(ConversationStatus.DELETED.value, conversation_id),
+            f"UPDATE {self.CONV_TABLE} SET status = %s WHERE conversation_id = %s AND account_id = %s",
+            params=(ConversationStatus.DELETED.value, conversation_id, self._account_id),
         )
         return bool(affected)
 
@@ -177,18 +179,18 @@ class ChatRepository:
         if before_id is None:
             sql = (
                 f"SELECT {self._MSG_COLUMNS} FROM {self.MSG_TABLE} "
-                "WHERE conversation_id = %s ORDER BY id ASC LIMIT %s"
+                "WHERE conversation_id = %s AND account_id = %s ORDER BY id ASC LIMIT %s"
             )
-            params: Tuple[Any, ...] = (conversation_id, limit)
+            params: Tuple[Any, ...] = (conversation_id, self._account_id, limit)
         else:
             sql = (
                 f"SELECT {self._MSG_COLUMNS} FROM ("
                 f"  SELECT {self._MSG_COLUMNS} FROM {self.MSG_TABLE} "
-                "  WHERE conversation_id = %s AND id < %s "
+                "  WHERE conversation_id = %s AND id < %s AND account_id = %s "
                 "  ORDER BY id DESC LIMIT %s"
                 ") sub ORDER BY id ASC"
             )
-            params = (conversation_id, before_id, limit)
+            params = (conversation_id, before_id, self._account_id, limit)
 
         rows = await self._pool.async_fetch(sql, params=params)
         return [_decode_json_fields(r, _MSG_JSON_FIELDS) for r in (rows or [])]
@@ -215,7 +217,7 @@ class ChatRepository:
                 await cursor.execute(
                     f"INSERT INTO {self.MSG_TABLE} "
                     "(conversation_id, role, content, tool_calls, tool_call_id, "
-                    "trace_id, token_usage, status) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)",
+                    "trace_id, token_usage, status, account_id) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)",
                     (
                         conversation_id,
                         role,
@@ -225,6 +227,7 @@ class ChatRepository:
                         trace_id,
                         _dump_json(token_usage),
                         status,
+                        self._account_id,
                     ),
                 )
                 message_id = cursor.lastrowid
@@ -239,8 +242,8 @@ class ChatRepository:
     async def update_message_status(self, message_id: int, status: int) -> bool:
         """更新单条消息的 status 字段。"""
         affected = await self._pool.async_save(
-            f"UPDATE {self.MSG_TABLE} SET status = %s WHERE id = %s",
-            params=(status, message_id),
+            f"UPDATE {self.MSG_TABLE} SET status = %s WHERE id = %s AND account_id = %s",
+            params=(status, message_id, self._account_id),
         )
         return bool(affected)
 
@@ -248,9 +251,9 @@ class ChatRepository:
         """查最新一条 status=pending_confirmation 的消息（含 tool_calls）。"""
         row = await self._pool.async_fetch_one(
             f"SELECT {self._MSG_COLUMNS} FROM {self.MSG_TABLE} "
-            "WHERE conversation_id = %s AND status = %s "
+            "WHERE conversation_id = %s AND status = %s AND account_id = %s "
             "ORDER BY id DESC LIMIT 1",
-            params=(conversation_id, MSG_STATUS_PENDING_CONFIRMATION),
+            params=(conversation_id, MSG_STATUS_PENDING_CONFIRMATION, self._account_id),
         )
         return _decode_json_fields(row, _MSG_JSON_FIELDS) if row else None
 

@@ -12,6 +12,7 @@ from src.api.middleware import (
     RequestLoggerMiddleware,
     RateLimitMiddleware,
 )
+from src.core.auth import AuthMiddleware
 from src.infra.observability import TraceIdFilter
 
 # 配置日志格式，包含 trace_id
@@ -32,6 +33,8 @@ app.config["ACCEPTING_TASKS"] = True
 app.config["MAX_CONTENT_LENGTH"] = 1 * 1024 * 1024  # 1MB
 
 # 注册中间件（顺序很重要）
+# Trace → ErrorHandler → Logger → RateLimit 先注册（不依赖容器）
+# AuthMiddleware 依赖 MySQL Pool，在容器初始化后注册
 TraceMiddleware(app)
 ErrorHandlerMiddleware(app)
 RequestLoggerMiddleware(app)
@@ -52,6 +55,8 @@ async_mysql_pool = server_container.async_mysql_pool()
 lifecycle = server_container.task_lifecycle_manager()
 events = server_container.trace_event_bus()
 
+AuthMiddleware(app, async_mysql_pool)
+
 routes = server_routes(
     async_mysql_pool,
     log_service,
@@ -59,6 +64,7 @@ routes = server_routes(
     alert_service,
     lifecycle,
     events,
+    server_container.auth_service(),
 )
 app.register_blueprint(routes)
 
