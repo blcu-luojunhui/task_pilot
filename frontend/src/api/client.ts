@@ -62,12 +62,14 @@ apiClient.interceptors.response.use(
   (error: AxiosError) => {
     // 401 自动清除登录态
     if (error.response?.status === 401) {
+      const body = (error.response.data as { code?: number; message?: string }) || {};
+      message.error(body.message || '认证失败');
       localStorage.removeItem('auth-storage');
       // 不在登录页才跳转，避免死循环
       if (window.location.pathname !== '/login' && window.location.pathname !== '/register') {
         window.location.href = '/login';
       }
-      return Promise.reject(error);
+      return Promise.reject(new Error(body.message || 'Unauthorized'));
     }
     if (error.response?.data) {
       const body = error.response.data as { code?: number; message?: string };

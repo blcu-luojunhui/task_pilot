@@ -1,4 +1,5 @@
 import { apiClient, unwrap } from './client';
+import { hashPassword } from '@/utils/crypto';
 
 export interface AccountInfo {
   id: number;
@@ -44,14 +45,16 @@ export interface CreateTokenResult {
 }
 
 export async function register(username: string, email: string, password: string) {
+  const hashed = await hashPassword(password);
   return unwrap<RegisterResult>(
-    apiClient.post('/auth/register', { username, email, password }),
+    apiClient.post('/auth/register', { username, email, password: hashed }),
   );
 }
 
 export async function login(username: string, password: string) {
+  const hashed = await hashPassword(password);
   return unwrap<LoginResult>(
-    apiClient.post('/auth/login', { username, password }),
+    apiClient.post('/auth/login', { username, password: hashed }),
   );
 }
 
