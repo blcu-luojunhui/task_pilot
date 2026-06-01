@@ -19,6 +19,25 @@ class AppContext:
 
     async def start_up(self):
         """启动所有资源"""
+        logger.info("=== Phase 0: Loading agentic tools into global registry ===")
+        from src.core.agents.capabilities.tools.loader import load_agentic_tools
+
+        loaded = load_agentic_tools(["database", "http", "task", "utils", "chat_ops"])
+        logger.info("Agentic tools loaded in this worker: %s", ", ".join(loaded))
+
+        from pathlib import Path
+
+        from src.core.agents.capabilities.skills import get_global_registry
+        from src.core.agents.capabilities.skills.loader import SkillLoader
+
+        knowledge_dir = Path(__file__).resolve().parents[2].parent / "skills" / "knowledge"
+        if knowledge_dir.exists():
+            registry = get_global_registry()
+            knowledge_skills = SkillLoader(str(knowledge_dir)).load_all()
+            for skill in knowledge_skills:
+                registry.register(skill)
+            logger.info("Knowledge skills loaded in this worker: %d", len(knowledge_skills))
+
         logger.info("=== Phase 1: Initializing MySQL pools ===")
         pool = self.container.async_mysql_pool()
         await pool.init_pools()

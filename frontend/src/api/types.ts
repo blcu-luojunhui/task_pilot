@@ -135,7 +135,10 @@ export interface TraceEventsData {
 
 // ============ Skills ============
 
-export type RiskLevel = 'READ' | 'WRITE' | 'DESTRUCTIVE';
+export type RiskLevel = 'READ' | 'WRITE' | 'DESTRUCTIVE' | 'read' | 'write' | 'destructive';
+
+export type SkillSource = 'system' | 'personal';
+export type SkillType = 'executable' | 'knowledge';
 
 export interface SkillParameter {
   type: string;
@@ -150,8 +153,14 @@ export interface SkillInfo {
   description: string;
   category: string;
   risk_level: RiskLevel;
+  skill_type?: SkillType;
   parameters: Record<string, SkillParameter>;
   call_count_24h?: number;
+  source: SkillSource;
+  editable: boolean;
+  markdown: string;
+  tags?: string[];
+  scope?: string;
 }
 
 export interface SkillCallRecord {

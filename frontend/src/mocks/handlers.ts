@@ -2,7 +2,7 @@ import { http, HttpResponse } from 'msw';
 import { TaskStatus, type SystemStats, type TaskSummary } from '@/api/types';
 import { findTaskByTraceId, MOCK_TASK_DETAILS, MOCK_TASKS } from './fixtures/tasks';
 import { buildFailedTraceEvents, buildSuccessTraceEvents } from './fixtures/events';
-import { MOCK_SKILLS } from './fixtures/skills';
+import { MOCK_SKILLS, MOCK_PERSONAL_SKILLS, nextPersonalSkillId } from './fixtures/skills';
 
 /** 内存可变副本，支持 mock 期间提交 / 取消 */
 const taskState: TaskSummary[] = MOCK_TASKS.map((t) => ({ ...t, data: { ...t.data } }));
@@ -134,7 +134,80 @@ export const handlers = [
   }),
 
   // ============ GET /api/skills ============
-  http.get('/api/skills', () => ok(MOCK_SKILLS)),
+  http.get('/api/skills', () => ok([...MOCK_SKILLS, ...MOCK_PERSONAL_SKILLS])),
+
+  http.get('/api/skills/personal/template', ({ request }) => {
+    const url = new URL(request.url);
+    const name = url.searchParams.get('name') ?? 'new-skill';
+    const category = url.searchParams.get('category') ?? 'chat_ops';
+    const markdown = [
+      '---',
+      `name: ${name}`,
+      'description: 在此填写简短描述',
+      `category: ${category}`,
+      'skill_type: knowledge',
+      'scope: agent:*',
+      '---',
+      '',
+      '## Description',
+      '',
+      '在此描述 skill 的用途与触发场景。',
+      '',
+      '## Guidelines',
+      '',
+      '',
+    ].join('\n');
+    return ok({ markdown });
+  }),
+
+  http.post('/api/skills/personal', async ({ request }) => {
+    const body = (await request.json()) as { content?: string };
+    const content = body.content ?? '';
+    const nameMatch = content.match(/^name:\s*(.+)$/m);
+    const categoryMatch = content.match(/^category:\s*(.+)$/m);
+    const descMatch = content.match(/^description:\s*(.+)$/m);
+    const skill: (typeof MOCK_PERSONAL_SKILLS)[number] = {
+      skill_id: nextPersonalSkillId(),
+      name: nameMatch?.[1]?.trim() ?? 'new-skill',
+      description: descMatch?.[1]?.trim() ?? '',
+      category: categoryMatch?.[1]?.trim() ?? 'general',
+      risk_level: 'read',
+      skill_type: 'knowledge',
+      parameters: {},
+      source: 'personal',
+      editable: true,
+      markdown: content,
+    };
+    MOCK_PERSONAL_SKILLS.push(skill);
+    return ok(skill);
+  }),
+
+  http.put('/api/skills/personal/:skillId', async ({ params, request }) => {
+    const skillId = String(params.skillId);
+    const body = (await request.json()) as { content?: string };
+    const idx = MOCK_PERSONAL_SKILLS.findIndex((s) => s.skill_id === skillId);
+    if (idx < 0) return err(404, 'Skill not found', 404);
+    const content = body.content ?? '';
+    const nameMatch = content.match(/^name:\s*(.+)$/m);
+    const categoryMatch = content.match(/^category:\s*(.+)$/m);
+    const descMatch = content.match(/^description:\s*(.+)$/m);
+    MOCK_PERSONAL_SKILLS[idx] = {
+      ...MOCK_PERSONAL_SKILLS[idx],
+      name: nameMatch?.[1]?.trim() ?? MOCK_PERSONAL_SKILLS[idx].name,
+      description: descMatch?.[1]?.trim() ?? MOCK_PERSONAL_SKILLS[idx].description,
+      category: categoryMatch?.[1]?.trim() ?? MOCK_PERSONAL_SKILLS[idx].category,
+      markdown: content,
+    };
+    return ok(MOCK_PERSONAL_SKILLS[idx]);
+  }),
+
+  http.delete('/api/skills/personal/:skillId', ({ params }) => {
+    const skillId = String(params.skillId);
+    const idx = MOCK_PERSONAL_SKILLS.findIndex((s) => s.skill_id === skillId);
+    if (idx < 0) return err(404, 'Skill not found', 404);
+    MOCK_PERSONAL_SKILLS.splice(idx, 1);
+    return ok({ deleted: true, skill_id: skillId });
+  }),
 
   // ============ GET /api/system/stats ============
   http.get('/api/system/stats', () => {
