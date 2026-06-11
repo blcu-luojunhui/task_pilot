@@ -20,6 +20,7 @@ import type {
   ChatMessage,
   ChatMessageStatus,
   ConversationDetailData,
+  ListConversationsData,
   PlanStep,
   TokenUsage,
   TraceEvent,
@@ -239,9 +240,7 @@ export const useChatStore = create<ChatStoreState>((set, get) => ({
     const isActive = get().activeConversationId === id;
     if (!isActive) return null;
 
-    const list = queryClient.getQueryData<{ items: { conversation_id: string }[] }>(
-      chatKeys.conversations(),
-    );
+    const list = queryClient.getQueryData<ListConversationsData>(chatKeys.conversations());
     const remaining = (list?.items ?? []).filter((c) => c.conversation_id !== id);
 
     set({
@@ -367,7 +366,7 @@ export const useChatStore = create<ChatStoreState>((set, get) => ({
           chatKeys.conversation(convId),
         );
         const pending = detail?.messages.find(
-          (m) => m.role === 'assistant' && m.status === 1,
+          (m: ChatMessage) => m.role === 'assistant' && m.status === 1,
         );
         if (pending && get().pendingPlan) {
           set({ pendingPlan: { ...get().pendingPlan!, messageId: pending.id } });
@@ -388,7 +387,7 @@ export const useChatStore = create<ChatStoreState>((set, get) => ({
     const messages = detail?.messages ?? [];
 
     if (conv && !conv.title && convId) {
-      const firstUser = messages.find((m) => m.role === 'user');
+      const firstUser = messages.find((m: ChatMessage) => m.role === 'user');
       if (firstUser?.content) {
         const autoTitle = firstUser.content.slice(0, 30);
         try {
