@@ -13,6 +13,8 @@ import {
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import { Empty, Tag, Typography } from 'antd';
+import { useTranslation } from 'react-i18next';
+import i18n from '@/locales/i18n';
 import type { TraceEvent } from '@/api/types';
 
 interface StepMeta {
@@ -97,7 +99,7 @@ function buildGraph(steps: StepMeta[]): { nodes: Node[]; edges: Edge[] } {
           <Handle type="target" position={Position.Top} />
           <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginBottom: 4 }}>
             <Tag color="blue" style={{ margin: 0 }}>Step {s.step}</Tag>
-            {s.isError && <Tag color="red" style={{ margin: 0 }}>错误</Tag>}
+            {s.isError && <Tag color="red" style={{ margin: 0 }}>{i18n.t('trace:dag.error')}</Tag>}
           </div>
           {s.thinkContent && (
             <Typography.Text
@@ -153,6 +155,7 @@ function buildGraph(steps: StepMeta[]): { nodes: Node[]; edges: Edge[] } {
 }
 
 export function DAGView({ events }: { events: TraceEvent[] }) {
+  const { t } = useTranslation('trace');
   const steps = useMemo(() => extractSteps(events), [events]);
   const { nodes: initialNodes, edges: initialEdges } = useMemo(() => buildGraph(steps), [steps]);
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
@@ -169,7 +172,7 @@ export function DAGView({ events }: { events: TraceEvent[] }) {
   }, []);
 
   if (steps.length === 0) {
-    return <Empty description="无步骤数据可渲染 DAG" />;
+    return <Empty description={t('dag.noData')} />;
   }
 
   return (

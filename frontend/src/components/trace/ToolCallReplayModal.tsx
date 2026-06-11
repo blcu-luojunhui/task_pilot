@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   Alert,
   Button,
@@ -54,6 +55,7 @@ interface Props {
 }
 
 export function ToolCallReplayModal({ event, open, onClose }: Props) {
+  const { t } = useTranslation('trace');
   const [submitting, setSubmitting] = useState(false);
   const [result, setResult] = useState<{ success: boolean; result: string } | null>(null);
   const [form] = Form.useForm();
@@ -69,7 +71,7 @@ export function ToolCallReplayModal({ event, open, onClose }: Props) {
       try {
         params = JSON.parse(values.arguments);
       } catch {
-        message.error('参数不是有效 JSON');
+        message.error(t('replayModal.argsNotValidJson'));
         return;
       }
 
@@ -90,7 +92,7 @@ export function ToolCallReplayModal({ event, open, onClose }: Props) {
       }
     } catch (err: unknown) {
       const e = err as { response?: { data?: { message?: string } } };
-      message.error(e?.response?.data?.message ?? '请求失败');
+      message.error(e?.response?.data?.message ?? t('replayModal.requestFailed'));
     } finally {
       setSubmitting(false);
     }
@@ -107,7 +109,7 @@ export function ToolCallReplayModal({ event, open, onClose }: Props) {
       title={
         <Space>
           <PlayCircleOutlined />
-          <span>重放 Tool Call</span>
+          <span>{t('replayModal.title')}</span>
           {toolCall && <Tag color="geekblue">{toolCall.name}</Tag>}
         </Space>
       }
@@ -116,7 +118,7 @@ export function ToolCallReplayModal({ event, open, onClose }: Props) {
       width={560}
       footer={
         <Space>
-          <Button onClick={handleClose}>关闭</Button>
+          <Button onClick={handleClose}>{t('replayModal.close')}</Button>
           <Button
             type="primary"
             icon={<PlayCircleOutlined />}
@@ -124,7 +126,7 @@ export function ToolCallReplayModal({ event, open, onClose }: Props) {
             onClick={handleReplay}
             disabled={!toolCall}
           >
-            执行
+            {t('replayModal.execute')}
           </Button>
         </Space>
       }
@@ -133,7 +135,7 @@ export function ToolCallReplayModal({ event, open, onClose }: Props) {
         <Alert
           type="warning"
           showIcon
-          message="此事件不包含可重放的失败 tool call"
+          message={t('replayModal.noToolCall')}
         />
       ) : (
         <Space direction="vertical" size={16} style={{ width: '100%' }}>
@@ -141,8 +143,8 @@ export function ToolCallReplayModal({ event, open, onClose }: Props) {
             type="info"
             showIcon
             icon={<WarningOutlined />}
-            message="此功能仅允许调用 READ 级别的 Skill"
-            description="DESTRUCTIVE 操作被永久禁止。默认需要环境变量 TASK_PILOT_ALLOW_DIRECT_SKILL_INVOKE=true。"
+            message={t('replayModal.readOnlyWarning')}
+            description={t('replayModal.destructiveWarning')}
           />
 
           <Form form={form} layout="vertical" initialValues={{
@@ -158,13 +160,13 @@ export function ToolCallReplayModal({ event, open, onClose }: Props) {
             </Form.Item>
             <Form.Item
               name="arguments"
-              label="参数 (JSON)"
+              label={t('replayModal.argsLabel')}
               rules={[
-                { required: true, message: '请输入参数' },
+                { required: true, message: t('replayModal.argsRequired') },
                 {
                   validator: (_, v) => {
                     try { JSON.parse(v); return Promise.resolve(); }
-                    catch { return Promise.reject('非法 JSON'); }
+                    catch { return Promise.reject(t('replayModal.argsInvalid')); }
                   },
                 },
               ]}
@@ -189,7 +191,7 @@ export function ToolCallReplayModal({ event, open, onClose }: Props) {
               }}
             >
               <Typography.Text strong>
-                {result.success ? '成功' : '失败'}
+                {result.success ? t('replayModal.success') : t('replayModal.failed')}
               </Typography.Text>
               <pre style={{ margin: '8px 0 0', fontSize: 12, whiteSpace: 'pre-wrap' }}>
                 {result.result}

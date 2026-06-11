@@ -1,5 +1,6 @@
 import { useMemo } from 'react';
 import { Col, Empty, Row, Statistic, Typography } from 'antd';
+import { useTranslation } from 'react-i18next';
 import {
   BarChart,
   Bar,
@@ -117,12 +118,13 @@ function parseToolCounts(events: TraceEvent[]): ToolCount[] {
 }
 
 export function StatsView({ events }: { events: TraceEvent[] }) {
+  const { t } = useTranslation('trace');
   const timings = useMemo(() => parseTimestamps(events), [events]);
   const tokens = useMemo(() => parseTokens(events), [events]);
   const toolCounts = useMemo(() => parseToolCounts(events), [events]);
 
   if (events.length === 0) {
-    return <Empty description="无统计数据" />;
+    return <Empty description={t('stats.noData')} />;
   }
 
   const totalThink = timings.reduce((s, t) => s + t.thinkMs, 0);
@@ -133,26 +135,26 @@ export function StatsView({ events }: { events: TraceEvent[] }) {
     <div style={{ padding: '8px 0' }}>
       <Row gutter={16} style={{ marginBottom: 24 }}>
         <Col span={6}>
-          <Statistic title="总思考耗时" value={totalThink} suffix="ms" precision={0} />
+          <Statistic title={t('stats.totalThink')} value={totalThink} suffix="ms" precision={0} />
         </Col>
         <Col span={6}>
-          <Statistic title="总执行耗时" value={totalAct} suffix="ms" precision={0} />
+          <Statistic title={t('stats.totalAct')} value={totalAct} suffix="ms" precision={0} />
         </Col>
         <Col span={6}>
           <Statistic
-            title="Token 用量"
+            title={t('stats.tokenUsage')}
             value={lastToken?.total ?? 0}
             suffix={`tokens (prompt: ${lastToken?.prompt ?? 0} / completion: ${lastToken?.completion ?? 0})`}
           />
         </Col>
         <Col span={6}>
-          <Statistic title="工具调用" value={toolCounts.reduce((s, t) => s + t.count, 0)} suffix="次" />
+          <Statistic title={t('stats.toolCalls')} value={toolCounts.reduce((s, t) => s + t.count, 0)} suffix={t('stats.times')} />
         </Col>
       </Row>
 
       {timings.length > 0 && (
         <div style={{ marginBottom: 24 }}>
-          <Typography.Title level={5}>每步耗时 (ms)</Typography.Title>
+          <Typography.Title level={5}>{t('stats.perStepTiming')}</Typography.Title>
           <ResponsiveContainer width="100%" height={200}>
             <BarChart data={timings}>
               <CartesianGrid strokeDasharray="3 3" />
@@ -169,7 +171,7 @@ export function StatsView({ events }: { events: TraceEvent[] }) {
 
       {tokens.length > 1 && (
         <div style={{ marginBottom: 24 }}>
-          <Typography.Title level={5}>Token 累积曲线</Typography.Title>
+          <Typography.Title level={5}>{t('stats.tokenCurve')}</Typography.Title>
           <ResponsiveContainer width="100%" height={200}>
             <LineChart data={tokens}>
               <CartesianGrid strokeDasharray="3 3" />
@@ -187,7 +189,7 @@ export function StatsView({ events }: { events: TraceEvent[] }) {
 
       {toolCounts.length > 0 && (
         <div>
-          <Typography.Title level={5}>工具调用分布</Typography.Title>
+          <Typography.Title level={5}>{t('stats.toolDistribution')}</Typography.Title>
           <ResponsiveContainer width="100%" height={250}>
             <PieChart>
               <Pie

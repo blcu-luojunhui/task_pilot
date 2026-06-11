@@ -5,6 +5,7 @@ import {
   LoadingOutlined,
   ToolOutlined,
 } from '@ant-design/icons';
+import { useTranslation } from 'react-i18next';
 import type { ToolCallStatus } from '@/stores/chatStore';
 
 interface Props {
@@ -37,6 +38,7 @@ function formatResult(result: unknown): string {
 
 export function ToolCallBlock({ toolCall }: Props) {
   const { token } = theme.useToken();
+  const { t } = useTranslation('chat');
 
   const statusIcon =
     toolCall.status === 'running' ? (
@@ -49,10 +51,10 @@ export function ToolCallBlock({ toolCall }: Props) {
 
   const statusLabel =
     toolCall.status === 'running'
-      ? '执行中'
+      ? t('executing')
       : toolCall.status === 'completed'
-        ? '完成'
-        : '失败';
+        ? t('completed')
+        : t('failed');
 
   const statusColor =
     toolCall.status === 'running'
@@ -94,7 +96,7 @@ export function ToolCallBlock({ toolCall }: Props) {
             items={[
               {
                 key: 'args',
-                label: '参数',
+                label: t('paramsLabel'),
                 children: (
                   <pre
                     style={{
@@ -112,7 +114,7 @@ export function ToolCallBlock({ toolCall }: Props) {
                 ? [
                     {
                       key: 'result',
-                      label: toolCall.status === 'completed' ? '结果' : '错误',
+                      label: toolCall.status === 'completed' ? t('resultLabel') : t('errorLabel'),
                       children: (
                         <pre
                           style={{

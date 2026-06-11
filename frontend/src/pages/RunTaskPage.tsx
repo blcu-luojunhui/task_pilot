@@ -24,6 +24,7 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { useRunTaskStore } from '@/stores/runTaskStore';
 import { useChatTurnStream } from '@/hooks/useChatTurnStream';
+import { useTranslation } from 'react-i18next';
 import { ToolCallBlock } from '@/components/chat/ToolCallBlock';
 import '@/components/chat/ChatMessage.css';
 
@@ -43,13 +44,6 @@ const AREA_META: Record<string, AreaMeta> = {
   utils: { label: 'Utils', icon: '🔧', color: 'default' },
 };
 
-const AREA_DESC: Record<string, string> = {
-  chat_ops: '计划制定、任务调度、agent 升级',
-  database: '数据库读写与查询',
-  http: '外部 API 调用与网络请求',
-  task: '任务状态查询、创建、取消',
-  utils: '通用工具集',
-};
 
 function MarkdownRenderer({ content, token }: { content: string; token: ReturnType<typeof theme.useToken>['token'] }) {
   return (
@@ -121,7 +115,16 @@ function MarkdownRenderer({ content, token }: { content: string; token: ReturnTy
 }
 
 export function RunTaskPage() {
+  const { t } = useTranslation('runTask');
   const { token } = theme.useToken();
+
+  const areaDesc: Record<string, string> = {
+    chat_ops: t('chatOpsDesc'),
+    database: t('databaseDesc'),
+    http: t('httpDesc'),
+    task: t('taskDesc'),
+    utils: t('utilsDesc'),
+  };
 
   const toolAreas = useRunTaskStore((s) => s.toolAreas);
   const selectedAreas = useRunTaskStore((s) => s.selectedAreas);
@@ -169,8 +172,8 @@ export function RunTaskPage() {
   const handleCopyResult = useCallback(() => {
     if (finalResult) {
       navigator.clipboard.writeText(finalResult).then(
-        () => message.success('已复制到剪贴板'),
-        () => message.error('复制失败'),
+        () => message.success(t('copied')),
+        () => message.error(t('copyFailed')),
       );
     }
   }, [finalResult]);
@@ -208,10 +211,10 @@ export function RunTaskPage() {
         >
           <Space align="center" size={8}>
             <ThunderboltOutlined style={{ fontSize: 18, color: token.colorPrimary }} />
-            <Typography.Text strong style={{ fontSize: 15 }}>Agent Run</Typography.Text>
+            <Typography.Text strong style={{ fontSize: 15 }}>{t('title')}</Typography.Text>
           </Space>
           <Typography.Text type="secondary" style={{ fontSize: 12, display: 'block', marginTop: 4 }}>
-            设定目标，选择工具，让 Agent 自主执行
+            {t('subtitle')}
           </Typography.Text>
         </div>
 
@@ -220,10 +223,10 @@ export function RunTaskPage() {
           <div style={{ padding: '16px 16px 8px' }}>
             <Space size={4} style={{ marginBottom: 8 }}>
               <AimOutlined style={{ color: token.colorPrimary }} />
-              <Typography.Text strong style={{ fontSize: 13 }}>目标</Typography.Text>
+              <Typography.Text strong style={{ fontSize: 13 }}>{t('goal')}</Typography.Text>
             </Space>
             <TextArea
-              placeholder="描述你要完成的目标…&#10;例如：查最近 24h 任务执行情况，汇总成功率并分析失败原因"
+              placeholder={t('goalPlaceholder')}
               value={goal}
               onChange={(e) => setGoal(e.target.value)}
               rows={4}
@@ -236,9 +239,9 @@ export function RunTaskPage() {
           <div style={{ padding: '8px 16px' }}>
             <Space size={4} style={{ marginBottom: 8 }}>
               <SettingOutlined style={{ color: token.colorWarning }} />
-              <Typography.Text strong style={{ fontSize: 13 }}>Skills</Typography.Text>
+              <Typography.Text strong style={{ fontSize: 13 }}>{t('skills')}</Typography.Text>
               {selectedAreas.length > 0 && (
-                <Tag style={{ marginLeft: 4 }}>{selectedAreas.length} 项</Tag>
+                <Tag style={{ marginLeft: 4 }}>{t('skillsCount', { count: selectedAreas.length })}</Tag>
               )}
             </Space>
 
@@ -272,7 +275,7 @@ export function RunTaskPage() {
                           type="secondary"
                           style={{ fontSize: 11, display: 'block', lineHeight: 1.4 }}
                         >
-                          {AREA_DESC[area] || ''}
+                          {areaDesc[area] || ''}
                         </Typography.Text>
                       </div>
                       {selected && (
@@ -297,7 +300,7 @@ export function RunTaskPage() {
             loading={inFlight}
             disabled={!goal.trim() || selectedAreas.length === 0}
           >
-            {inFlight ? '执行中…' : 'Run'}
+            {inFlight ? t('executing') : t('run')}
           </Button>
           {inFlight && (
             <Button
@@ -308,7 +311,7 @@ export function RunTaskPage() {
               onClick={() => void cancel()}
               style={{ marginTop: 8 }}
             >
-              取消执行
+              {t('cancelExecution')}
             </Button>
           )}
         </div>
@@ -353,17 +356,17 @@ export function RunTaskPage() {
             </div>
             <div style={{ textAlign: 'center' }}>
               <Typography.Title level={5} type="secondary" style={{ margin: 0 }}>
-                准备就绪
+                {t('ready')}
               </Typography.Title>
               <Typography.Text type="secondary" style={{ fontSize: 13 }}>
-                在左侧设置目标与 Skills，点击 Run 开始执行
+                {t('readyHint')}
               </Typography.Text>
             </div>
             <div style={{ display: 'flex', gap: 24, marginTop: 8 }}>
               {[
-                { step: 1, text: '设定自然语言目标' },
-                { step: 2, text: '勾选 Agent 可用的 Skills' },
-                { step: 3, text: '点击 Run，实时观看结果' },
+                { step: 1, text: t('step1') },
+                { step: 2, text: t('step2') },
+                { step: 3, text: t('step3') },
               ].map((s) => (
                 <div key={s.step} style={{ textAlign: 'center' }}>
                   <div
@@ -399,7 +402,7 @@ export function RunTaskPage() {
             {inFlight && traceId && (
               <Card size="small" style={{ background: token.colorInfoBg, borderColor: token.colorInfoBorder }}>
                 <Space size={12}>
-                  <Tag color="processing" icon={<LoadingOutlined />}>执行中</Tag>
+                  <Tag color="processing" icon={<LoadingOutlined />}>{t('executing')}</Tag>
                   <Typography.Text type="secondary" style={{ fontSize: 11 }} copyable={{ text: traceId }}>
                     <code style={{ fontSize: 11 }}>{traceId}</code>
                   </Typography.Text>
@@ -421,7 +424,7 @@ export function RunTaskPage() {
                 title={
                   <Space size={4}>
                     <LoadingOutlined style={{ color: token.colorPrimary }} />
-                    <span>实时输出</span>
+                    <span>{t('realtimeOutput')}</span>
                   </Space>
                 }
               >
@@ -441,7 +444,7 @@ export function RunTaskPage() {
                 title={
                   <Space size={4}>
                     <CheckCircleOutlined style={{ color: token.colorSuccess }} />
-                    <span>执行完成</span>
+                    <span>{t('completed')}</span>
                   </Space>
                 }
                 extra={
@@ -451,7 +454,7 @@ export function RunTaskPage() {
                     icon={<CopyOutlined />}
                     onClick={handleCopyResult}
                   >
-                    复制
+                    {t('copy')}
                   </Button>
                 }
                 style={{

@@ -1,0 +1,30 @@
+{
+  "app": {
+    "subtitle": "Cron jobs to agentic execution — Web Console v1",
+    "searchPlaceholder": "Search trace_id or task name",
+    "darkModeTooltipOn": "Switch to light mode",
+    "darkModeTooltipOff": "Switch to dark mode",
+    "userMenu": {
+      "account": "Account",
+      "logout": "Log out"
+    },
+    "nav": {
+      "chat": "Chat",
+      "runTask": "Run Task",
+      "dashboard": "Dashboard",
+      "tasks": "Tasks",
+      "traces": "Traces",
+      "skills": "Skills",
+      "system": "System",
+      "runs": "Runs",
+      "account": "Account"
+    }
+  },
+  "error": {
+    "crashTitle": "Something went wrong",
+    "retry": "Retry"
+  },
+  "empty": {
+    "noData": "No data"
+  }
+}

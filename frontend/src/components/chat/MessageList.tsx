@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { Empty, Typography } from 'antd';
+import { useTranslation } from 'react-i18next';
 import type { ChatMessage } from '@/api/types';
 import type { PendingPlan, ToolCallStatus } from '@/stores/chatStore';
 import { MessageBubble } from './MessageBubble';
@@ -32,6 +33,7 @@ export function MessageList({
   onRejectPlan,
 }: Props) {
   const bottomRef = useRef<HTMLDivElement | null>(null);
+  const { t } = useTranslation('chat');
 
   // 持久化消息 / 工具调用 / pendingPlan 变化时滚到底；
   // liveStreamingText 高频变化由 StreamingBubble 内部 rAF 节流处理。
@@ -58,7 +60,7 @@ export function MessageList({
         <Empty
           description={
             <Typography.Text type="secondary">
-              开始对话吧 — TaskPilot agent 可以帮你规划、运行和取消任务
+              {t('emptyHint')}
             </Typography.Text>
           }
         />
@@ -109,7 +111,7 @@ export function MessageList({
               <span />
             </div>
             <Typography.Text type="secondary" style={{ fontSize: 13 }}>
-              {agenticMode ? 'Agent 执行中' : 'Agent 思考中'}
+              {agenticMode ? t('agentExecuting') : t('agentThinking')}
             </Typography.Text>
           </div>
         </div>

@@ -1,14 +1,16 @@
 import { create } from 'zustand';
 import type { ListTasksParams, TaskSummary } from '@/api/types';
-import { listTasks } from '@/api/tasks';
+import { listTasks, listAdminTasks } from '@/api/tasks';
 
 interface TaskStoreState {
   items: TaskSummary[];
   total: number;
   loading: boolean;
+  adminMode: boolean;
   params: ListTasksParams;
 
   fetch: (params?: ListTasksParams) => Promise<void>;
+  setAdminMode: (mode: boolean) => void;
   setParams: (patch: Partial<ListTasksParams>) => void;
   reset: () => void;
 }
@@ -22,17 +24,25 @@ export const useTaskStore = create<TaskStoreState>((set, get) => ({
   items: [],
   total: 0,
   loading: false,
+  adminMode: false,
   params: { ...DEFAULT_PARAMS },
 
   fetch: async (override?: ListTasksParams) => {
-    const next = { ...get().params, ...(override ?? {}) };
+    const { params, adminMode } = get();
+    const next = { ...params, ...(override ?? {}) };
     set({ loading: true, params: next });
     try {
-      const data = await listTasks(next);
+      const fetcher = adminMode ? listAdminTasks : listTasks;
+      const data = await fetcher(next);
       set({ items: data.items, total: data.total, loading: false });
     } catch {
-      // 拦截器已经弹了 message，这里只回滚 loading
       set({ loading: false });
+    }
+  },
+
+  setAdminMode: (mode: boolean) => {
+    if (mode !== get().adminMode) {
+      set({ adminMode: mode, items: [], total: 0, params: { ...DEFAULT_PARAMS } });
     }
   },
 

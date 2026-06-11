@@ -1,13 +1,32 @@
 import { apiClient, unwrap } from './client';
+import { hashPassword } from '@/utils/crypto';
 
 export interface AccountInfo {
   id: number;
   username: string;
   email: string;
+  role: string;
   daily_token_limit: number;
   today_tokens_used: number;
   created_at: string;
   updated_at: string;
+}
+
+export interface AdminUserInfo {
+  id: number;
+  username: string;
+  email: string;
+  role: string;
+  daily_token_limit: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface AdminUserListData {
+  total: number;
+  page: number;
+  page_size: number;
+  items: AdminUserInfo[];
 }
 
 export interface RegisterResult {
@@ -44,14 +63,16 @@ export interface CreateTokenResult {
 }
 
 export async function register(username: string, email: string, password: string) {
+  const hashed = await hashPassword(password);
   return unwrap<RegisterResult>(
-    apiClient.post('/auth/register', { username, email, password }),
+    apiClient.post('/auth/register', { username, email, password: hashed }),
   );
 }
 
 export async function login(username: string, password: string) {
+  const hashed = await hashPassword(password);
   return unwrap<LoginResult>(
-    apiClient.post('/auth/login', { username, password }),
+    apiClient.post('/auth/login', { username, password: hashed }),
   );
 }
 
@@ -75,4 +96,22 @@ export async function listTokens() {
 
 export async function revokeToken(tokenId: number) {
   return unwrap<null>(apiClient.delete(`/auth/tokens/${tokenId}`));
+}
+
+export async function listUsers(page = 1, pageSize = 20) {
+  return unwrap<AdminUserListData>(
+    apiClient.get('/auth/admin/users', { params: { page, page_size: pageSize } }),
+  );
+}
+
+export async function updateUserRole(userId: number, role: string) {
+  return unwrap<null>(
+    apiClient.put(`/auth/admin/users/${userId}/role`, { role }),
+  );
+}
+
+export async function updateUserQuota(userId: number, dailyTokenLimit: number) {
+  return unwrap<null>(
+    apiClient.put(`/auth/admin/users/${userId}/quota`, { daily_token_limit: dailyTokenLimit }),
+  );
 }

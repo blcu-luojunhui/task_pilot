@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   Alert,
   Badge,
@@ -27,15 +28,18 @@ import { useTraceStream, type StreamStatus } from '@/hooks/useTraceStream';
 import { formatSeconds, formatTimestamp } from '@/utils/format';
 import '@/components/chat/ChatMessage.css';
 
-const STREAM_STATUS_MAP: Record<StreamStatus, { text: string; color: 'green' | 'blue' | 'red' | 'orange' | 'default' }> = {
-  idle: { text: '未连接', color: 'default' },
-  connecting: { text: '连接中...', color: 'blue' },
-  open: { text: '实时同步中', color: 'green' },
-  closed: { text: '已结束', color: 'default' },
-  error: { text: '重连中...', color: 'orange' },
+const STREAM_STATUS_COLORS: Record<StreamStatus, 'green' | 'blue' | 'red' | 'orange' | 'default'> = {
+  idle: 'default',
+  connecting: 'blue',
+  open: 'green',
+  closed: 'default',
+  error: 'orange',
 };
 
+
+
 export function TaskDetailPage() {
+  const { t } = useTranslation('tasks');
   const { traceId = '' } = useParams<{ traceId: string }>();
   const navigate = useNavigate();
   const [detail, setDetail] = useState<TaskDetail | null>(null);
@@ -51,13 +55,25 @@ export function TaskDetailPage() {
     detail?.task_status === TaskStatus.CANCEL_REQUESTED;
   const streamStatus = useTraceStream(traceId || null, { enabled: isLive });
 
+  const streamStatusText = useMemo<Record<StreamStatus, string>>(
+    () => ({
+      idle: t('streamIdle'),
+      connecting: t('streamConnecting'),
+      open: t('streamOpen'),
+      closed: t('streamClosed'),
+      error: t('streamError'),
+    }),
+    [t],
+  );
+
   const refresh = async () => {
     if (!traceId) return;
     setDetailLoading(true);
     try {
       const [d] = await Promise.all([getTaskDetail(traceId), traceOpen(traceId)]);
       setDetail(d);
-    } catch {
+    } catch (err) {
+      console.error('[TaskDetailPage] refresh failed:', err);
       setDetail(null);
     } finally {
       setDetailLoading(false);
@@ -71,139 +87,146 @@ export function TaskDetailPage() {
 
   const loading = (detailLoading && !detail) || traceLoading;
 
+  // 所有 hooks 必须在条件 return 之前调用
+  const agent = detail?.agent_metadata;
+  const streamColor = STREAM_STATUS_COLORS[streamStatus];
+
   if (loading && !detail) {
-    return <Spin />;
+    return (
+      <div style={{ textAlign: 'center', padding: 80 }}>
+        <Spin size="large" tip={t('loading') || 'Loading...'} />
+      </div>
+    );
   }
   if (!detail) {
     return (
       <Alert
         type="error"
         showIcon
-        message="任务不存在或已被清理"
+        message={t('taskNotExist')}
         description={`trace_id: ${traceId}`}
+        action={
+          <Button size="small" onClick={() => navigate(-1)}>
+            {t('back')}
+          </Button>
+        }
       />
     );
   }
 
-  const agent = detail.agent_metadata;
-  const streamMeta = STREAM_STATUS_MAP[streamStatus];
-
   return (
     <Space direction="vertical" size={16} style={{ width: '100%' }}>
-      <Space style={{ justifyContent: 'space-between', width: '100%' }}>
-        <Space>
-          <Button icon={<ArrowLeftOutlined />} onClick={() => navigate(-1)}>
-            返回
-          </Button>
-          <Typography.Title level={4} style={{ margin: 0 }}>
-            任务详情
-          </Typography.Title>
-          <TaskStatusTag status={detail.task_status} />
-          {isLive && (
-            <Badge
-              status={
-                streamMeta.color === 'orange'
-                  ? 'processing'
-                  : (streamMeta.color === 'green' ? 'success' : 'default')
-              }
-              text={streamMeta.text}
-            />
-          )}
-        </Space>
-        <Space>
-          <Button
-            icon={<SwapOutlined />}
-            onClick={() => setReplayOpen(true)}
-            disabled={!detail}
-          >
-            Time Travel
-          </Button>
-          <Button
-            icon={<ReloadOutlined />}
-            onClick={refresh}
-            loading={detailLoading || traceLoading}
-          >
-            刷新
-          </Button>
-        </Space>
-      </Space>
-
-      <Row gutter={16}>
-        {/* 左侧：任务状态机 */}
-        <Col xs={24} lg={9}>
-          <Card title="任务状态机" variant="borderless">
-            <Descriptions column={1} size="small" bordered>
-              <Descriptions.Item label="trace_id">
-                <code style={{ fontSize: 12 }}>{detail.trace_id}</code>
-              </Descriptions.Item>
-              <Descriptions.Item label="task_name">{detail.task_name}</Descriptions.Item>
-              <Descriptions.Item label="业务日期">{detail.date_string}</Descriptions.Item>
-              <Descriptions.Item label="开始">{formatTimestamp(detail.start_timestamp)}</Descriptions.Item>
-              <Descriptions.Item label="结束">{formatTimestamp(detail.finish_timestamp)}</Descriptions.Item>
-              <Descriptions.Item label="输出结果">
-                <DataDisplay data={detail.data} />
-              </Descriptions.Item>
-            </Descriptions>
-          </Card>
-        </Col>
-
-        {/* 右侧：Agent 流程追溯 */}
-        <Col xs={24} lg={15}>
-          <Card
-            title="Agent 流程追溯"
-            extra={
-              agent && (
-                <Space size={[6, 0]} wrap>
-                  <Tag color="purple">stop_reason: {agent.stop_reason}</Tag>
-                  <Tag color="blue">{agent.total_steps} steps</Tag>
-                  <Tag color="cyan">{agent.tool_calls_count} tools</Tag>
-                  <Tag>tokens: {agent.token_usage.total}</Tag>
-                  <Tag>{formatSeconds(agent.duration_seconds)}</Tag>
-                </Space>
-              )
-            }
-            variant="borderless"
-          >
-            {agent?.goal && (
-              <Alert
-                type="info"
-                showIcon={false}
-                message={<Typography.Text strong>goal</Typography.Text>}
-                description={agent.goal}
-                style={{ marginBottom: 12 }}
+        <Space style={{ justifyContent: 'space-between', width: '100%' }}>
+          <Space>
+            <Button icon={<ArrowLeftOutlined />} onClick={() => navigate(-1)}>
+              {t('back')}
+            </Button>
+            <Typography.Title level={4} style={{ margin: 0 }}>
+              {t('taskDetail')}
+            </Typography.Title>
+            <TaskStatusTag status={detail.task_status} />
+            {isLive && (
+              <Badge
+                status={
+                  streamColor === 'orange'
+                    ? 'processing'
+                    : (streamColor === 'green' ? 'success' : 'default')
+                }
+                text={streamStatusText[streamStatus]}
               />
             )}
-            {agent?.final_answer && (
-              <Card
-                size="small"
-                title="final_answer"
-                style={{ marginBottom: 12 }}
-              >
-                <div className="markdown-body" style={{ fontSize: 13 }}>
-                  <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                    {String(agent.final_answer)}
-                  </ReactMarkdown>
-                </div>
-              </Card>
-            )}
+          </Space>
+          <Space>
+            <Button
+              icon={<SwapOutlined />}
+              onClick={() => setReplayOpen(true)}
+              disabled={!detail}
+            >
+              Time Travel
+            </Button>
+            <Button
+              icon={<ReloadOutlined />}
+              onClick={refresh}
+              loading={detailLoading || traceLoading}
+            >
+              {t('refresh')}
+            </Button>
+          </Space>
+        </Space>
 
-            <TraceView events={traceEvents} />
-          </Card>
-        </Col>
-      </Row>
-      <CompareView
-        traceId={traceId || null}
-        open={replayOpen}
-        onClose={() => setReplayOpen(false)}
-      />
-    </Space>
+        <Row gutter={16}>
+          <Col xs={24} lg={9}>
+            <Card title={t('taskStateMachine')} variant="borderless">
+              <Descriptions column={1} size="small" bordered>
+                <Descriptions.Item label="trace_id">
+                  <code style={{ fontSize: 12 }}>{detail.trace_id}</code>
+                </Descriptions.Item>
+                <Descriptions.Item label="task_name">{detail.task_name}</Descriptions.Item>
+                <Descriptions.Item label={t('bizDate')}>{detail.date_string}</Descriptions.Item>
+                <Descriptions.Item label={t('startTime')}>{formatTimestamp(detail.start_timestamp)}</Descriptions.Item>
+                <Descriptions.Item label={t('endTime')}>{formatTimestamp(detail.finish_timestamp)}</Descriptions.Item>
+                <Descriptions.Item label={t('output')}>
+                  <DataDisplay data={detail.data} />
+                </Descriptions.Item>
+              </Descriptions>
+            </Card>
+          </Col>
+
+          <Col xs={24} lg={15}>
+            <Card
+              title={t('agentTrace')}
+              extra={
+                agent != null ? (
+                  <Space size={[6, 0]} wrap>
+                    {agent.stop_reason ? <Tag color="purple">stop_reason: {agent.stop_reason}</Tag> : null}
+                    {agent.total_steps != null ? <Tag color="blue">{agent.total_steps} steps</Tag> : null}
+                    {agent.tool_calls_count != null ? <Tag color="cyan">{agent.tool_calls_count} tools</Tag> : null}
+                    {agent.token_usage?.total != null ? <Tag>tokens: {agent.token_usage.total}</Tag> : null}
+                    {agent.duration_seconds != null ? <Tag>{formatSeconds(agent.duration_seconds)}</Tag> : null}
+                  </Space>
+                ) : null
+              }
+              variant="borderless"
+            >
+              {agent?.goal ? (
+                <Alert
+                  type="info"
+                  showIcon={false}
+                  message={<Typography.Text strong>goal</Typography.Text>}
+                  description={agent.goal}
+                  style={{ marginBottom: 12 }}
+                />
+              ) : null}
+              {agent?.final_answer ? (
+                <Card
+                  size="small"
+                  title="final_answer"
+                  style={{ marginBottom: 12 }}
+                >
+                  <div className="markdown-body" style={{ fontSize: 13 }}>
+                    <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                      {String(agent.final_answer)}
+                    </ReactMarkdown>
+                  </div>
+                </Card>
+              ) : null}
+
+              <TraceView events={traceEvents ?? []} />
+            </Card>
+          </Col>
+        </Row>
+        <CompareView
+          traceId={traceId || null}
+          open={replayOpen}
+          onClose={() => setReplayOpen(false)}
+        />
+      </Space>
   );
 }
 
 function DataDisplay({ data }: { data: unknown }) {
   if (!data) return <Typography.Text type="secondary">—</Typography.Text>;
 
-  // run_goal 任务结果：data 包含 {content, goal, ...}
   if (typeof data === 'object' && data !== null) {
     const d = data as Record<string, unknown>;
     const content = d.content;
@@ -220,10 +243,14 @@ function DataDisplay({ data }: { data: unknown }) {
     }
   }
 
-  // fallback: 原始 JSON
-  return (
-    <pre style={{ margin: 0, fontSize: 12, maxHeight: 200, overflow: 'auto' }}>
-      {JSON.stringify(data, null, 2)}
-    </pre>
-  );
+  try {
+    const json = JSON.stringify(data, null, 2);
+    return (
+      <pre style={{ margin: 0, fontSize: 12, maxHeight: 200, overflow: 'auto' }}>
+        {json}
+      </pre>
+    );
+  } catch {
+    return <Typography.Text type="secondary">[无法序列化]</Typography.Text>;
+  }
 }

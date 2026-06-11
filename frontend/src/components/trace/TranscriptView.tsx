@@ -6,6 +6,7 @@ import {
   UserOutlined,
   SettingOutlined,
 } from '@ant-design/icons';
+import { useTranslation } from 'react-i18next';
 import type { TraceEvent } from '@/api/types';
 
 interface Message {
@@ -86,32 +87,35 @@ function extractMessages(events: TraceEvent[]): Message[] {
   return messages;
 }
 
-const ROLE_CONFIG: Record<string, { icon: React.ReactNode; bg: string; label: string; defaultCollapse: boolean }> = {
-  system: { icon: <SettingOutlined />, bg: '#f5f5f5', label: 'System', defaultCollapse: true },
-  user: { icon: <UserOutlined />, bg: '#e6f4ff', label: 'User', defaultCollapse: false },
-  assistant: { icon: <RobotOutlined />, bg: '#fffbe6', label: 'Assistant', defaultCollapse: false },
-  tool: { icon: <ToolOutlined />, bg: '#f6ffed', label: 'Tool', defaultCollapse: false },
-};
+function getRoleConfig(t: (key: string) => string): Record<string, { icon: React.ReactNode; bg: string; label: string; defaultCollapse: boolean }> {
+  return {
+    system: { icon: <SettingOutlined />, bg: '#f5f5f5', label: t('transcript.system'), defaultCollapse: true },
+    user: { icon: <UserOutlined />, bg: '#e6f4ff', label: t('transcript.user'), defaultCollapse: false },
+    assistant: { icon: <RobotOutlined />, bg: '#fffbe6', label: t('transcript.assistant'), defaultCollapse: false },
+    tool: { icon: <ToolOutlined />, bg: '#f6ffed', label: t('transcript.tool'), defaultCollapse: false },
+  };
+}
 
 export function TranscriptView({ events }: { events: TraceEvent[] }) {
   const messages = extractMessages(events);
+  const { t } = useTranslation('trace');
 
   if (messages.length === 0) {
-    return <Empty description="无对话记录（缺少 run_start/think_end 事件）" />;
+    return <Empty description={t('transcript.noData')} />;
   }
 
   return (
     <Space direction="vertical" size={8} style={{ width: '100%', padding: '8px 0' }}>
       {messages.map((msg, i) => (
-        <MessageBubble key={i} message={msg} index={i} />
+        <MessageBubble key={i} message={msg} index={i} t={t} />
       ))}
     </Space>
   );
 }
 
-function MessageBubble({ message, index }: { message: Message; index: number }) {
+function MessageBubble({ message, index, t }: { message: Message; index: number; t: (key: string, opts?: Record<string, unknown>) => string }) {
   const [expanded, setExpanded] = useState(false);
-  const config = ROLE_CONFIG[message.role] ?? ROLE_CONFIG.assistant;
+  const config = getRoleConfig(t)[message.role] ?? getRoleConfig(t).assistant;
   const shouldCollapse = config.defaultCollapse || message.content.length > 500;
   const displayContent = expanded || !shouldCollapse
     ? message.content
@@ -153,7 +157,7 @@ function MessageBubble({ message, index }: { message: Message; index: number }) 
               key: 'calls',
               label: (
                 <Typography.Text style={{ fontSize: 12 }}>
-                  调用 {message.tool_calls.length} 个工具
+                  {t('transcript.toolCallsCount', { count: message.tool_calls.length })}
                 </Typography.Text>
               ),
               children: (
@@ -192,7 +196,7 @@ function MessageBubble({ message, index }: { message: Message; index: number }) 
               style={{ fontSize: 11 }}
               onClick={() => setExpanded(!expanded)}
             >
-              {expanded ? '收起' : `展开完整内容 (${message.content.length} 字符)`}
+              {expanded ? t('transcript.collapse') : t('transcript.expand', { length: message.content.length })}
             </Typography.Link>
           )}
         </div>

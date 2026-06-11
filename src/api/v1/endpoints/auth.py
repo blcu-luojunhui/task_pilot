@@ -7,11 +7,13 @@ from datetime import datetime, date
 from typing import Any
 
 from pydantic import BaseModel, Field
-from quart import Blueprint, jsonify, request
+from quart import Blueprint, request
 
 from src.api.v1.utils import ApiDependencies
 from src.core.auth import get_current_account_id, DuplicateError, UnauthorizedError
 from src.core.auth.context import current_account_id
+from src.core.auth.decorators import require_role
+from src.api.v1.utils.json_columns import decode_json_columns
 from src.infra.shared.error_codes import ErrorCode
 
 logger = logging.getLogger(__name__)
@@ -31,11 +33,6 @@ class LoginRequest(BaseModel):
 
 class CreateTokenRequest(BaseModel):
     name: str | None = Field(default=None, max_length=128)
-
-
-class ChangePasswordRequest(BaseModel):
-    old_password: str = Field(..., min_length=1, max_length=128)
-    new_password: str = Field(..., min_length=6, max_length=128)
 
 
 class RefreshRequest(BaseModel):
@@ -246,6 +243,123 @@ def create_auth_bp(deps: ApiDependencies) -> Blueprint:
             return _error(ErrorCode.BAD_REQUEST, "令牌不存在", 404)
 
         return _ok(None, "已吊销")
+
+    # ── Admin 端点 ───────────────────────────────────────────
+
+    class UpdateRoleRequest(BaseModel):
+        role: str = Field(..., pattern=r"^(admin|user)$")
+
+    @bp.route("/auth/admin/users", methods=["GET"])
+    @require_role("admin")
+    async def admin_list_users():
+        try:
+            page = max(int(request.args.get("page", 1)), 1)
+            page_size = min(int(request.args.get("page_size", 20)), 100)
+        except (TypeError, ValueError):
+            page, page_size = 1, 20
+
+        result = await deps.auth.list_users(page, page_size)
+        return _ok(result)
+
+    @bp.route("/auth/admin/users/<int:user_id>/role", methods=["PUT"])
+    @require_role("admin")
+    async def admin_update_user_role(user_id: int):
+        try:
+            body = UpdateRoleRequest.model_validate(await request.get_json())
+        except Exception:
+            return _error(ErrorCode.VALIDATION_ERROR, "请求参数校验失败", 400)
+
+        account_id = get_current_account_id()
+        if user_id == account_id:
+            return _error(ErrorCode.BAD_REQUEST, "不能修改自己的角色", 400)
+
+        try:
+            updated = await deps.auth.update_user_role(user_id, body.role)
+        except ValueError as e:
+            return _error(ErrorCode.BAD_REQUEST, str(e), 400)
+        except Exception as e:
+            logger.exception("更新用户角色失败: %s", e)
+            return _error(ErrorCode.INTERNAL_ERROR, "更新角色失败", 500)
+
+        if not updated:
+            return _error(ErrorCode.BAD_REQUEST, "用户不存在", 404)
+
+        return _ok(None, f"角色已更新为 {body.role}")
+
+    class UpdateQuotaRequest(BaseModel):
+        daily_token_limit: int = Field(..., ge=0)
+
+    @bp.route("/auth/admin/users/<int:user_id>/quota", methods=["PUT"])
+    @require_role("admin")
+    async def admin_update_user_quota(user_id: int):
+        try:
+            body = UpdateQuotaRequest.model_validate(await request.get_json())
+        except Exception:
+            return _error(ErrorCode.VALIDATION_ERROR, "请求参数校验失败", 400)
+
+        try:
+            updated = await deps.auth.update_user_quota(user_id, body.daily_token_limit)
+        except ValueError as e:
+            return _error(ErrorCode.BAD_REQUEST, str(e), 400)
+        except Exception as e:
+            logger.exception("更新用户配额失败: %s", e)
+            return _error(ErrorCode.INTERNAL_ERROR, "更新配额失败", 500)
+
+        if not updated:
+            return _error(ErrorCode.BAD_REQUEST, "用户不存在", 404)
+
+        return _ok(None, "配额已更新")
+
+    # ── Admin: 任务管理 ──────────────────────────────────────
+
+    @bp.route("/auth/admin/tasks", methods=["GET"])
+    @require_role("admin")
+    async def admin_list_tasks():
+        try:
+            page = max(int(request.args.get("page", 1)), 1)
+            page_size = min(int(request.args.get("page_size", 20)), 100)
+        except (TypeError, ValueError):
+            page, page_size = 1, 20
+
+        status_filter = None
+        raw_status = request.args.getlist("status")
+        if raw_status:
+            try:
+                status_filter = [int(s) for s in raw_status]
+            except (TypeError, ValueError):
+                pass
+
+        task_name = request.args.get("task_name")
+        date = request.args.get("date")
+        trace_id_q = request.args.get("trace_id")
+
+        result = await deps.auth.list_all_tasks(
+            page, page_size, status_filter, task_name, date, trace_id_q
+        )
+        items = decode_json_columns(result["items"], ["data"], default={})
+        result["items"] = items
+        return _ok(result)
+
+    @bp.route("/auth/admin/tasks/<trace_id>/cancel", methods=["POST"])
+    @require_role("admin")
+    async def admin_cancel_task(trace_id: str):
+        cancelled = await deps.auth.cancel_any_task(trace_id)
+        if not cancelled:
+            return _error(ErrorCode.BAD_REQUEST, "任务不存在或状态不允许取消", 404)
+        return _ok(None, "已请求取消")
+
+    # ── Admin: 用量排名 ──────────────────────────────────────
+
+    @bp.route("/auth/admin/stats/usage", methods=["GET"])
+    @require_role("admin")
+    async def admin_usage_ranking():
+        try:
+            days = max(min(int(request.args.get("days", 7)), 90), 1)
+        except (TypeError, ValueError):
+            days = 7
+
+        ranking = await deps.auth.get_usage_ranking(days)
+        return _ok({"days": days, "ranking": ranking})
 
     return bp
 

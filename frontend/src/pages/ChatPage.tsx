@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Button, Layout, Popconfirm, Space, Tag, Typography, theme } from 'antd';
 import { CloseCircleOutlined } from '@ant-design/icons';
 import { ConversationList } from '@/components/chat/ConversationList';
@@ -8,6 +9,7 @@ import { useChatStore } from '@/stores/chatStore';
 import { useChatTurnStream } from '@/hooks/useChatTurnStream';
 
 export function ChatPage() {
+  const { t } = useTranslation('chat');
   const { token } = theme.useToken();
 
   const conversations = useChatStore((s) => s.conversations);
@@ -94,7 +96,7 @@ export function ChatPage() {
             <Typography.Text
               strong
               editable={{
-                text: activeConversation?.title || '新会话',
+                text: activeConversation?.title || t('newConversation'),
                 onChange(text) {
                   const id = activeConversationId;
                   if (id && text.trim()) {
@@ -104,31 +106,31 @@ export function ChatPage() {
                 triggerType: ['text'],
               }}
             >
-              {activeConversation?.title || '新会话'}
+              {activeConversation?.title || t('newConversation')}
             </Typography.Text>
             {activeConversation?.conversation_id && (
               <Typography.Text type="secondary" style={{ fontSize: 12 }}>
                 <code>{activeConversation.conversation_id}</code>
               </Typography.Text>
             )}
-            {inFlight && <Tag color="processing">运行中</Tag>}
+            {inFlight && <Tag color="processing">{t('running')}</Tag>}
             {agenticMode ? (
-              <Tag color="orange">Agentic 模式</Tag>
+              <Tag color="orange">{t('agenticMode')}</Tag>
             ) : (
-              inFlight && <Tag color="blue">Chat 模式</Tag>
+              inFlight && <Tag color="blue">{t('chatMode')}</Tag>
             )}
           </Space>
 
           {inFlight && activeTraceId && (
             <Popconfirm
-              title="取消当前轮"
-              description="agent 会在下一个 step 间隙停止"
+              title={t('cancelTurn')}
+              description={t('cancelTurnDesc')}
               onConfirm={() => void cancelCurrentTurn()}
-              okText="取消"
-              cancelText="再等等"
+              okText={t('cancelOk')}
+              cancelText={t('cancelWait')}
             >
               <Button danger size="small" icon={<CloseCircleOutlined />}>
-                取消
+                {t('cancelOk')}
               </Button>
             </Popconfirm>
           )}

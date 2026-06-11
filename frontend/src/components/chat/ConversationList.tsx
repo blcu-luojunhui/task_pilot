@@ -1,6 +1,7 @@
 import { Button, Empty, Popconfirm, Space, Spin, Tooltip, Typography, theme } from 'antd';
 import { DeleteOutlined, MessageOutlined, PlusOutlined } from '@ant-design/icons';
 import dayjs from 'dayjs';
+import { useTranslation } from 'react-i18next';
 import type { ChatConversation } from '@/api/types';
 
 interface Props {
@@ -21,6 +22,7 @@ export function ConversationList({
   onDelete,
 }: Props) {
   const { token } = theme.useToken();
+  const { t } = useTranslation('chat');
 
   return (
     <div
@@ -35,7 +37,7 @@ export function ConversationList({
     >
       <div style={{ padding: 12, borderBottom: `1px solid ${token.colorBorderSecondary}` }}>
         <Button block type="primary" icon={<PlusOutlined />} onClick={onCreate}>
-          新建会话
+          {t('newConversation')}
         </Button>
       </div>
 
@@ -48,7 +50,7 @@ export function ConversationList({
           <div style={{ padding: 24 }}>
             <Empty
               image={Empty.PRESENTED_IMAGE_SIMPLE}
-              description={<Typography.Text type="secondary">还没有会话</Typography.Text>}
+              description={<Typography.Text type="secondary">{t('noConversations')}</Typography.Text>}
             />
           </div>
         ) : (
@@ -78,17 +80,17 @@ export function ConversationList({
                       ellipsis
                       style={{ fontSize: 13, maxWidth: 160 }}
                     >
-                      {c.title || '未命名会话'}
+                      {c.title || t('unnamedConversation')}
                     </Typography.Text>
                   </Space>
                   <Popconfirm
-                    title="删除会话"
-                    description="删除后将不可见"
+                    title={t('deleteConversation')}
+                    description={t('deleteDesc')}
                     onConfirm={() => onDelete(c.conversation_id)}
-                    okText="删除"
-                    cancelText="取消"
+                    okText={t('deleteOk')}
+                    cancelText={t('deleteCancel')}
                   >
-                    <Tooltip title="删除">
+                    <Tooltip title={t('deleteOk')}>
                       <Button
                         type="text"
                         size="small"

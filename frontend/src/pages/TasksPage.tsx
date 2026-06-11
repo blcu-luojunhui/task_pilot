@@ -1,24 +1,24 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { Button, Card, DatePicker, Form, Input, message, Select, Space } from 'antd';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
+import { Button, Card, DatePicker, Form, Input, message, Segmented, Select, Space } from 'antd';
 import { PlusOutlined, ReloadOutlined, FilterOutlined } from '@ant-design/icons';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import dayjs from 'dayjs';
 import { TaskListTable } from '@/components/task/TaskListTable';
 import { TaskSubmitForm } from '@/components/task/TaskSubmitForm';
 import { useTaskStore } from '@/stores/taskStore';
-import { cancelTask } from '@/api/tasks';
-import { TaskStatus, TASK_STATUS_LABEL } from '@/api/types';
+import { useAuthStore } from '@/stores/authStore';
+import { cancelTask, cancelAdminTask } from '@/api/tasks';
+import { TaskStatus, TASK_STATUS_LABEL_KEYS } from '@/api/types';
 
-const STATUS_OPTIONS = (
-  [
-    TaskStatus.INIT,
-    TaskStatus.PROCESSING,
-    TaskStatus.SUCCESS,
-    TaskStatus.CANCEL_REQUESTED,
-    TaskStatus.CANCELLED,
-    TaskStatus.FAILED,
-  ] as TaskStatus[]
-).map((s) => ({ value: s, label: TASK_STATUS_LABEL[s] }));
+const STATUS_VALUES: TaskStatus[] = [
+  TaskStatus.INIT,
+  TaskStatus.PROCESSING,
+  TaskStatus.SUCCESS,
+  TaskStatus.CANCEL_REQUESTED,
+  TaskStatus.CANCELLED,
+  TaskStatus.FAILED,
+];
 
 interface FilterValues {
   status?: TaskStatus[];
@@ -27,11 +27,19 @@ interface FilterValues {
 }
 
 export function TasksPage() {
+  const { t } = useTranslation('tasks');
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const { items, total, loading, params, fetch } = useTaskStore();
+  const { items, total, loading, params, adminMode, fetch, setAdminMode } = useTaskStore();
+  const account = useAuthStore((s) => s.account);
+  const isAdmin = account?.role === 'admin';
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [filterForm] = Form.useForm<FilterValues>();
+
+  const statusOptions = useMemo(
+    () => STATUS_VALUES.map((s) => ({ value: s, label: t(TASK_STATUS_LABEL_KEYS[s]) })),
+    [t],
+  );
 
   /** 首次加载 + URL 带的 task_name 预填 */
   useEffect(() => {
@@ -75,59 +83,76 @@ export function TasksPage() {
   const handleCancel = useCallback(
     async (traceId: string) => {
       try {
-        const res = await cancelTask({ trace_id: traceId });
+        const res = adminMode
+          ? await cancelAdminTask(traceId)
+          : await cancelTask({ trace_id: traceId });
         if (res.code === 0) {
-          message.success('已请求取消');
+          message.success(t('cancelRequested'));
         } else {
-          message.warning(res.message || '任务不存在或已结束');
+          message.warning(res.message || t('taskNotFoundOrEnded'));
         }
         await fetch();
       } catch {
         // 拦截器已提示
       }
     },
-    [fetch]
+    [fetch, adminMode, t]
   );
 
   return (
     <Space direction="vertical" size={16} style={{ width: '100%' }}>
       <Card variant="borderless">
-        <Form<FilterValues> form={filterForm} layout="inline" onFinish={applyFilter}>
-          <Form.Item name="status" label="状态">
+        <Space direction="vertical" size={12} style={{ width: '100%' }}>
+          {isAdmin && (
+            <Segmented
+              value={adminMode ? 'all' : 'mine'}
+              onChange={(val) => {
+                setAdminMode(val === 'all');
+                filterForm.resetFields();
+              }}
+              options={[
+                { label: t('myTasks'), value: 'mine' },
+                { label: t('allUsers'), value: 'all' },
+              ]}
+            />
+          )}
+          <Form<FilterValues> form={filterForm} layout="inline" onFinish={applyFilter}>
+          <Form.Item name="status" label={t('statusLabel')}>
             <Select
               mode="multiple"
-              placeholder="全部"
+              placeholder={t('statusAll')}
               style={{ minWidth: 220 }}
-              options={STATUS_OPTIONS}
+              options={statusOptions}
               allowClear
               maxTagCount="responsive"
             />
           </Form.Item>
-          <Form.Item name="task_name" label="任务名">
-            <Input placeholder="模糊匹配" allowClear style={{ width: 200 }} />
+          <Form.Item name="task_name" label={t('taskNameLabel')}>
+            <Input placeholder={t('taskNamePlaceholder')} allowClear style={{ width: 200 }} />
           </Form.Item>
-          <Form.Item name="date" label="业务日期">
+          <Form.Item name="date" label={t('bizDateLabel')}>
             <DatePicker format="YYYY-MM-DD" />
           </Form.Item>
           <Form.Item>
             <Space>
               <Button type="primary" icon={<FilterOutlined />} htmlType="submit">
-                筛选
+                {t('filter')}
               </Button>
-              <Button onClick={resetFilter}>重置</Button>
+              <Button onClick={resetFilter}>{t('reset')}</Button>
               <Button icon={<ReloadOutlined />} onClick={() => fetch()}>
-                刷新
+                {t('refresh')}
               </Button>
               <Button
                 type="primary"
                 icon={<PlusOutlined />}
                 onClick={() => setDrawerOpen(true)}
               >
-                提交任务
+                {t('submitTask')}
               </Button>
             </Space>
           </Form.Item>
         </Form>
+        </Space>
       </Card>
 
       <Card variant="borderless" styles={{ body: { padding: 0 } }}>

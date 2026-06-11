@@ -1,0 +1,30 @@
+{
+  "app": {
+    "subtitle": "从定时任务到 Agentic 执行 — Web Console v1",
+    "searchPlaceholder": "搜索 trace_id 或任务名",
+    "darkModeTooltipOn": "切换亮色模式",
+    "darkModeTooltipOff": "切换暗色模式",
+    "userMenu": {
+      "account": "账号管理",
+      "logout": "退出登录"
+    },
+    "nav": {
+      "chat": "Chat",
+      "runTask": "Run Task",
+      "dashboard": "Dashboard",
+      "tasks": "Tasks",
+      "traces": "Traces",
+      "skills": "Skills",
+      "system": "System",
+      "runs": "Runs",
+      "account": "Account"
+    }
+  },
+  "error": {
+    "crashTitle": "界面崩溃",
+    "retry": "重试"
+  },
+  "empty": {
+    "noData": "暂无数据"
+  }
+}

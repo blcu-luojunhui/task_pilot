@@ -5,6 +5,7 @@ import {
   ExclamationCircleOutlined,
   LoadingOutlined,
 } from '@ant-design/icons';
+import { useTranslation } from 'react-i18next';
 import type { ToolCall } from '@/api/types';
 
 interface Props {
@@ -25,6 +26,7 @@ function formatArgs(argsStr: string): string {
 
 export function PendingPlanCard({ toolCalls, loading, onConfirm, onReject }: Props) {
   const { token } = theme.useToken();
+  const { t } = useTranslation('chat');
 
   return (
     <div
@@ -44,7 +46,7 @@ export function PendingPlanCard({ toolCalls, loading, onConfirm, onReject }: Pro
           title={
             <Space>
               <ExclamationCircleOutlined style={{ color: token.colorWarning }} />
-              <Typography.Text strong>我打算执行以下操作</Typography.Text>
+              <Typography.Text strong>{t('pendingPlanTitle')}</Typography.Text>
             </Space>
           }
         >
@@ -65,7 +67,7 @@ export function PendingPlanCard({ toolCalls, loading, onConfirm, onReject }: Pro
                   items={[
                     {
                       key: 'args',
-                      label: '参数',
+                      label: t('paramsLabel'),
                       children: (
                         <pre
                           style={{
@@ -92,7 +94,7 @@ export function PendingPlanCard({ toolCalls, loading, onConfirm, onReject }: Pro
               loading={loading}
               onClick={onConfirm}
             >
-              确认执行
+              {t('confirmExecute')}
             </Button>
             <Button
               danger
@@ -100,7 +102,7 @@ export function PendingPlanCard({ toolCalls, loading, onConfirm, onReject }: Pro
               disabled={loading}
               onClick={onReject}
             >
-              取消
+              {t('cancel')}
             </Button>
           </div>
         </Card>

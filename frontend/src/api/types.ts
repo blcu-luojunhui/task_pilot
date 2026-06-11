@@ -16,13 +16,13 @@ export enum TaskStatus {
   FAILED = 99,
 }
 
-export const TASK_STATUS_LABEL: Record<TaskStatus, string> = {
-  [TaskStatus.INIT]: '待调度',
-  [TaskStatus.PROCESSING]: '执行中',
-  [TaskStatus.SUCCESS]: '成功',
-  [TaskStatus.CANCELLED]: '已取消',
-  [TaskStatus.CANCEL_REQUESTED]: '取消中',
-  [TaskStatus.FAILED]: '失败',
+export const TASK_STATUS_LABEL_KEYS: Record<TaskStatus, string> = {
+  [TaskStatus.INIT]: 'tasks.status.init',
+  [TaskStatus.PROCESSING]: 'tasks.status.processing',
+  [TaskStatus.SUCCESS]: 'tasks.status.success',
+  [TaskStatus.CANCELLED]: 'tasks.status.cancelled',
+  [TaskStatus.CANCEL_REQUESTED]: 'tasks.status.cancelRequested',
+  [TaskStatus.FAILED]: 'tasks.status.failed',
 };
 
 // ============ 通用响应包装 ============
@@ -135,7 +135,10 @@ export interface TraceEventsData {
 
 // ============ Skills ============
 
-export type RiskLevel = 'READ' | 'WRITE' | 'DESTRUCTIVE';
+export type RiskLevel = 'READ' | 'WRITE' | 'DESTRUCTIVE' | 'read' | 'write' | 'destructive';
+
+export type SkillSource = 'system' | 'personal';
+export type SkillType = 'executable' | 'knowledge';
 
 export interface SkillParameter {
   type: string;
@@ -150,8 +153,14 @@ export interface SkillInfo {
   description: string;
   category: string;
   risk_level: RiskLevel;
+  skill_type?: SkillType;
   parameters: Record<string, SkillParameter>;
   call_count_24h?: number;
+  source: SkillSource;
+  editable: boolean;
+  markdown: string;
+  tags?: string[];
+  scope?: string;
 }
 
 export interface SkillCallRecord {

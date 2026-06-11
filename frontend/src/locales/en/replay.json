@@ -1,0 +1,14 @@
+{
+  "title": "Replay / Time Travel",
+  "close": "Close",
+  "rerun": "Re-execute",
+  "info": "Time Travel replays the last prompt of a historical trace to the LLM and compares the old vs. new results",
+  "infoDetail": "Only the last step's full prompt (including conversation history) is replayed. The model defaults to the LLM_ env var configuration.",
+  "callingLLM": "Calling LLM...",
+  "original": "Original",
+  "replay": "Replay",
+  "noFinalAnswer": "No final_answer",
+  "emptyHint": "Click \"Re-execute\" to start Time Travel",
+  "modelPlaceholder": "Model override (optional)",
+  "failed": "Replay failed"
+}

@@ -1,6 +1,8 @@
 import { useState, type ReactNode } from 'react';
 import { Button, Timeline, Tag, Typography, Space, Alert } from 'antd';
 import { PlayCircleOutlined } from '@ant-design/icons';
+import { useTranslation } from 'react-i18next';
+import i18n from '@/locales/i18n';
 import type { TraceEvent } from '@/api/types';
 import { formatIso } from '@/utils/format';
 import { SOURCE_COLOR } from '@/utils/colors';
@@ -8,9 +10,10 @@ import { ToolCallReplayModal } from './ToolCallReplayModal';
 
 export function TimelineView({ events }: { events: TraceEvent[] }) {
   const [replayEvent, setReplayEvent] = useState<TraceEvent | null>(null);
+  const { t } = useTranslation('trace');
 
   if (events.length === 0) {
-    return <Alert type="warning" showIcon message="暂无事件数据" />;
+    return <Alert type="warning" showIcon message={t('timeline.noEvents')} />;
   }
 
   const hasFailedActEnd = events.some((evt) => {
@@ -79,7 +82,7 @@ function summarizeEvent(event: TraceEvent, onReplay?: (e: TraceEvent) => void): 
         )}
         {msg?.tool_calls && msg.tool_calls.length > 0 && (
           <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-            将发起 {msg.tool_calls.length} 个工具调用
+            {i18n.t('trace:timeline.toolCallsCount', { count: msg.tool_calls.length })}
           </Typography.Text>
         )}
       </Space>
@@ -118,7 +121,7 @@ function summarizeEvent(event: TraceEvent, onReplay?: (e: TraceEvent) => void): 
             onClick={() => onReplay(event)}
             style={{ padding: 0, fontSize: 11 }}
           >
-            重放此 Tool Call
+            {i18n.t('trace:timeline.replayToolCall')}
           </Button>
         )}
       </Space>

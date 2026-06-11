@@ -3,7 +3,6 @@ import { Button, Layout, Menu, Input, Space, Typography, theme, Dropdown } from 
 import {
   DashboardOutlined,
   UnorderedListOutlined,
-  PartitionOutlined,
   ToolOutlined,
   MonitorOutlined,
   HistoryOutlined,
@@ -16,8 +15,10 @@ import {
   SettingOutlined,
 } from '@ant-design/icons';
 import { Outlet, useLocation, useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { useDarkMode } from '@/hooks/useDarkMode';
 import { useAuthStore } from '@/stores/authStore';
+import { useLocaleStore } from '@/stores/localeStore';
 
 const { Header, Sider, Content } = Layout;
 
@@ -26,7 +27,6 @@ const NAV_ITEMS = [
   { key: '/run-task', icon: <PlayCircleOutlined />, label: 'Run Task' },
   { key: '/', icon: <DashboardOutlined />, label: 'Dashboard' },
   { key: '/tasks', icon: <UnorderedListOutlined />, label: 'Tasks' },
-  { key: '/traces', icon: <PartitionOutlined />, label: 'Traces' },
   { key: '/skills', icon: <ToolOutlined />, label: 'Skills' },
   { key: '/system', icon: <MonitorOutlined />, label: 'System' },
   { key: '/runs', icon: <HistoryOutlined />, label: 'Runs' },
@@ -41,12 +41,14 @@ export function AppLayout() {
   const account = useAuthStore((s) => s.account);
   const logout = useAuthStore((s) => s.logout);
   const fetchMe = useAuthStore((s) => s.fetchMe);
+  const locale = useLocaleStore((s) => s.locale);
+  const setLocale = useLocaleStore((s) => s.setLocale);
+  const { t } = useTranslation('common');
 
   useEffect(() => {
     if (!account) fetchMe();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  /** 当前激活的菜单 — 用前缀匹配，避免详情页失活 */
   const selectedKey = useMemo(() => {
     const item = NAV_ITEMS.slice()
       .sort((a, b) => b.key.length - a.key.length)
@@ -73,14 +75,14 @@ export function AppLayout() {
     {
       key: 'account',
       icon: <SettingOutlined />,
-      label: '账号管理',
+      label: t('app.userMenu.account'),
       onClick: () => navigate('/account'),
     },
     { type: 'divider' as const },
     {
       key: 'logout',
       icon: <LogoutOutlined />,
-      label: '退出登录',
+      label: t('app.userMenu.logout'),
       onClick: handleLogout,
     },
   ];
@@ -89,26 +91,39 @@ export function AppLayout() {
     <Layout style={{ minHeight: '100vh' }}>
       <Sider
         width={220}
-        style={{ background: token.colorBgContainer, borderRight: `1px solid ${token.colorBorderSecondary}` }}
+        style={{
+          background: token.colorBgContainer,
+          boxShadow: '1px 0 8px rgba(0,0,0,0.04)',
+          borderRight: 'none',
+          zIndex: 10,
+        }}
       >
         <div
+          className="sider-logo"
           style={{
             height: 56,
             display: 'flex',
             alignItems: 'center',
             padding: '0 20px',
-            borderBottom: `1px solid ${token.colorBorderSecondary}`,
           }}
         >
-          <img src="/logo.svg" alt="TaskPilot" width={24} height={24} />
-          <Typography.Title level={5} style={{ margin: '0 0 0 10px' }}>
+          <img src="/logo.svg" alt="TaskPilot" width={28} height={28} />
+          <span
+            className="gradient-text"
+            style={{
+              marginLeft: 10,
+              fontSize: 17,
+              fontWeight: 700,
+              letterSpacing: '-0.3px',
+            }}
+          >
             TaskPilot
-          </Typography.Title>
+          </span>
         </div>
         <Menu
           mode="inline"
           selectedKeys={[selectedKey]}
-          style={{ borderRight: 0, paddingTop: 8 }}
+          style={{ borderRight: 0, paddingTop: 4 }}
           items={NAV_ITEMS}
           onClick={({ key }) => navigate(key)}
         />
@@ -117,26 +132,37 @@ export function AppLayout() {
         <Header
           style={{
             background: token.colorBgContainer,
-            borderBottom: `1px solid ${token.colorBorderSecondary}`,
+            boxShadow: '0 1px 4px rgba(0,0,0,0.04)',
+            borderBottom: 'none',
             paddingInline: 24,
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
             gap: 16,
+            zIndex: 9,
+            position: 'sticky',
+            top: 0,
           }}
         >
-          <Typography.Text type="secondary">
-            从定时任务到 Agentic 执行 — Web Console v1
+          <Typography.Text type="secondary" style={{ fontSize: 13 }}>
+            {t('app.subtitle')}
           </Typography.Text>
-          <Space>
+          <Space size={8}>
+            <Button
+              type="text"
+              onClick={() => setLocale(locale === 'zh' ? 'en' : 'zh')}
+              style={{ fontWeight: 600, fontSize: 12, minWidth: 36 }}
+            >
+              {locale === 'zh' ? 'EN' : '中'}
+            </Button>
             <Button
               type="text"
               icon={dark ? <SunOutlined /> : <MoonOutlined />}
               onClick={() => setDark(!dark)}
-              title={dark ? '切换亮色模式' : '切换暗色模式'}
+              title={dark ? t('app.darkModeTooltipOn') : t('app.darkModeTooltipOff')}
             />
             <Input.Search
-              placeholder="搜索 trace_id 或任务名"
+              placeholder={t('app.searchPlaceholder')}
               allowClear
               onSearch={handleGlobalSearch}
               style={{ width: 280 }}
@@ -148,7 +174,7 @@ export function AppLayout() {
             </Dropdown>
           </Space>
         </Header>
-        <Content style={{ padding: 24, background: token.colorBgLayout }}>
+        <Content style={{ padding: 24, background: token.colorBgLayout, minHeight: 'calc(100vh - 56px)' }}>
           <Outlet />
         </Content>
       </Layout>

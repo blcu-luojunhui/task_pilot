@@ -19,6 +19,8 @@ import {
   ReloadOutlined,
   SwapOutlined,
 } from '@ant-design/icons';
+import { useTranslation } from 'react-i18next';
+import i18n from '@/locales/i18n';
 import { replayTrace } from '@/api/replay';
 import type { ReplayResult } from '@/api/types';
 
@@ -29,6 +31,7 @@ interface Props {
 }
 
 export function CompareView({ traceId, open, onClose }: Props) {
+  const { t } = useTranslation('replay');
   const [result, setResult] = useState<ReplayResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [model, setModel] = useState('');
@@ -45,7 +48,7 @@ export function CompareView({ traceId, open, onClose }: Props) {
       setResult(res);
     } catch (err: unknown) {
       const e = err as { message?: string };
-      message.error(e.message ?? 'Replay 失败');
+      message.error(e.message ?? t('failed'));
     } finally {
       setLoading(false);
     }
@@ -68,7 +71,7 @@ export function CompareView({ traceId, open, onClose }: Props) {
       title={
         <Space>
           <SwapOutlined />
-          <span>Replay / Time Travel</span>
+          <span>{t('title')}</span>
           {result && <Tag color="blue">{result.model}</Tag>}
         </Space>
       }
@@ -77,14 +80,14 @@ export function CompareView({ traceId, open, onClose }: Props) {
       width={900}
       footer={
         <Space>
-          <Button onClick={handleClose}>关闭</Button>
+          <Button onClick={handleClose}>{t('close')}</Button>
           <Button
             type="primary"
             icon={<ReloadOutlined />}
             loading={loading}
             onClick={run}
           >
-            重新执行
+            {t('rerun')}
           </Button>
         </Space>
       }
@@ -93,11 +96,11 @@ export function CompareView({ traceId, open, onClose }: Props) {
         <Alert
           type="info"
           showIcon
-          message="Time Travel 将历史 trace 的最后一个 prompt 重新发给 LLM，对比新旧结果差异"
-          description="当前仅重放最后一个 step 的完整 prompt（含历史对话）。模型默认使用 LLM_ 环境变量配置。"
+          message={t('info')}
+          description={t('infoDetail')}
         />
 
-        {loading && <Spin tip="正在调用 LLM..." />}
+        {loading && <Spin tip={t('callingLLM')} />}
 
         {result && !loading && (
           <>
@@ -118,7 +121,7 @@ export function CompareView({ traceId, open, onClose }: Props) {
                   }}
                 >
                   <Typography.Title level={5} style={{ margin: 0 }}>
-                    <Tag color="default">原版</Tag>
+                    <Tag color="default">{t('original')}</Tag>
                     Original
                   </Typography.Title>
                   <Descriptions column={1} size="small" style={{ marginTop: 8 }}>
@@ -148,7 +151,7 @@ export function CompareView({ traceId, open, onClose }: Props) {
                       {result.original.final_answer}
                     </div>
                   ) : (
-                    <Empty description="无 final_answer" image={Empty.PRESENTED_IMAGE_SIMPLE} />
+                    <Empty description={t('noFinalAnswer')} image={Empty.PRESENTED_IMAGE_SIMPLE} />
                   )}
                 </div>
               </Col>
@@ -163,7 +166,7 @@ export function CompareView({ traceId, open, onClose }: Props) {
                   }}
                 >
                   <Typography.Title level={5} style={{ margin: 0 }}>
-                    <Tag color="green">重放</Tag>
+                    <Tag color="green">{t('replay')}</Tag>
                     Replay
                   </Typography.Title>
                   <Descriptions column={1} size="small" style={{ marginTop: 8 }}>
@@ -193,7 +196,7 @@ export function CompareView({ traceId, open, onClose }: Props) {
                       {result.replay.final_answer}
                     </div>
                   ) : (
-                    <Empty description="无 final_answer" image={Empty.PRESENTED_IMAGE_SIMPLE} />
+                    <Empty description={t('noFinalAnswer')} image={Empty.PRESENTED_IMAGE_SIMPLE} />
                   )}
                 </div>
               </Col>
@@ -202,7 +205,7 @@ export function CompareView({ traceId, open, onClose }: Props) {
         )}
 
         {!result && !loading && (
-          <Empty description="点击「重新执行」开始 Time Travel" />
+          <Empty description={t('emptyHint')} />
         )}
       </Space>
     </Modal>
@@ -213,7 +216,7 @@ function ModelInput({ model, onChange }: { model: string; onChange: (v: string) 
   return (
     <Input
       size="small"
-      placeholder="模型覆盖（可选）"
+      placeholder={i18n.t('replay:modelPlaceholder')}
       value={model}
       onChange={(e) => onChange(e.target.value)}
       style={{ width: 160 }}

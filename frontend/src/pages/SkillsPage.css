@@ -1,0 +1,124 @@
+.skill-explorer {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.skill-explorer button {
+  appearance: none;
+  background: transparent;
+  border: 0;
+  color: inherit;
+  cursor: pointer;
+  font: inherit;
+  margin: 0;
+  min-width: 0;
+  padding: 0;
+  text-align: left;
+}
+
+.skill-explorer-categoryButton,
+.skill-explorer-fileButton {
+  align-items: center;
+  display: flex;
+  gap: 8px;
+  min-width: 0;
+  width: 100%;
+}
+
+.skill-explorer-categoryButton:hover,
+.skill-explorer-fileButton:hover {
+  background: rgba(22, 119, 255, 0.07);
+}
+
+.skill-explorer-categoryButton.is-selected,
+.skill-explorer-fileButton.is-selected {
+  background: #e6f4ff;
+  color: #1677ff;
+}
+
+.skill-explorer-categories {
+  padding: 1px 0 3px;
+}
+
+.skill-explorer-category + .skill-explorer-category {
+  margin-top: 4px;
+}
+
+.skill-explorer-categoryButton {
+  border-radius: 8px;
+  min-height: 30px;
+  padding: 5px 8px 5px 24px;
+}
+
+.skill-explorer-files {
+  border-left: 0;
+  margin: 1px 0 3px;
+  padding-left: 42px;
+}
+
+.skill-explorer-fileButton {
+  border-radius: 8px;
+  min-height: 28px;
+  padding: 4px 8px;
+}
+
+.skill-explorer-caret {
+  align-items: center;
+  color: rgba(128, 128, 128, 0.65);
+  display: inline-flex;
+  flex: 0 0 10px;
+  font-size: 9px;
+  justify-content: center;
+}
+
+.skill-explorer-folderIcon {
+  color: rgba(128, 128, 128, 0.65);
+  flex: 0 0 auto;
+}
+
+.skill-explorer-fileIcon {
+  color: #1677ff;
+  flex: 0 0 auto;
+  font-size: 12px;
+  opacity: 0.8;
+}
+
+.skill-explorer-categoryTitle,
+.skill-explorer-fileName {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.skill-explorer-categoryTitle,
+.skill-explorer-fileName {
+  font-size: 13px;
+}
+
+.skill-explorer-fileExt {
+  color: rgba(128, 128, 128, 0.5);
+  margin-left: 1px;
+}
+
+.skill-explorer-count {
+  align-items: center;
+  background: rgba(128, 128, 128, 0.1);
+  border-radius: 999px;
+  color: rgba(128, 128, 128, 0.65);
+  display: inline-flex;
+  flex: 0 0 auto;
+  font-size: 11px;
+  height: 20px;
+  justify-content: center;
+  min-width: 22px;
+  padding: 0 6px;
+}
+
+.skill-explorer-empty {
+  color: rgba(128, 128, 128, 0.5);
+  font-size: 12px;
+  padding: 10px 12px;
+}
