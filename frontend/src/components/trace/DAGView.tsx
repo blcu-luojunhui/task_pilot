@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useCallback } from 'react';
+import { useCallback, useEffect, useMemo, useRef } from 'react';
 import {
   ReactFlow,
   Node,
@@ -10,189 +10,200 @@ import {
   useEdgesState,
   Handle,
   Position,
+  type NodeChange,
+  type NodeProps,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
-import { Empty, Tag, Typography } from 'antd';
+import { Empty, Tag, Typography, theme } from 'antd';
 import { useTranslation } from 'react-i18next';
-import i18n from '@/locales/i18n';
 import type { TraceEvent } from '@/api/types';
+import { useSemanticColors } from '@/hooks/useSemanticColors';
+import { parseTraceGraph, type TraceGraphNode } from '@/utils/traceGraph';
+import { buildFlowEdges, computeDagrePositions, DAG_NODE_SIZE } from '@/utils/dagLayout';
 
-interface StepMeta {
-  step: number;
-  thinkContent: string | null;
-  toolCalls: string[];
-  isError: boolean;
-  parentTraceId?: string;
-  msgToParent?: string;
-  msgFromParent?: string;
+function TraceStepNode({ data }: NodeProps) {
+  const node = data.graphNode as TraceGraphNode;
+  if (!node) return null;
+  return <StepNodeLabel node={node} />;
 }
 
-function extractSteps(events: TraceEvent[]): StepMeta[] {
-  const byStep = new Map<number, TraceEvent[]>();
-  for (const evt of events) {
-    if (evt.step == null) continue;
-    const group = byStep.get(evt.step) || [];
-    group.push(evt);
-    byStep.set(evt.step, group);
-  }
+function StepNodeLabel({ node }: { node: TraceGraphNode }) {
+  const { t } = useTranslation('trace');
 
-  const steps: StepMeta[] = [];
-  for (const [step, evts] of [...byStep.entries()].sort((a, b) => a[0] - b[0])) {
-    let thinkContent: string | null = null;
-    const toolCalls: string[] = [];
-    let isError = false;
-    let parentTraceId: string | undefined;
-    let msgToParent: string | undefined;
-    let msgFromParent: string | undefined;
+  const statusColor =
+    node.status === 'failed' || node.isError
+      ? 'error'
+      : node.status === 'running'
+        ? 'processing'
+        : node.status === 'done'
+          ? 'success'
+          : 'default';
 
-    for (const evt of evts) {
-      const data = evt.data as Record<string, unknown>;
-
-      if (evt.type === 'think_end') {
-        const msg = data.assistant_message as {
-          content?: string;
-          tool_calls?: Array<{ function?: { name: string }; name?: string }>;
-        } | undefined;
-        thinkContent = (msg?.content || '').trim().slice(0, 80) || null;
-        if (msg?.tool_calls) {
-          for (const tc of msg.tool_calls) {
-            const func = tc.function || tc;
-            toolCalls.push(func.name || tc.name || '?');
-          }
-        }
-      }
-
-      if (evt.type === 'act_end') {
-        const results = data.tool_results as Array<{ content?: string }> | undefined;
-        if (results?.some((r) => (r.content ?? '').startsWith('Error:'))) {
-          isError = true;
-        }
-      }
-
-      if (evt.type === 'run_start') {
-        const meta = data.metadata as Record<string, unknown> | undefined;
-        if (meta?.parent_trace_id) {
-          parentTraceId = String(meta.parent_trace_id);
-        }
-      }
-      if (evt.type === 'step_end') {
-        const payload = data as Record<string, unknown>;
-        if (payload.msg_to_parent) msgToParent = String(payload.msg_to_parent);
-        if (payload.msg_from_parent) msgFromParent = String(payload.msg_from_parent);
-      }
-    }
-
-    steps.push({ step, thinkContent, toolCalls, isError, parentTraceId, msgToParent, msgFromParent });
-  }
-
-  return steps;
-}
-
-function buildGraph(steps: StepMeta[]): { nodes: Node[]; edges: Edge[] } {
-  const nodes: Node[] = steps.map((s, i) => ({
-    id: `step-${s.step}`,
-    position: { x: i * 220, y: s.isError ? 80 : 0 },
-    type: 'default',
-    data: {
-      label: (
-        <div style={{ padding: '4px 8px', minWidth: 160 }}>
-          <Handle type="target" position={Position.Top} />
-          <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginBottom: 4 }}>
-            <Tag color="blue" style={{ margin: 0 }}>Step {s.step}</Tag>
-            {s.isError && <Tag color="red" style={{ margin: 0 }}>{i18n.t('trace:dag.error')}</Tag>}
-          </div>
-          {s.thinkContent && (
-            <Typography.Text
-              style={{ fontSize: 11, display: 'block', marginBottom: 2 }}
-              ellipsis
-            >
-              {s.thinkContent}
-            </Typography.Text>
-          )}
-          {s.toolCalls.length > 0 && (
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 2 }}>
-              {s.toolCalls.map((name, j) => (
-                <Tag key={j} color="geekblue" style={{ fontSize: 10, margin: 0 }}>
-                  {name}
-                </Tag>
-              ))}
-            </div>
-          )}
-          {s.msgToParent && (
-            <Typography.Text type="secondary" style={{ fontSize: 10 }}>
-              → parent: {s.msgToParent}
-            </Typography.Text>
-          )}
-          {s.msgFromParent && (
-            <Typography.Text type="secondary" style={{ fontSize: 10 }}>
-              ← parent: {s.msgFromParent}
-            </Typography.Text>
-          )}
-          <Handle type="source" position={Position.Bottom} />
+  return (
+    <div style={{ padding: '4px 8px', minWidth: 160 }}>
+      <Handle type="target" position={Position.Top} />
+      <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginBottom: 4, flexWrap: 'wrap' }}>
+        <Tag color="blue" style={{ margin: 0 }}>
+          Step {node.step}
+        </Tag>
+        <Tag color={statusColor} style={{ margin: 0 }}>
+          {node.status}
+        </Tag>
+        {(node.status === 'failed' || node.isError) && (
+          <Tag color="red" style={{ margin: 0 }}>
+            {t('dag.error')}
+          </Tag>
+        )}
+      </div>
+      {node.thinkContent && (
+        <Typography.Text style={{ fontSize: 11, display: 'block', marginBottom: 2 }} ellipsis>
+          {node.thinkContent}
+        </Typography.Text>
+      )}
+      {node.toolCalls.length > 0 && (
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 2 }}>
+          {node.toolCalls.map((name, j) => (
+            <Tag key={j} color="geekblue" style={{ fontSize: 10, margin: 0 }}>
+              {name}
+            </Tag>
+          ))}
         </div>
-      ),
-    },
-    style: {
-      background: s.isError ? '#fff2f0' : '#fafafa',
-      border: `2px solid ${s.isError ? '#ff4d4f' : '#d9d9d9'}`,
-      borderRadius: 8,
-      padding: 0,
-    },
-  }));
+      )}
+      {node.subagentTraceId && (
+        <Typography.Text type="secondary" style={{ fontSize: 10, display: 'block' }}>
+          sub: {node.subagentTraceId.slice(0, 16)}…
+        </Typography.Text>
+      )}
+      {node.msgToParent && (
+        <Typography.Text type="secondary" style={{ fontSize: 10 }}>
+          → parent: {node.msgToParent}
+        </Typography.Text>
+      )}
+      <Handle type="source" position={Position.Bottom} />
+    </div>
+  );
+}
 
-  const edges: Edge[] = [];
-  for (let i = 1; i < nodes.length; i++) {
-    edges.push({
-      id: `e-step-${steps[i - 1].step}-${steps[i].step}`,
-      source: `step-${steps[i - 1].step}`,
-      target: `step-${steps[i].step}`,
-      animated: true,
-      style: { stroke: steps[i].isError ? '#ff4d4f' : '#1677ff' },
-    });
-  }
+const nodeTypes = {
+  traceStep: TraceStepNode,
+};
 
+function graphToFlow(
+  graph: ReturnType<typeof parseTraceGraph>,
+  positions: Record<string, { x: number; y: number }>,
+  palette: ReturnType<typeof useSemanticColors>,
+): { nodes: Node[]; edges: Edge[] } {
+  const nodes: Node[] = graph.nodes.map((n) => {
+    const pos = positions[n.id] ?? { x: 0, y: 0 };
+    const borderColor =
+      n.status === 'failed' || n.isError
+        ? palette.stepErrorBorder
+        : n.status === 'running'
+          ? palette.running
+          : palette.stepBorder;
+    const bg = n.status === 'failed' || n.isError ? palette.stepErrorBg : palette.stepBg;
+
+    return {
+      id: n.id,
+      type: 'traceStep',
+      position: pos,
+      data: { graphNode: n },
+      style: {
+        background: bg,
+        border: `2px solid ${borderColor}`,
+        borderRadius: 8,
+        padding: 0,
+        width: DAG_NODE_SIZE.width,
+      },
+    };
+  });
+
+  const edges = buildFlowEdges(graph.edges, palette) as Edge[];
   return { nodes, edges };
 }
 
-export function DAGView({ events }: { events: TraceEvent[] }) {
+export function DAGView({
+  events,
+  selectedStep,
+  onSelectStep,
+}: {
+  events: TraceEvent[];
+  selectedStep?: number | null;
+  onSelectStep?: (step: number | null) => void;
+}) {
   const { t } = useTranslation('trace');
-  const steps = useMemo(() => extractSteps(events), [events]);
-  const { nodes: initialNodes, edges: initialEdges } = useMemo(() => buildGraph(steps), [steps]);
-  const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
-  const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
+  const { token } = theme.useToken();
+  const palette = useSemanticColors();
+  const savedPositions = useRef<Record<string, { x: number; y: number }>>({});
 
-  // Re-sync when events change
+  const graph = useMemo(() => parseTraceGraph(events), [events]);
+
+  const [nodes, setNodes, onNodesChange] = useNodesState<Node>([]);
+  const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
+
   useEffect(() => {
-    setNodes(initialNodes);
-    setEdges(initialEdges);
-  }, [initialNodes, initialEdges, setNodes, setEdges]);
+    const positions = computeDagrePositions(graph, savedPositions.current);
+    const { nodes: nextNodes, edges: nextEdges } = graphToFlow(graph, positions, palette);
 
-  const onInit = useCallback(() => {
-    // ReactFlow 初始化后可加 fitView
-  }, []);
+    setNodes((prev) => {
+      const prevPos = new Map(prev.map((n) => [n.id, n.position]));
+      return nextNodes.map((n) => ({
+        ...n,
+        position: prevPos.get(n.id) ?? n.position,
+      }));
+    });
+    setEdges(nextEdges);
+  }, [graph, palette, setNodes, setEdges]);
 
-  if (steps.length === 0) {
+  const handleNodesChange = useCallback(
+    (changes: NodeChange[]) => {
+      onNodesChange(changes);
+      for (const ch of changes) {
+        if (ch.type === 'position' && ch.position && !ch.dragging) {
+          savedPositions.current[ch.id] = ch.position;
+        }
+      }
+    },
+    [onNodesChange],
+  );
+
+  const handleNodeClick = useCallback(
+    (_: React.MouseEvent, node: Node) => {
+      const gn = (node.data as { graphNode?: TraceGraphNode }).graphNode;
+      onSelectStep?.(gn?.step ?? null);
+    },
+    [onSelectStep],
+  );
+
+  if (graph.nodes.length === 0) {
     return <Empty description={t('dag.noData')} />;
   }
 
   return (
-    <div style={{ height: 400, width: '100%' }}>
+    <div style={{ height: 420, width: '100%' }}>
       <ReactFlow
-        nodes={nodes}
+        nodes={nodes.map((n) => ({
+          ...n,
+          selected:
+            (n.data as { graphNode?: TraceGraphNode }).graphNode?.step === selectedStep,
+        }))}
         edges={edges}
-        onNodesChange={onNodesChange}
+        nodeTypes={nodeTypes}
+        onNodesChange={handleNodesChange}
         onEdgesChange={onEdgesChange}
-        onInit={onInit}
+        onNodeClick={handleNodeClick}
         fitView
         attributionPosition="bottom-right"
       >
-        <Background />
+        <Background color={token.colorBorderSecondary} />
         <Controls />
         <MiniMap
-          nodeStrokeColor="#d9d9d9"
+          nodeStrokeColor={token.colorBorder}
           nodeColor={(n) => {
-            const bg = (n.style as Record<string, string>)?.background || '#fafafa';
-            return bg === '#fff2f0' ? '#ff4d4f' : '#1677ff';
+            const gn = (n.data as { graphNode?: TraceGraphNode }).graphNode;
+            if (gn?.isError || gn?.status === 'failed') return palette.failed;
+            if (gn?.status === 'running') return palette.running;
+            return palette.done;
           }}
         />
       </ReactFlow>

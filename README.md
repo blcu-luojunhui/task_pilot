@@ -1,164 +1,72 @@
 # TaskPilot
 
-> From scheduled tasks to agentic execution.
-
-调度器从不问"下一步该做什么"。它只负责在正确的时间触发正确的函数，然后等待结果。
-
-但当任务需要理解上下文、在失败中调整策略、跨越多轮判断才能收敛时，"定时触发"这四个字就不够用了。
-
-TaskPilot 的设计起点，就是承认这两件事必须同时成立——
-
-**工程底座不可退让。** 并发控制、状态机、超时/取消、可观测、优雅关闭——这些是确定性不该打折的地方。
-
-**Agent 智能必须长进去。** Agent Loop（Think → Act → Observe）、Skills 框架、多智能体协作——嵌入执行链路内部，任务得以在上下文中持续判断，而不是被盲目地"运行"。
-
-一条链路，两层逻辑：确定性兜底，Agent 驱动上限。
-
-**TaskPilot 的目标，是在可控的后端工程边界内，让任务系统拥有 Agentic Workflow 的能力。**
+> 确定性兜底，Agent 驱动上限。
+> 在工程底座上运行 Agentic Workflow 的任务执行框架。
 
 ---
 
 ## Architecture
 
-```
-api (Quart, 轻薄接入层)
-  └─ jobs (任务引擎, 确定性边界)
-       └─ core (Agent 引擎, 能力中心)
-            └─ infra (MySQL / 日志 / 告警 / 事件总线)
-```
+![TaskPilot Architecture](assets/architecture.svg)
 
-四层单向依赖，反向依赖视为设计缺陷。每一层的职责和边界见 [Project Guide](docs/project.md)。
+四层单向依赖（api → jobs → core/agents → infra）。外层是经过验证的分布式基础设施——状态机、并发控制、超时/取消、优雅关闭。内层是可插拔的 Agent 智能引擎——多策略决策、记忆检索、反思修正、多代理协作。
 
-Agent 引擎内部结构：
-
-```
-AgentLoopRunner                    # 驱动 Think → Act → Observe 循环
-  ├─ Planner                       # 将 Skills 序列化为 LLM tool calling 格式
-  ├─ SkillExecutor                 # 执行工具，结果写回 transcript
-  ├─ WorkflowController            # Budget / ConstraintSet / 取消 判断
-  ├─ FeedbackLoop                  # 结果评估与反馈
-  ├─ ContinuousImprovement         # 从反馈中学习改进
-  └─ MultiAgentCoordinator         # 多智能体协作编排
-```
-
-![TaskPilot Strategy](assets/strategy.png)
-
----
-
-## What It Gives You
-
-**任务引擎**
-- MySQL 状态机：`INIT → PROCESSING → SUCCESS / FAILED / CANCELLED`
-- 并发控制、超时处理、跨进程协作式取消
-- 优雅关闭：停止接新 → 等待收敛 → 刷新缓冲 → 释放连接池
-
-**Agentic 执行**
-- Think → Act → Observe 循环，LLM 在每步根据 transcript 动态决策
-- Budget 控制（max_steps / max_tool_calls / max_duration_seconds）框住不确定性
-- trace_id 贯穿全链路（格式 `Agent-YYYYmmddHHMMSS-xxxxxxxxxxxxxxxx`）
-
-**Skills 体系**
-- `@skill` 装饰器注册可执行工具，自动发现
-- Markdown 知识文档注入 Agent 上下文
-- Tool 区域按需启用：database / http / task / utils
-
-**Multi-Agent 协作**
-- Coordinator 编排多智能体通信与结果聚合
-- MessageBus 解耦智能体间消息传递
-
-**LLM 多提供商**
-- OpenAI 兼容接口，已适配 DeepSeek / OpenAI / Claude
-- Provider 抽象层，切换模型不影响上层逻辑
-
-**可观测**
-- 异步缓冲日志、prometheus 指标、TraceEventBus 事件流
-- 告警服务、请求限流、全链路 trace
+两层之间通过 Budget / ConstraintSet / Cancel Signal 收敛。Agent 的自主性始终运行在治理边界之内。
 
 ---
 
 ## Quick Start
 
 ```bash
-# 安装依赖
 pip install -r requirements.txt
-
-# 配置环境变量（复制模板修改）
 cp .env.example .env
-
-# 初始化数据库
 python scripts/init_db.py
 
-# 启动服务（默认 0.0.0.0:6060）
-hypercorn app:app -c app_config.toml
+hypercorn app:app -c app_config.toml        # → :6060
+cd frontend && npm install && npm run dev   # → :5173
 ```
-
-完整运行说明见 [Quickstart](docs/quickstart.md)。
 
 ---
 
-## Define a Skill
+## Usage
 
 ```python
-from src.core.agents.capabilities.skills import skill
+from src.core.agents import Agent
+
+agent = Agent.create(
+    llm_api_key="your-api-key",
+    llm_provider="deepseek",
+    strategy="react",          # react | plan_execute | reflexion
+    tool_areas=["http", "utils"],
+)
+
+result = await agent.run("分析过去 7 天的天气趋势并生成报告")
+print(result.final_answer)
+```
+
+```python
+from src.core.agents import skill, SkillContext
 
 @skill(
     name="fetch_weather",
     description="获取指定城市的天气信息",
-    category="http",
+    risk_level="read",
+    parameters={
+        "city": {"type": "string", "description": "城市名称", "required": True},
+    },
 )
-async def fetch_weather(city: str) -> dict:
-    """Agent 可以调用这个 Skill 获取天气数据。"""
-    ...
-```
-
-Skill 注册后会被 Planner 自动发现并序列化为 LLM function call 的 tool spec，Agent 在 Loop 中按需调用。
-
----
-
-## Project Structure
-
-```
-src/
-├── api/          # Quart web 层：中间件、路由、校验
-├── jobs/         # 任务引擎：调度器、状态机、生命周期
-├── core/         # 核心能力：Agent 引擎、Skills、LLM、配置、DI
-│   └── agents/
-│       ├── engine/         # Agent Loop / Runner / Planner
-│       ├── capabilities/   # LLM / Tools / Skills
-│       ├── runtime/        # 运行时 Hook / Harness
-│       ├── state/          # 状态管理 / 快照 / 上下文 / 记忆
-│       ├── multi_agents/   # 多智能体协作
-│       └── execution/      # 执行调度
-├── infra/        # 基础设施：MySQL、日志、告警、事件总线
-skills/
-├── execute/      # 可执行 Skills（@skill 注册）
-└── knowledge/    # 知识 Skills（Markdown 注入上下文）
-docs/             # 项目文档、设计文档、开发指南
-tests/            # 测试
+async def fetch_weather(ctx: SkillContext, city: str) -> dict:
+    return {"city": city, "temperature": 22, "condition": "晴"}
 ```
 
 ---
 
-## Read Next
+## Docs
 
-- [Project Guide](docs/project.md) — 架构分层、模块职责、任务状态机
-- [Agent Guide](docs/agent.md) — Agent Loop、Skills、工具适配与扩展
-- [Agent Usage Guide](docs/agent-usage-guide.md) — Agent 使用指南
-- [Quickstart](docs/quickstart.md) — 安装、启动、环境变量、数据库初始化
-- [API Guide](docs/api.md) — 健康检查、运行任务、取消任务
+- [Agent Guide](docs/agent.md) — 六层架构、Loop、策略、Memory、Multi-Agent
+- [Quickstart](docs/quickstart.md) — 环境变量、数据库初始化、启动配置
+- [API Guide](docs/api.md) — 端点参考
 
 ---
-
-## For Whom
-
-- 想把传统异步任务系统升级为 Agentic Workflow
-- 需要跨进程状态协同、任务取消和故障可追踪
-- 希望把执行能力、领域知识与基础设施能力分层治理
-- 需要在 Agent 自主性和工程可控性之间找到平衡点
-- 想快速搭建 Agentic App 服务——Skill 注册即用，Loop 开箱即跑，基础设施已就绪
-
----
-
-## License
 
 MIT

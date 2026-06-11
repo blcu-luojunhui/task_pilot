@@ -33,6 +33,11 @@
     "noData": "No step data to render DAG",
     "error": "Error"
   },
+  "scrubber": {
+    "label": "Time travel: step {{step}} / {{max}}",
+    "play": "Play",
+    "pause": "Pause"
+  },
   "replayModal": {
     "title": "Replay Tool Call",
     "close": "Close",

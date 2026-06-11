@@ -1,110 +1,104 @@
-import { useEffect, useRef } from 'react';
-import { Empty, Typography } from 'antd';
+import { useCallback, useRef, useState } from 'react';
+import { Button, Empty, Typography, theme } from 'antd';
+import { VerticalAlignBottomOutlined } from '@ant-design/icons';
 import { useTranslation } from 'react-i18next';
-import type { ChatMessage } from '@/api/types';
+import { useDarkMode } from '@/hooks/useDarkMode';
+import { Virtuoso, type VirtuosoHandle } from 'react-virtuoso';
+import type { ArtifactRef, ChatMessage, PlanStep } from '@/api/types';
 import type { PendingPlan, ToolCallStatus } from '@/stores/chatStore';
+import { ArtifactCard } from './ArtifactCard';
+import { CompactionNotice } from './CompactionNotice';
 import { MessageBubble } from './MessageBubble';
 import { PendingPlanCard } from './PendingPlanCard';
+import { PlanPanel } from './PlanPanel';
+import { ReasoningBlock } from './ReasoningBlock';
 import { StreamingBubble } from './StreamingBubble';
 import { ToolCallBlock } from './ToolCallBlock';
 import './ChatMessage.css';
 
 interface Props {
   messages: ChatMessage[];
-  /** 正在执行中的工具调用 */
   liveToolCalls: ToolCallStatus[];
-  /** 待确认的高风险 plan */
   pendingPlan: PendingPlan | null;
   inFlight: boolean;
   agenticMode?: boolean;
+  plan?: PlanStep[];
+  liveReasoning?: string;
+  reflections?: string[];
+  artifacts?: ArtifactRef[];
+  compactionNotices?: string[];
   confirmLoading?: boolean;
   onConfirmPlan?: () => void;
   onRejectPlan?: () => void;
 }
 
-export function MessageList({
-  messages,
+function LiveFooter({
   liveToolCalls,
   pendingPlan,
   inFlight,
-  agenticMode = false,
-  confirmLoading = false,
+  agenticMode,
+  plan,
+  liveReasoning,
+  reflections,
+  artifacts,
+  compactionNotices,
+  confirmLoading,
   onConfirmPlan,
   onRejectPlan,
-}: Props) {
-  const bottomRef = useRef<HTMLDivElement | null>(null);
+}: Omit<Props, 'messages'>) {
+  const { token } = theme.useToken();
   const { t } = useTranslation('chat');
 
-  // 持久化消息 / 工具调用 / pendingPlan 变化时滚到底；
-  // liveStreamingText 高频变化由 StreamingBubble 内部 rAF 节流处理。
-  useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'auto', block: 'end' });
-  }, [messages.length, liveToolCalls.length, pendingPlan]);
-
-  const isIdle =
-    messages.length === 0 &&
-    liveToolCalls.length === 0 &&
-    !pendingPlan &&
-    !inFlight;
-
-  if (isIdle) {
-    return (
-      <div
-        style={{
-          flex: 1,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-        }}
-      >
-        <Empty
-          description={
-            <Typography.Text type="secondary">
-              {t('emptyHint')}
-            </Typography.Text>
-          }
-        />
-      </div>
-    );
-  }
-
   return (
-    <div style={{ flex: 1, overflowY: 'auto', padding: '8px 0' }}>
-      {/* 持久化消息 */}
-      {messages.map((m) => (
-        <MessageBubble key={m.id} message={m} />
+    <div style={{ paddingBottom: 8 }}>
+      {plan && plan.length > 0 && <PlanPanel steps={plan} compact />}
+
+      {liveReasoning && (
+        <div style={{ padding: '0 16px' }}>
+          <ReasoningBlock text={liveReasoning} streaming={inFlight} />
+        </div>
+      )}
+
+      {reflections?.map((text, i) => (
+        <div key={`reflection-${i}`} style={{ padding: '0 16px' }}>
+          <ReasoningBlock text={text} variant="reflection" />
+        </div>
       ))}
 
-      {/* 流式实时文本 — 独立订阅 store，隔离高频重渲染 */}
+      {compactionNotices?.map((msg, i) => (
+        <CompactionNotice key={`compact-${i}`} message={msg} />
+      ))}
+
+      {artifacts?.map((a) => (
+        <div key={a.id} style={{ padding: '4px 16px' }}>
+          <ArtifactCard artifact={a} />
+        </div>
+      ))}
+
       <StreamingBubble />
 
-      {/* 实时工具调用执行状态 */}
       {liveToolCalls.map((tc, i) => (
         <ToolCallBlock key={tc.callId || `tc-${i}`} toolCall={tc} />
       ))}
 
-      {/* 待确认高风险 plan */}
       {pendingPlan && onConfirmPlan && onRejectPlan && (
         <PendingPlanCard
           toolCalls={pendingPlan.toolCalls}
-          loading={confirmLoading}
+          loading={confirmLoading ?? false}
           onConfirm={onConfirmPlan}
           onReject={onRejectPlan}
         />
       )}
 
-      {/* 等待中指示器 */}
       {inFlight && liveToolCalls.length === 0 && !pendingPlan && (
         <div style={{ display: 'flex', alignItems: 'center', padding: '4px 16px' }}>
-          <div style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: 10,
-            padding: '8px 16px',
-            borderRadius: 14,
-            background: '#f6ffed',
-            border: '1px solid #b7eb8f',
-          }}>
+          <div
+            className="thinking-indicator"
+            style={{
+              background: token.colorSuccessBg,
+              border: `1px solid ${token.colorSuccessBorder}`,
+            }}
+          >
             <div className="thinking-dots">
               <span />
               <span />
@@ -116,8 +110,133 @@ export function MessageList({
           </div>
         </div>
       )}
+    </div>
+  );
+}
 
-      <div ref={bottomRef} />
+/** 虚拟化消息列表 + 智能粘底滚动（FE-5） */
+export function MessageList({
+  messages,
+  liveToolCalls,
+  pendingPlan,
+  inFlight,
+  agenticMode = false,
+  plan = [],
+  liveReasoning = '',
+  reflections = [],
+  artifacts = [],
+  compactionNotices = [],
+  confirmLoading = false,
+  onConfirmPlan,
+  onRejectPlan,
+}: Props) {
+  const { t } = useTranslation('chat');
+  const [dark] = useDarkMode();
+  const [atBottom, setAtBottom] = useState(true);
+  const virtuosoRef = useRef<VirtuosoHandle>(null);
+
+  const Footer = useCallback(
+    () => (
+      <LiveFooter
+        liveToolCalls={liveToolCalls}
+        pendingPlan={pendingPlan}
+        inFlight={inFlight}
+        agenticMode={agenticMode}
+        plan={plan}
+        liveReasoning={liveReasoning}
+        reflections={reflections}
+        artifacts={artifacts}
+        compactionNotices={compactionNotices}
+        confirmLoading={confirmLoading}
+        onConfirmPlan={onConfirmPlan}
+        onRejectPlan={onRejectPlan}
+      />
+    ),
+    [
+      liveToolCalls,
+      pendingPlan,
+      inFlight,
+      agenticMode,
+      plan,
+      liveReasoning,
+      reflections,
+      artifacts,
+      compactionNotices,
+      confirmLoading,
+      onConfirmPlan,
+      onRejectPlan,
+    ],
+  );
+
+  const isIdle =
+    messages.length === 0 &&
+    liveToolCalls.length === 0 &&
+    !pendingPlan &&
+    !inFlight &&
+    plan.length === 0 &&
+    !liveReasoning &&
+    reflections.length === 0;
+
+  if (isIdle) {
+    return (
+      <div
+        className="chat-thread"
+        data-theme={dark ? 'dark' : 'light'}
+        style={{
+          flex: 1,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}
+      >
+        <Empty
+          description={
+            <Typography.Text type="secondary">{t('emptyHint')}</Typography.Text>
+          }
+        />
+      </div>
+    );
+  }
+
+  return (
+    <div
+      className="chat-thread"
+      data-theme={dark ? 'dark' : 'light'}
+      style={{ position: 'relative', flex: 1, minHeight: 0, display: 'flex' }}
+    >
+      <Virtuoso
+        ref={virtuosoRef}
+        style={{ flex: 1 }}
+        data={messages}
+        atBottomStateChange={setAtBottom}
+        followOutput={(isAtBottom) => (isAtBottom ? 'auto' : false)}
+        itemContent={(_index, message) => <MessageBubble message={message} />}
+        components={{ Footer }}
+      />
+      {!atBottom && (
+        <Button
+          type="default"
+          size="small"
+          icon={<VerticalAlignBottomOutlined />}
+          onClick={() => {
+            virtuosoRef.current?.scrollToIndex({
+              index: Math.max(0, messages.length - 1),
+              behavior: 'smooth',
+              align: 'end',
+            });
+          }}
+          className="chat-scroll-bottom"
+          style={{
+            position: 'absolute',
+            bottom: 16,
+            left: '50%',
+            transform: 'translateX(-50%)',
+            zIndex: 10,
+          }}
+        >
+          {t('scrollToBottom')}
+        </Button>
+      )}
     </div>
   );
 }

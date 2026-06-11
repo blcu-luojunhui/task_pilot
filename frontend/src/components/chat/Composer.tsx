@@ -1,5 +1,5 @@
 import { KeyboardEvent, useRef, useState } from 'react';
-import { Button, Input, Space } from 'antd';
+import { Button, Input, Space, theme } from 'antd';
 import { SendOutlined } from '@ant-design/icons';
 import { useTranslation } from 'react-i18next';
 
@@ -9,6 +9,7 @@ interface Props {
 }
 
 export function Composer({ disabled, onSend }: Props) {
+  const { token } = theme.useToken();
   const [value, setValue] = useState('');
   const textAreaRef = useRef<HTMLTextAreaElement>(null);
   const { t } = useTranslation('chat');
@@ -38,7 +39,11 @@ export function Composer({ disabled, onSend }: Props) {
         onChange={(e) => setValue(e.target.value)}
         onKeyDown={onKeyDown}
         disabled={disabled}
-        style={{ borderRadius: '10px 0 0 10px' }}
+        style={{
+          borderRadius: '12px 0 0 12px',
+          background: token.colorFillQuaternary,
+          border: `1px solid ${token.colorBorderSecondary}`,
+        }}
       />
       <Button
         type="primary"
@@ -47,7 +52,10 @@ export function Composer({ disabled, onSend }: Props) {
         onClick={submit}
         style={{
           height: 'auto',
-          borderRadius: '0 10px 10px 0',
+          borderRadius: '0 12px 12px 0',
+          background: 'linear-gradient(135deg, #5ac8fa 0%, #007aff 100%)',
+          border: 'none',
+          boxShadow: '0 2px 8px rgba(0, 122, 255, 0.2)',
           minWidth: 60,
         }}
       >

@@ -1,8 +1,56 @@
+/* ── Typography (Apple system stack) ── */
+:root {
+  --font-sans:
+    -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'SF Pro Text', 'PingFang SC',
+    'Hiragino Sans GB', 'Microsoft YaHei', 'Segoe UI', Roboto, 'Helvetica Neue', Arial,
+    sans-serif;
+  --font-mono:
+    'SF Mono', 'SFMono-Regular', ui-monospace, Menlo, Monaco, Consolas, 'Liberation Mono',
+    monospace;
+}
+
 /* ── Base ── */
 html {
   scroll-behavior: smooth;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+  font-family: var(--font-sans);
+  height: 100%;
+}
+
+body,
+#root {
+  height: 100%;
+  margin: 0;
+}
+
+body,
+#root,
+.ant-app {
+  font-family: var(--font-sans);
+  letter-spacing: -0.01em;
+}
+
+button,
+input,
+textarea,
+select,
+optgroup {
+  font-family: inherit;
+}
+
+code,
+pre,
+kbd,
+samp,
+.font-mono {
+  font-family: var(--font-mono);
+}
+
+.hljs,
+.hljs * {
+  font-family: var(--font-mono) !important;
 }
 
 ::selection {

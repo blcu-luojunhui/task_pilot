@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Typography, Tag, Space, Collapse, Empty } from 'antd';
+import { Typography, Tag, Space, Collapse, Empty, theme } from 'antd';
 import {
   RobotOutlined,
   ToolOutlined,
@@ -8,6 +8,7 @@ import {
 } from '@ant-design/icons';
 import { useTranslation } from 'react-i18next';
 import type { TraceEvent } from '@/api/types';
+import { FONT_MONO } from '@/utils/fonts';
 
 interface Message {
   role: 'system' | 'user' | 'assistant' | 'tool';
@@ -87,18 +88,42 @@ function extractMessages(events: TraceEvent[]): Message[] {
   return messages;
 }
 
-function getRoleConfig(t: (key: string) => string): Record<string, { icon: React.ReactNode; bg: string; label: string; defaultCollapse: boolean }> {
+function getRoleConfig(
+  t: (key: string) => string,
+  token: ReturnType<typeof theme.useToken>['token'],
+): Record<string, { icon: React.ReactNode; bg: string; label: string; defaultCollapse: boolean }> {
   return {
-    system: { icon: <SettingOutlined />, bg: '#f5f5f5', label: t('transcript.system'), defaultCollapse: true },
-    user: { icon: <UserOutlined />, bg: '#e6f4ff', label: t('transcript.user'), defaultCollapse: false },
-    assistant: { icon: <RobotOutlined />, bg: '#fffbe6', label: t('transcript.assistant'), defaultCollapse: false },
-    tool: { icon: <ToolOutlined />, bg: '#f6ffed', label: t('transcript.tool'), defaultCollapse: false },
+    system: {
+      icon: <SettingOutlined />,
+      bg: token.colorFillQuaternary,
+      label: t('transcript.system'),
+      defaultCollapse: true,
+    },
+    user: {
+      icon: <UserOutlined />,
+      bg: token.colorPrimaryBg,
+      label: t('transcript.user'),
+      defaultCollapse: false,
+    },
+    assistant: {
+      icon: <RobotOutlined />,
+      bg: token.colorWarningBg,
+      label: t('transcript.assistant'),
+      defaultCollapse: false,
+    },
+    tool: {
+      icon: <ToolOutlined />,
+      bg: token.colorSuccessBg,
+      label: t('transcript.tool'),
+      defaultCollapse: false,
+    },
   };
 }
 
 export function TranscriptView({ events }: { events: TraceEvent[] }) {
   const messages = extractMessages(events);
   const { t } = useTranslation('trace');
+  const { token } = theme.useToken();
 
   if (messages.length === 0) {
     return <Empty description={t('transcript.noData')} />;
@@ -107,15 +132,25 @@ export function TranscriptView({ events }: { events: TraceEvent[] }) {
   return (
     <Space direction="vertical" size={8} style={{ width: '100%', padding: '8px 0' }}>
       {messages.map((msg, i) => (
-        <MessageBubble key={i} message={msg} index={i} t={t} />
+        <MessageBubble key={i} message={msg} index={i} t={t} token={token} />
       ))}
     </Space>
   );
 }
 
-function MessageBubble({ message, index, t }: { message: Message; index: number; t: (key: string, opts?: Record<string, unknown>) => string }) {
+function MessageBubble({
+  message,
+  index,
+  t,
+  token,
+}: {
+  message: Message;
+  index: number;
+  t: (key: string, opts?: Record<string, unknown>) => string;
+  token: ReturnType<typeof theme.useToken>['token'];
+}) {
   const [expanded, setExpanded] = useState(false);
-  const config = getRoleConfig(t)[message.role] ?? getRoleConfig(t).assistant;
+  const config = getRoleConfig(t, token)[message.role] ?? getRoleConfig(t, token).assistant;
   const shouldCollapse = config.defaultCollapse || message.content.length > 500;
   const displayContent = expanded || !shouldCollapse
     ? message.content
@@ -127,7 +162,7 @@ function MessageBubble({ message, index, t }: { message: Message; index: number;
         background: config.bg,
         borderRadius: 8,
         padding: '8px 12px',
-        border: '1px solid #f0f0f0',
+        border: `1px solid ${token.colorBorderSecondary}`,
       }}
     >
       <Space size={4} style={{ marginBottom: 4 }}>
@@ -184,9 +219,7 @@ function MessageBubble({ message, index, t }: { message: Message; index: number;
               fontSize: 12,
               whiteSpace: 'pre-wrap',
               wordBreak: 'break-word',
-              fontFamily: message.role === 'system'
-                ? 'ui-monospace, SFMono-Regular, monospace'
-                : undefined,
+              fontFamily: message.role === 'system' ? FONT_MONO : undefined,
             }}
           >
             {displayContent}

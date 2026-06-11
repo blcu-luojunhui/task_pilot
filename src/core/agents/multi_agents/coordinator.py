@@ -46,6 +46,7 @@ class MultiAgentCoordinator:
         """
         self.bus = bus or MessageBus()
         self.agents: Dict[str, Agent] = {}
+        self._capabilities: Dict[str, List[str]] = {}  # OPT-8: agent_id → [tags]
         self.assignments: Dict[str, TaskAssignment] = {}
         self.planner_agent_id = planner_agent_id
 
@@ -60,17 +61,19 @@ class MultiAgentCoordinator:
         self.bus.subscribe(MessageType.RESULT, self._handle_result)
         self.bus.subscribe(MessageType.HEARTBEAT, self._handle_heartbeat)
 
-    def register_agent(self, agent_id: str, agent: Agent):
+    def register_agent(self, agent_id: str, agent: Agent, capabilities: Optional[List[str]] = None):
         """
         注册 Agent
 
         Args:
             agent_id: Agent ID
             agent: Agent 实例
+            capabilities: 能力标签列表 (如 ["database", "analysis"]), OPT-8
         """
         self.agents[agent_id] = agent
+        self._capabilities[agent_id] = list(capabilities or [])
         self.bus.register_agent(agent_id)
-        logger.info(f"Agent {agent_id} registered with coordinator")
+        logger.info(f"Agent {agent_id} registered (capabilities: {self._capabilities[agent_id]})")
 
     def unregister_agent(self, agent_id: str):
         """
@@ -107,7 +110,11 @@ class MultiAgentCoordinator:
         sub_tasks = await self._decompose_task(task, context)
         logger.info(f"Task decomposed into {len(sub_tasks)} sub-tasks")
 
-        # 2. 任务分配
+        # 2. 任务分配 (DAG 策略不需要轮询分配)
+        if strategy == "dag":
+            results = await self._execute_dag(sub_tasks)
+            return self._aggregate_results(results)
+
         assignments = self._assign_tasks(sub_tasks, strategy)
 
         # 3. 执行任务
@@ -208,7 +215,7 @@ class MultiAgentCoordinator:
 
     def _assign_tasks(self, tasks: List[str], strategy: str) -> List[TaskAssignment]:
         """
-        任务分配
+        任务分配 — OPT-8: 按能力评分分配，无匹配时回退轮询
 
         Args:
             tasks: 任务列表
@@ -219,13 +226,14 @@ class MultiAgentCoordinator:
         """
         assignments = []
         agent_ids = list(self.agents.keys())
-
         if not agent_ids:
             raise ValueError("No agents available for task assignment")
 
         for i, task in enumerate(tasks):
-            # 简单的轮询分配
-            agent_id = agent_ids[i % len(agent_ids)]
+            # 按能力打分选最佳 agent
+            scores = [(self._score_agent(task, aid), aid) for aid in agent_ids]
+            best_score, best_agent = max(scores, key=lambda x: x[0])
+            agent_id = best_agent if best_score > 0 else agent_ids[i % len(agent_ids)]
 
             assignment = TaskAssignment(
                 task_id=f"task_{i}_{id(task)}", agent_id=agent_id, task=task
@@ -234,6 +242,22 @@ class MultiAgentCoordinator:
             self.assignments[assignment.task_id] = assignment
 
         return assignments
+
+    def _score_agent(self, task: str, agent_id: str) -> float:
+        """OPT-8: 按能力标签匹配子任务描述打分"""
+        caps = self._capabilities.get(agent_id, [])
+        if not caps:
+            return 0.0
+        task_lower = task.lower()
+        score = 0.0
+        for cap in caps:
+            if cap.lower() in task_lower:
+                score += 1.0
+            # 部分匹配加分
+            for word in cap.lower().split("_"):
+                if len(word) > 2 and word in task_lower:
+                    score += 0.3
+        return score
 
     async def _execute_parallel(self, assignments: List[TaskAssignment]) -> List[TaskAssignment]:
         """
@@ -423,8 +447,116 @@ class MultiAgentCoordinator:
 
     def get_status(self) -> Dict[str, Any]:
         """获取协调器状态"""
+    async def _execute_dag(self, sub_tasks: list) -> List[TaskAssignment]:
+        """DAG 依赖调度执行 — OPT-7
+
+        拓扑分层 + 批量并行：无依赖的批并行执行，完成后解锁下游。
+        """
+        from .protocol import SubTask
+
+        # 将字符串列表或 SubTask 列表统一为 SubTask
+        tasks: Dict[str, SubTask] = {}
+        for i, st in enumerate(sub_tasks):
+            if isinstance(st, str):
+                st = SubTask(id=f"task_{i}", goal=st, deps=[])
+            tasks[st.id] = st
+
+        # 环检测
+        if self._has_cycle(tasks):
+            logger.warning("DAG cycle detected, falling back to sequential execution")
+            assignments = [
+                TaskAssignment(task_id=tid, agent_id=list(self.agents.keys())[0], task=t.goal)
+                for tid, t in tasks.items()
+            ]
+            return await self._execute_sequential(assignments)
+
+        agent_ids = list(self.agents.keys())
+        if not agent_ids:
+            raise ValueError("No agents available for DAG execution")
+
+        completed_ids: set = set()
+        assignments: List[TaskAssignment] = []
+
+        while len(completed_ids) < len(tasks):
+            # 取所有 deps 已完成且状态为 pending 的
+            ready = [
+                t for t in tasks.values()
+                if t.status == "pending" and all(d in completed_ids for d in t.deps)
+            ]
+            if not ready:
+                # 没有可执行的但还有未完成的 → 可能存在死锁或全部已处理
+                pending_count = sum(1 for t in tasks.values() if t.status == "pending")
+                if pending_count == 0:
+                    break
+                # 标记剩余为 skipped（无法解析的依赖）
+                for t in tasks.values():
+                    if t.status == "pending":
+                        t.status = "skipped"
+                break
+
+            # 并行执行 ready 层
+            batch_assignments = []
+            for j, subtask in enumerate(ready):
+                agent_id = agent_ids[j % len(agent_ids)]
+                subtask.status = "running"
+                assignment = TaskAssignment(
+                    task_id=subtask.id, agent_id=agent_id, task=subtask.goal, status="running"
+                )
+                batch_assignments.append(assignment)
+                self.assignments[subtask.id] = assignment
+
+            async def _run_one(asgn: TaskAssignment) -> TaskAssignment:
+                try:
+                    agent = self.agents[asgn.agent_id]
+                    result = await agent.run(asgn.task)
+                    asgn.result = result.final_answer
+                    asgn.status = "completed" if result.success else "failed"
+                except Exception as e:
+                    asgn.status = "failed"
+                    asgn.error = str(e)
+                return asgn
+
+            batch_results = await asyncio.gather(*[_run_one(a) for a in batch_assignments])
+            assignments.extend(batch_results)
+
+            # 更新完成集合
+            for a in batch_results:
+                completed_ids.add(a.task_id)
+                if a.status == "failed":
+                    # 标记依赖此任务的下游为 skipped
+                    for t in tasks.values():
+                        if a.task_id in t.deps and t.status == "pending":
+                            t.status = "skipped"
+
+        return assignments
+
+    @staticmethod
+    def _has_cycle(tasks: dict) -> bool:
+        """DFS 环检测"""
+        visited = set()
+        stack = set()
+
+        def dfs(node: str) -> bool:
+            visited.add(node)
+            stack.add(node)
+            for dep_id in tasks[node].deps:
+                if dep_id not in visited:
+                    if dfs(dep_id):
+                        return True
+                elif dep_id in stack:
+                    return True
+            stack.discard(node)
+            return False
+
+        for tid in tasks:
+            if tid not in visited:
+                if dfs(tid):
+                    return True
+        return False
+
+    def get_stats(self) -> Dict[str, Any]:
+        """获取协调器统计信息"""
         return {
-            "agents": list(self.agents.keys()),
             "agent_health": {
                 aid: self._agent_healthy.get(aid, True) for aid in self.agents
             },

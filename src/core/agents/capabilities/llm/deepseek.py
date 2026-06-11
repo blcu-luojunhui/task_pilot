@@ -12,6 +12,13 @@ the internal AgentLoopRunner message shape.
 import json
 import os
 import warnings
+
+warnings.warn(
+    "DeepSeekPlanner is deprecated, use DeepSeekProvider instead. "
+    "This module will be removed in v5.",
+    DeprecationWarning,
+    stacklevel=2,
+)
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, List, Optional

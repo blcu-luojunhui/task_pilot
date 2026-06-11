@@ -45,6 +45,12 @@ from src.core.agents.state import (
     generate_agent_trace_id,
 )
 from src.core.agents.engine.loop import Think
+from src.core.agents.engine.planning.strategy import (
+    DecisionStrategy,
+    StepOutput,
+    StrategyContext,
+)
+from src.core.agents.engine.planning.react import ReActStrategy
 
 if TYPE_CHECKING:
     from src.core.agents.engine.lifecycle import LifecycleManager
@@ -91,6 +97,7 @@ class AgentLoopHarness:
     workflow: Optional[WorkflowController] = None
     event_logger: HarnessEventLogger = field(default_factory=HarnessEventLogger)
     lifecycle: "Optional[LifecycleManager]" = None
+    strategy: Optional[DecisionStrategy] = None
 
     def __post_init__(self) -> None:
         if self.workflow is None:
@@ -102,6 +109,13 @@ class AgentLoopHarness:
         self._current_state: Optional[AgentLoopState] = None
         if self.thinker.publish_event is None:
             self.thinker.publish_event = self._emit_thinker_event
+        if self.strategy is None:
+            self.strategy = ReActStrategy()
+        self._strategy_ctx = StrategyContext(
+            thinker=self.thinker,
+            actor=self.actor,
+            observer=self.observer,
+        )
 
     async def run(
         self,
@@ -135,8 +149,11 @@ class AgentLoopHarness:
                 self.lifecycle.current_loop_state = state
                 if self.lifecycle.state == AgentState.IDLE:
                     self.lifecycle.transition_to(AgentState.RUNNING, reason="harness start")
-                # 如果已在 RUNNING 状态（Agent.run() 可能预先设置了），不再重复转换
                 state.lifecycle_state = self.lifecycle.state
+
+            # 策略初始化钩子（如 PlanExecute 生成 plan）
+            assert self.strategy is not None
+            await self.strategy.on_run_start(state, self._strategy_ctx)
 
             while not state.is_terminated():
                 # 生命周期检查：暂停 / 停止
@@ -159,30 +176,17 @@ class AgentLoopHarness:
                 state.step += 1
                 await self._emit("step_start", state)
 
-                assistant_message = await self._think(state)
+                # ── 委托给策略执行单步 Think → Act → Observe ──
+                step_output = await self.strategy.run_step(state, self._strategy_ctx)
+                assistant_message = step_output.assistant_message
+                tool_results = step_output.tool_results
+
+                if step_output.stop_reason_override:
+                    state.stop_reason = step_output.stop_reason_override
+                    break
+
                 if state.is_terminated() or assistant_message is None:
                     break
-
-                decision = self.workflow.after_think(state, assistant_message)
-                if decision:
-                    # 记录 Step 后再终止
-                    step_records = self._build_step_records(state, assistant_message, [])
-                    state.steps.extend(step_records)
-                    await self._apply_workflow_decision(state, decision)
-                    break
-
-                tool_results = []
-                decision = self.workflow.before_act(state, assistant_message)
-                if decision:
-                    self._observe(state, assistant_message, tool_results)
-                    # 记录 Step（工具调用被约束阻止）
-                    step_records = self._build_step_records(state, assistant_message, tool_results)
-                    state.steps.extend(step_records)
-                    await self._apply_workflow_decision(state, decision)
-                    break
-                else:
-                    tool_results = await self._act(state, assistant_message)
-                    self._observe(state, assistant_message, tool_results)
 
                 feedback_messages = await self.feedback_loop.run(
                     state,
@@ -210,6 +214,9 @@ class AgentLoopHarness:
                 # 构建结构化 Step 记录（并行工具调用各自一个 Step）
                 step_records = self._build_step_records(state, assistant_message, tool_results)
                 state.steps.extend(step_records)
+
+                # 策略步后钩子（如 Reflexion）
+                await self.strategy.on_step_end(state, self._strategy_ctx, step_output)
 
                 await self._emit(
                     "step_end",

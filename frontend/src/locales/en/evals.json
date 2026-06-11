@@ -1,0 +1,24 @@
+{
+  "title": "Evaluations",
+  "subtitle": "Agent benchmark reports, success trends, and per-case drill-down",
+  "trendTitle": "Success rate trend",
+  "casesTitle": "Test cases",
+  "metrics": {
+    "successRate": "Success rate",
+    "avgSteps": "Avg steps",
+    "avgTokens": "Avg tokens",
+    "toolErrorRate": "Tool error rate"
+  },
+  "table": {
+    "goal": "Goal",
+    "success": "Result",
+    "pass": "Pass",
+    "fail": "Fail",
+    "steps": "Steps",
+    "tokens": "Tokens",
+    "judge": "Judge",
+    "trace": "Trace",
+    "viewTrace": "View",
+    "noReason": "No judge reason"
+  }
+}

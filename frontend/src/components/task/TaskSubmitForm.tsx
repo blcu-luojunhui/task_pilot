@@ -3,6 +3,7 @@ import { Button, DatePicker, Drawer, Form, Input, message, Select, Space, Typogr
 import dayjs, { Dayjs } from 'dayjs';
 import { useTranslation } from 'react-i18next';
 import { getTaskNames, runTask } from '@/api/tasks';
+import { FONT_MONO } from '@/utils/fonts';
 
 interface Props {
   open: boolean;
@@ -107,7 +108,7 @@ export function TaskSubmitForm({ open, onClose, onSubmitted }: Props) {
           <Input.TextArea
             rows={6}
             placeholder='{"window_minutes": 30}'
-            styles={{ textarea: { fontFamily: 'ui-monospace, SFMono-Regular, monospace' } }}
+            styles={{ textarea: { fontFamily: FONT_MONO } }}
           />
         </Form.Item>
         <Typography.Paragraph type="secondary" style={{ fontSize: 12 }}>

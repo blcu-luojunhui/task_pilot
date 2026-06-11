@@ -5,6 +5,7 @@ import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import type { SkillCallRecord, SkillInfo } from '@/api/types';
 import { getSkillCalls } from '@/api/skills';
+import { FONT_MONO } from '@/utils/fonts';
 
 interface Props {
   skill: SkillInfo | null;
@@ -61,7 +62,7 @@ export function SkillCallHistoryDrawer({ skill, open, onClose }: Props) {
       key: 'arguments',
       ellipsis: true,
       render: (args: unknown) => (
-        <Typography.Text style={{ fontSize: 11, fontFamily: 'ui-monospace, monospace' }}>
+        <Typography.Text style={{ fontSize: 11, fontFamily: FONT_MONO }}>
           <code>{JSON.stringify(args)}</code>
         </Typography.Text>
       ),

@@ -67,3 +67,23 @@ class Step:
     thought: Optional[Thought] = None
     action: Optional[Action] = None
     observation: Optional[Observation] = None
+
+
+class PlanStepStatus(str, Enum):
+    """计划步骤状态"""
+
+    PENDING = "pending"
+    IN_PROGRESS = "in_progress"
+    DONE = "done"
+    FAILED = "failed"
+    SKIPPED = "skipped"
+
+
+@dataclass
+class PlanStep:
+    """结构化计划步骤 — 单代理内 todo 一等公民"""
+
+    id: str
+    goal: str
+    status: PlanStepStatus = PlanStepStatus.PENDING
+    result: Optional[str] = None

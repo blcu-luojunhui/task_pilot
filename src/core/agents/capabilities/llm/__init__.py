@@ -22,7 +22,7 @@ __all__ = [
     "OpenAIProvider",
     "ClaudeProvider",
     "DeepSeekProvider",
-    # Legacy (兼容)
+    # Legacy (deprecated, remove in v5)
     "DeepSeekPlanner",
     "DeepSeekSettings",
     "load_dotenv",

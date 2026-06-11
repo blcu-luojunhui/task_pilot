@@ -35,6 +35,8 @@ interface RunTaskState {
   fetchToolAreas: () => Promise<void>;
   setGoal: (goal: string) => void;
   toggleArea: (area: string) => void;
+  selectAllAreas: () => void;
+  clearAreas: () => void;
   run: () => Promise<string | null>;
   confirmPlan: (action: 'confirm' | 'reject') => Promise<void>;
   cancel: () => Promise<void>;
@@ -73,6 +75,11 @@ export const useRunTaskStore = create<RunTaskState>((set, get) => ({
         ? s.selectedAreas.filter((a) => a !== area)
         : [...s.selectedAreas, area],
     })),
+
+  selectAllAreas: () =>
+    set((s) => ({ selectedAreas: [...s.toolAreas] })),
+
+  clearAreas: () => set({ selectedAreas: [] }),
 
   run: async () => {
     const { goal, selectedAreas } = get();

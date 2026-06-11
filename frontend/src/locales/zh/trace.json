@@ -33,6 +33,11 @@
     "noData": "无步骤数据可渲染 DAG",
     "error": "错误"
   },
+  "scrubber": {
+    "label": "时间旅行：step {{step}} / {{max}}",
+    "play": "播放",
+    "pause": "暂停"
+  },
   "replayModal": {
     "title": "重放 Tool Call",
     "close": "关闭",

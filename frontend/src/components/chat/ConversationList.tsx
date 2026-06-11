@@ -11,6 +11,8 @@ interface Props {
   onSelect: (id: string) => void;
   onCreate: () => void;
   onDelete: (id: string) => void;
+  /** 抽屉内全宽展示（窄屏 FE-9） */
+  embedded?: boolean;
 }
 
 export function ConversationList({
@@ -20,6 +22,7 @@ export function ConversationList({
   onSelect,
   onCreate,
   onDelete,
+  embedded = false,
 }: Props) {
   const { token } = theme.useToken();
   const { t } = useTranslation('chat');
@@ -27,8 +30,8 @@ export function ConversationList({
   return (
     <div
       style={{
-        width: 240,
-        borderRight: `1px solid ${token.colorBorderSecondary}`,
+        width: embedded ? '100%' : 240,
+        borderRight: embedded ? undefined : `1px solid ${token.colorBorderSecondary}`,
         display: 'flex',
         flexDirection: 'column',
         height: '100%',

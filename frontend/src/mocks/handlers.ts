@@ -2,6 +2,7 @@ import { http, HttpResponse } from 'msw';
 import { TaskStatus, type SystemStats, type TaskSummary } from '@/api/types';
 import { findTaskByTraceId, MOCK_TASK_DETAILS, MOCK_TASKS } from './fixtures/tasks';
 import { buildFailedTraceEvents, buildSuccessTraceEvents } from './fixtures/events';
+import { MOCK_EVAL_REPORTS, MOCK_EVAL_SUMMARIES } from './fixtures/evals';
 import { MOCK_SKILLS, MOCK_PERSONAL_SKILLS, nextPersonalSkillId } from './fixtures/skills';
 
 /** 内存可变副本，支持 mock 期间提交 / 取消 */
@@ -248,4 +249,44 @@ export const handlers = [
       checks: { mysql: 'ok', log_service: 'ok' },
     })
   ),
+
+  // ============ FE-8 Evals ============
+  http.get('/api/evals/reports', () => ok({ items: MOCK_EVAL_SUMMARIES })),
+  http.get('/api/evals/reports/:reportId', ({ params }) => {
+    const report = MOCK_EVAL_REPORTS[String(params.reportId)];
+    if (!report) return err(404, 'report not found', 404);
+    return ok(report);
+  }),
+
+  // ============ FE-4 Agent 生命周期控制（mock） ============
+  http.post('/api/agent/:traceId/pause', () => ok({ code: 0, message: 'paused' })),
+  http.post('/api/agent/:traceId/resume', () => ok({ code: 0, message: 'resumed' })),
+  http.post('/api/agent/:traceId/stop', () => ok({ code: 0, message: 'stopped' })),
+  http.post('/api/agent/:traceId/snapshot', () =>
+    ok({ code: 0, message: 'saved', snapshot_id: `snap-${Date.now()}` }),
+  ),
+  http.post('/api/agent/:traceId/run_from_snapshot', async ({ request }) => {
+    const body = (await request.json()) as { snapshot_id?: string };
+    return ok({
+      code: 0,
+      message: 'replayed',
+      trace_id: makeTraceId(),
+      snapshot_id: body.snapshot_id,
+    });
+  }),
+
+  // ============ FE-3 工件读取（mock） ============
+  http.get('/api/artifacts/:artifactId', ({ params, request }) => {
+    const url = new URL(request.url);
+    const offset = Number(url.searchParams.get('offset') ?? 0);
+    const full = `Mock artifact content for ${params.artifactId}\n`.repeat(40);
+    const slice = full.slice(offset, offset + 8000);
+    return ok({
+      id: String(params.artifactId),
+      content: slice,
+      offset,
+      has_more: offset + slice.length < full.length,
+      total_size: full.length,
+    });
+  }),
 ];

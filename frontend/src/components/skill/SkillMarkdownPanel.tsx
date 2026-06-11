@@ -6,6 +6,7 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import type { SkillInfo } from '@/api/types';
 import { RISK_COLOR } from '@/utils/colors';
+import { FONT_MONO } from '@/utils/fonts';
 
 interface Props {
   skill: SkillInfo | null;
@@ -198,7 +199,7 @@ export function SkillMarkdownPanel({
           onChange={(e) => onDraftChange?.(e.target.value)}
           autoSize={{ minRows: 22, maxRows: 32 }}
           style={{
-            fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace',
+            fontFamily: FONT_MONO,
             fontSize: 13,
           }}
         />

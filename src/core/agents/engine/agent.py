@@ -91,6 +91,30 @@ class AgentConfig:
     tool_areas: Optional[List[str]] = None
     tool_dependencies: Optional[Mapping[str, Any]] = None
 
+    # 决策策略
+    strategy: str = "react"  # react | plan_execute | reflexion
+    enable_reflection: bool = False  # OPT-3: 启用反思
+    reflection_trigger_errors: int = 2  # OPT-3: 连续失败触发反思的阈值
+
+    # 记忆 (OPT-4)
+    memory_backend: str = "keyword"  # keyword | embedding
+    long_term_memory_path: Optional[str] = None
+    embedding_provider: Optional[str] = None
+
+    # 上下文卸载 (OPT-5)
+    enable_context_offload: bool = False
+    offload_threshold_chars: int = 4000
+
+    # 知识注入 (OPT-6)
+    knowledge_backend: str = "keyword"  # keyword | embedding
+
+    # Prompt 缓存 & Thinking (OPT-13/14)
+    enable_prompt_cache: bool = False
+    thinking_budget: int = 0  # 0=关闭
+
+    # MCP (OPT-15)
+    mcp_servers: Optional[List[dict]] = None
+
     # 其他配置
     enable_routing: bool = False
     is_cancelled: Optional[Callable[[], bool]] = None
@@ -116,6 +140,11 @@ class AgentConfig:
             raise AgentConfigError("max_tool_result_length must be > 0")
         if self.max_consecutive_errors <= 0:
             raise AgentConfigError("max_consecutive_errors must be > 0")
+        valid_strategies = {"react", "plan_execute", "reflexion"}
+        if self.strategy not in valid_strategies:
+            raise AgentConfigError(
+                f"Unknown strategy '{self.strategy}'. Supported: {sorted(valid_strategies)}"
+            )
 
 
 class Agent:
@@ -169,6 +198,7 @@ class Agent:
         tool_areas: Optional[List[str]] = None,
         tool_dependencies: Optional[Mapping[str, Any]] = None,
         enable_routing: bool = False,
+        strategy: str = "react",
         verbose: bool = False,
         show_prompt: bool = False,
         **kwargs,
@@ -221,6 +251,7 @@ class Agent:
             tool_areas=tool_areas,
             tool_dependencies=tool_dependencies,
             enable_routing=enable_routing,
+            strategy=strategy,
             **kwargs,
         )
 
@@ -367,6 +398,12 @@ class Agent:
             hooks=list(kwargs.get("hooks") or []),
             stream_callback=kwargs.get("stream_callback"),
             chat_mode=kwargs.get("chat_mode", False),
+            strategy=config.strategy,
+            enable_reflection=config.enable_reflection,
+            reflection_trigger_errors=config.reflection_trigger_errors,
+            memory_backend=config.memory_backend,
+            long_term_memory_path=config.long_term_memory_path,
+            embedding_provider=config.embedding_provider,
         )
 
     # ── 生命周期控制 ──────────────────────────────────────

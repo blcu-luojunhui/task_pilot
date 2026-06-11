@@ -22,6 +22,15 @@ from .engine.types import (
     Step,
 )
 from .engine.loop import Think, Act, Observe, AssistantPlanner
+from .engine.planning import (
+    DecisionStrategy,
+    StepOutput,
+    StrategyContext,
+    ReActStrategy,
+    PlanExecuteStrategy,
+    ReflexionStrategy,
+    resolve_strategy,
+)
 
 # 状态层 - 从 state 导出
 from .state import (
@@ -102,6 +111,13 @@ __all__ = [
     "Act",
     "Observe",
     "AssistantPlanner",
+    "DecisionStrategy",
+    "StepOutput",
+    "StrategyContext",
+    "ReActStrategy",
+    "PlanExecuteStrategy",
+    "ReflexionStrategy",
+    "resolve_strategy",
     # State
     "AgentState",
     "StateTransition",

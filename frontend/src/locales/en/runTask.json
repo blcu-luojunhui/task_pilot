@@ -5,6 +5,8 @@
   "goalPlaceholder": "Describe what you want to accomplish...\ne.g. Check task execution in the last 24h, summarize success rate and analyze failures",
   "skills": "Skills",
   "skillsCount": "{{count}} selected",
+  "selectAll": "Select all",
+  "deselectAll": "Clear all",
   "executing": "Executing...",
   "run": "Run",
   "cancelExecution": "Cancel",

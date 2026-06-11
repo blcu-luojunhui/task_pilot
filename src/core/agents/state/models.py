@@ -6,7 +6,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 
 if TYPE_CHECKING:
-    from ..engine.types import Step
+    from ..engine.types import Step, PlanStep
 
 
 class AgentState(str, Enum):
@@ -88,6 +88,9 @@ class AgentLoopState:
 
     # 累计 token 使用量
     token_usage: Dict[str, int] = field(default_factory=lambda: {"prompt": 0, "completion": 0, "total": 0})
+
+    # 结构化计划 (OPT-2)
+    plan: List["PlanStep"] = field(default_factory=list)
 
     def __post_init__(self):
         if self.lifecycle_state is None:

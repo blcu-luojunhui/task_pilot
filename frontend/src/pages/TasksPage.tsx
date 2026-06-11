@@ -1,7 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Button, Card, DatePicker, Form, Input, message, Segmented, Select, Space } from 'antd';
-import { PlusOutlined, ReloadOutlined, FilterOutlined } from '@ant-design/icons';
+import { Button, DatePicker, Form, Input, message, Segmented, Select, Space } from 'antd';
+import { PlusOutlined, ReloadOutlined, FilterOutlined, UnorderedListOutlined } from '@ant-design/icons';
+import { PageShell } from '@/components/common/PageShell';
+import { PageHero } from '@/components/common/PageHero';
+import { PageCard, PageCardIcon, PageCardTitle } from '@/components/common/PageCard';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import dayjs from 'dayjs';
 import { TaskListTable } from '@/components/task/TaskListTable';
@@ -100,8 +103,29 @@ export function TasksPage() {
   );
 
   return (
-    <Space direction="vertical" size={16} style={{ width: '100%' }}>
-      <Card variant="borderless">
+    <PageShell>
+      <PageHero
+        title={t('pageTitle')}
+        subtitle={t('pageSubtitle')}
+        icon={<UnorderedListOutlined />}
+        gradient="purple"
+      />
+
+      <PageCard
+        title={
+          <PageCardTitle
+            icon={
+              <PageCardIcon color="#5856d6" bg="rgba(88,86,214,0.12)">
+                <FilterOutlined />
+              </PageCardIcon>
+            }
+          >
+            {t('filter')}
+          </PageCardTitle>
+        }
+        styles={{ body: { padding: '18px 22px' } }}
+        style={{ marginBottom: 20 }}
+      >
         <Space direction="vertical" size={12} style={{ width: '100%' }}>
           {isAdmin && (
             <Segmented
@@ -117,45 +141,41 @@ export function TasksPage() {
             />
           )}
           <Form<FilterValues> form={filterForm} layout="inline" onFinish={applyFilter}>
-          <Form.Item name="status" label={t('statusLabel')}>
-            <Select
-              mode="multiple"
-              placeholder={t('statusAll')}
-              style={{ minWidth: 220 }}
-              options={statusOptions}
-              allowClear
-              maxTagCount="responsive"
-            />
-          </Form.Item>
-          <Form.Item name="task_name" label={t('taskNameLabel')}>
-            <Input placeholder={t('taskNamePlaceholder')} allowClear style={{ width: 200 }} />
-          </Form.Item>
-          <Form.Item name="date" label={t('bizDateLabel')}>
-            <DatePicker format="YYYY-MM-DD" />
-          </Form.Item>
-          <Form.Item>
-            <Space>
-              <Button type="primary" icon={<FilterOutlined />} htmlType="submit">
-                {t('filter')}
-              </Button>
-              <Button onClick={resetFilter}>{t('reset')}</Button>
-              <Button icon={<ReloadOutlined />} onClick={() => fetch()}>
-                {t('refresh')}
-              </Button>
-              <Button
-                type="primary"
-                icon={<PlusOutlined />}
-                onClick={() => setDrawerOpen(true)}
-              >
-                {t('submitTask')}
-              </Button>
-            </Space>
-          </Form.Item>
-        </Form>
+            <Form.Item name="status" label={t('statusLabel')}>
+              <Select
+                mode="multiple"
+                placeholder={t('statusAll')}
+                style={{ minWidth: 220 }}
+                options={statusOptions}
+                allowClear
+                maxTagCount="responsive"
+              />
+            </Form.Item>
+            <Form.Item name="task_name" label={t('taskNameLabel')}>
+              <Input placeholder={t('taskNamePlaceholder')} allowClear style={{ width: 200 }} />
+            </Form.Item>
+            <Form.Item name="date" label={t('bizDateLabel')}>
+              <DatePicker format="YYYY-MM-DD" />
+            </Form.Item>
+            <Form.Item>
+              <Space>
+                <Button type="primary" icon={<FilterOutlined />} htmlType="submit">
+                  {t('filter')}
+                </Button>
+                <Button onClick={resetFilter}>{t('reset')}</Button>
+                <Button icon={<ReloadOutlined />} onClick={() => fetch()}>
+                  {t('refresh')}
+                </Button>
+                <Button type="primary" icon={<PlusOutlined />} onClick={() => setDrawerOpen(true)}>
+                  {t('submitTask')}
+                </Button>
+              </Space>
+            </Form.Item>
+          </Form>
         </Space>
-      </Card>
+      </PageCard>
 
-      <Card variant="borderless" styles={{ body: { padding: 0 } }}>
+      <PageCard table styles={{ body: { padding: 0 } }}>
         <TaskListTable
           items={items}
           total={total}
@@ -165,13 +185,13 @@ export function TasksPage() {
           onPageChange={(page, page_size) => fetch({ page, page_size })}
           onCancel={handleCancel}
         />
-      </Card>
+      </PageCard>
 
       <TaskSubmitForm
         open={drawerOpen}
         onClose={() => setDrawerOpen(false)}
         onSubmitted={(traceId) => navigate(`/tasks/${encodeURIComponent(traceId)}`)}
       />
-    </Space>
+    </PageShell>
   );
 }

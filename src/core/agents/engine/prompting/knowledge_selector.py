@@ -2,13 +2,17 @@
 Knowledge selector for dynamic prompt injection.
 
 Selects relevant knowledge skills based on current goal and tool usage.
+Supports keyword-based (default) and embedding-based semantic selection.
 """
 
+import logging
 from dataclasses import dataclass, field
-from typing import Dict, List, Set
+from typing import Any, Dict, List, Optional, Set
 
 from ...state import AgentLoopState
 from ...capabilities.skills import SkillRegistry
+
+logger = logging.getLogger(__name__)
 
 
 _DOMAIN_KEYWORDS = {
@@ -50,6 +54,8 @@ class KnowledgeSelector:
     max_knowledge_tokens: int = 4000
     chars_per_token: float = 4.0
     domain_keywords: Dict[str, List[str]] = field(default_factory=lambda: dict(_DOMAIN_KEYWORDS))
+    retriever: Optional[Any] = None  # OPT-6: MemoryRetriever for semantic selection
+    backend: str = "keyword"  # OPT-6: keyword | embedding
 
     @staticmethod
     def auto_collect_domains(registry: SkillRegistry) -> Dict[str, List[str]]:
@@ -71,6 +77,12 @@ class KnowledgeSelector:
             merged[domain] = list(existing)
         return merged
 
+    async def aselect(self, state: AgentLoopState) -> str:
+        """异步选择知识（支持语义检索）"""
+        if self.backend == "embedding" and self.retriever:
+            return await self._select_embedding(state)
+        return self.select(state)
+
     def select(self, state: AgentLoopState) -> str:
         domains = self._infer_domains(state)
         if not domains:
@@ -87,6 +99,52 @@ class KnowledgeSelector:
         if not selected:
             return ""
 
+        return self._format_selected(selected)
+
+    async def _select_embedding(self, state: AgentLoopState) -> str:
+        """语义检索知识：用 goal + 近期工具名构造 query，检索 knowledge skill 文本"""
+        query = (state.goal or "") + " "
+        query += " ".join(record.tool_name for record in state.tool_call_history[-5:])
+
+        all_knowledge = self.registry.list_knowledge()
+        if not all_knowledge:
+            return ""
+
+        # 为知识片段建 MemoryEntry 进行检索
+        from ...state.memory.long_term import MemoryEntry
+
+        entries = []
+        for skill in all_knowledge:
+            text = skill.to_prompt_text().strip()
+            if text:
+                entries.append(MemoryEntry(
+                    key=skill.name,
+                    value=text,
+                    category="knowledge",
+                    importance=0.5,
+                ))
+
+        if not entries:
+            return ""
+
+        try:
+            await self.retriever.index(entries)
+            results = await self.retriever.search(query, min(len(entries), 5))
+        except Exception:
+            logger.exception("KnowledgeSelector embedding search failed, falling back to keyword")
+            return self.select(state)
+
+        selected = []
+        for entry in results:
+            skill = self.registry.get(entry.key)
+            if skill:
+                selected.append(skill)
+
+        return self._format_selected(selected)
+
+    def _format_selected(self, selected: list) -> str:
+        if not selected:
+            return ""
         parts: List[str] = []
         max_chars = int(self.max_knowledge_tokens * self.chars_per_token)
         used_chars = 0

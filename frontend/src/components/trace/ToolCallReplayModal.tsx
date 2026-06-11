@@ -13,6 +13,7 @@ import {
   theme,
 } from 'antd';
 import { PlayCircleOutlined, WarningOutlined } from '@ant-design/icons';
+import { FONT_MONO } from '@/utils/fonts';
 import { apiClient } from '@/api/client';
 import type { TraceEvent } from '@/api/types';
 
@@ -174,7 +175,7 @@ export function ToolCallReplayModal({ event, open, onClose }: Props) {
               <Input.TextArea
                 rows={6}
                 style={{
-                  fontFamily: 'ui-monospace, SFMono-Regular, monospace',
+                  fontFamily: FONT_MONO,
                   fontSize: 12,
                 }}
               />

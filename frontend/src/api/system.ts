@@ -1,8 +1,10 @@
 import { apiClient, unwrap } from './client';
-import type { SystemStats } from './types';
+import type { ApiRequestOptions, SystemStats } from './types';
 
-export async function getSystemStats(): Promise<SystemStats> {
-  return unwrap(apiClient.get<{ data: SystemStats }>('/system/stats'));
+export async function getSystemStats(options?: ApiRequestOptions): Promise<SystemStats> {
+  return unwrap(
+    apiClient.get<{ data: SystemStats }>('/system/stats', { signal: options?.signal }),
+  );
 }
 
 export interface HealthData {

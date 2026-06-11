@@ -104,6 +104,15 @@ class StateSnapshot:
                 "final_answer": loop_state.final_answer,
                 "stop_reason": loop_state.stop_reason.value if loop_state.stop_reason else None,
                 "consecutive_tool_errors": loop_state.consecutive_tool_errors,
+                "plan": [
+                    {
+                        "id": ps.id,
+                        "goal": ps.goal,
+                        "status": ps.status.value,
+                        "result": ps.result,
+                    }
+                    for ps in getattr(loop_state, "plan", []) or []
+                ],
             },
             "metadata": metadata or {},
             "timestamp": datetime.now().isoformat(),
@@ -204,6 +213,21 @@ class StateSnapshot:
                     duration_ms=tc_data.get("duration_ms", 0.0),
                 )
             )
+
+        # 恢复 plan（向后兼容：旧快照无 plan 字段时默认 []）
+        plan_data = loop_data.get("plan", [])
+        if plan_data:
+            from ..engine.types import PlanStep, PlanStepStatus
+
+            for p_data in plan_data:
+                loop_state.plan.append(
+                    PlanStep(
+                        id=p_data["id"],
+                        goal=p_data["goal"],
+                        status=PlanStepStatus(p_data.get("status", "pending")),
+                        result=p_data.get("result"),
+                    )
+                )
 
         metadata = data.get("metadata", {})
 

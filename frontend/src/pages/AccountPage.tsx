@@ -1,7 +1,5 @@
 import { useEffect, useState, useCallback } from 'react';
 import {
-  Card,
-  Descriptions,
   Button,
   Table,
   Modal,
@@ -17,14 +15,13 @@ import {
   Col,
   Select,
   InputNumber,
-  Statistic,
   theme,
 } from 'antd';
+import { useSemanticColors } from '@/hooks/useSemanticColors';
 import {
   PlusOutlined,
   KeyOutlined,
   CopyOutlined,
-  UserOutlined,
   SafetyCertificateOutlined,
   ThunderboltOutlined,
   TeamOutlined,
@@ -44,12 +41,15 @@ import {
 } from '@/api/auth';
 import { apiClient, unwrap } from '@/api/client';
 import { useTranslation } from 'react-i18next';
+import { PageShell } from '@/components/common/PageShell';
+import { PageHero } from '@/components/common/PageHero';
+import { PageCard, PageCardIcon, PageCardTitle, PageInfoItem } from '@/components/common/PageCard';
+import { FONT_MONO } from '@/utils/fonts';
 import dayjs from 'dayjs';
-
-const cardStyle: React.CSSProperties = { borderRadius: 10 };
 
 export function AccountPage() {
   const { token: themeToken } = theme.useToken();
+  const palette = useSemanticColors();
   const { t } = useTranslation('account');
   const account = useAuthStore((s) => s.account);
   const fetchMe = useAuthStore((s) => s.fetchMe);
@@ -61,7 +61,6 @@ export function AccountPage() {
   const [tokenName, setTokenName] = useState('');
   const [creating, setCreating] = useState(false);
 
-  // admin
   const isAdmin = account?.role === 'admin';
   const [users, setUsers] = useState<AdminUserInfo[]>([]);
   const [loadingUsers, setLoadingUsers] = useState(false);
@@ -124,7 +123,7 @@ export function AccountPage() {
     setLoadingRanking(true);
     try {
       const data = await unwrap<{ days: number; ranking: typeof usageRanking }>(
-        apiClient.get('/auth/admin/stats/usage', { params: { days: 7 } })
+        apiClient.get('/auth/admin/stats/usage', { params: { days: 7 } }),
       );
       setUsageRanking(data.ranking);
     } catch {
@@ -175,12 +174,23 @@ export function AccountPage() {
     ? Math.round((account.today_tokens_used / account.daily_token_limit) * 100)
     : 0;
 
+  const usageStroke =
+    usagePercent >= 100
+      ? palette.chartError
+      : usagePercent >= 80
+        ? palette.chartWarning
+        : '#007aff';
+
   const tokenColumns = [
     {
       title: t('columnPrefix'),
       dataIndex: 'token_prefix',
       key: 'token_prefix',
-      render: (v: string) => <code>{v}...</code>,
+      render: (v: string) => (
+        <code style={{ fontSize: 13, padding: '2px 8px', borderRadius: 6, background: themeToken.colorFillQuaternary }}>
+          {v}...
+        </code>
+      ),
     },
     {
       title: t('columnName'),
@@ -200,7 +210,7 @@ export function AccountPage() {
       dataIndex: 'expires_at',
       key: 'expires_at',
       render: (v: string | null) =>
-        v ? dayjs(v).format('YYYY-MM-DD HH:mm') : <Tag color="green">{t('columnNeverExpires')}</Tag>,
+        v ? dayjs(v).format('YYYY-MM-DD HH:mm') : <Tag color="success">{t('columnNeverExpires')}</Tag>,
     },
     {
       title: t('columnCreatedAt'),
@@ -211,6 +221,7 @@ export function AccountPage() {
     {
       title: t('columnActions'),
       key: 'actions',
+      width: 90,
       render: (_: unknown, record: TokenInfo) => (
         <Popconfirm
           title={t('revokeConfirm')}
@@ -235,278 +246,311 @@ export function AccountPage() {
   }
 
   return (
-    <div style={{ maxWidth: 900, margin: '0 auto', padding: '8px 0 40px' }}>
-      <div style={{ marginBottom: 24 }}>
-        <Typography.Title level={4} style={{ margin: 0 }}>
-          <UserOutlined style={{ marginRight: 8, color: themeToken.colorPrimary }} />
-          {t('title')}
-        </Typography.Title>
-        <Typography.Text type="secondary">{t('subtitle')}</Typography.Text>
-      </div>
-
-      {/* 基本信息 */}
-      <Card
-        variant="borderless"
-        style={cardStyle}
-        title={
-          <span>
-            <SafetyCertificateOutlined style={{ marginRight: 8, color: themeToken.colorPrimary }} />
-            {t('basicInfo')}
-          </span>
-        }
-        styles={{ body: { padding: '16px 24px' } }}
-      >
-        <Descriptions column={2} size="small">
-          <Descriptions.Item label={t('username')}>{account.username}</Descriptions.Item>
-          <Descriptions.Item label={t('email')}>{account.email}</Descriptions.Item>
-          <Descriptions.Item label={t('role')}>
-            <Tag color={isAdmin ? 'red' : 'blue'}>{account.role}</Tag>
-          </Descriptions.Item>
-          <Descriptions.Item label={t('registeredAt')}>
-            {dayjs(account.created_at).format('YYYY-MM-DD HH:mm')}
-          </Descriptions.Item>
-        </Descriptions>
-      </Card>
-
-      {/* 用量 */}
-      <Card
-        variant="borderless"
-        style={cardStyle}
-        title={
-          <span>
-            <ThunderboltOutlined style={{ marginRight: 8, color: themeToken.colorPrimary }} />
-            {t('todayUsage')}
-          </span>
-        }
-        styles={{ body: { padding: '16px 24px' } }}
-      >
-        <Row gutter={32} align="middle">
-          <Col xs={24} md={12}>
-            <Progress
-              percent={usagePercent}
-              status={usagePercent >= 100 ? 'exception' : 'active'}
-              format={() => `${account.today_tokens_used.toLocaleString()} / ${account.daily_token_limit.toLocaleString()}`}
-              strokeColor={
-                usagePercent >= 100
-                  ? '#ff4d4f'
-                  : usagePercent >= 80
-                    ? '#faad14'
-                    : themeToken.colorPrimary
-              }
-            />
-          </Col>
-          <Col xs={24} md={12}>
-            <Row gutter={24}>
-              <Col span={12}>
-                <Statistic
-                  title={t('used')}
-                  value={account.today_tokens_used}
-                  suffix="tokens"
-                  valueStyle={{ fontSize: 20 }}
-                />
-              </Col>
-              <Col span={12}>
-                <Statistic
-                  title={t('dailyQuota')}
-                  value={account.daily_token_limit}
-                  suffix="tokens"
-                  valueStyle={{ fontSize: 20 }}
-                />
-              </Col>
-            </Row>
-          </Col>
-        </Row>
-      </Card>
-
-      {/* Token 管理 */}
-      <Card
-        variant="borderless"
-        style={cardStyle}
-        title={
-          <span>
-            <KeyOutlined style={{ marginRight: 8, color: themeToken.colorPrimary }} />
-            {t('tokens')}
-          </span>
-        }
+    <PageShell>
+      <PageHero
+        title={t('title')}
+        subtitle={t('subtitle')}
+        avatarText={account.username}
+        gradient="blue"
         extra={
-          <Button
-            type="primary"
-            icon={<PlusOutlined />}
-            onClick={() => {
-              setNewToken(null);
-              setTokenName('');
-              setShowCreateModal(true);
-            }}
+          <Tag
+            color={isAdmin ? 'red' : 'blue'}
+            style={{ borderRadius: 20, padding: '4px 14px', fontSize: 13, fontWeight: 500, margin: 0 }}
           >
-            {t('createToken')}
-          </Button>
+            {account.role}
+          </Tag>
         }
-        styles={{ body: { padding: 0 } }}
-      >
-        <Table
-          dataSource={tokens}
-          columns={tokenColumns}
-          rowKey="id"
-          loading={loadingTokens}
-          pagination={false}
-          size="middle"
-        />
-      </Card>
+      />
 
-      {/* Admin: 用量排名 */}
-      {isAdmin && (
-        <Card
-          variant="borderless"
-          style={cardStyle}
-          title={
-            <span>
-              <BarChartOutlined style={{ marginRight: 8, color: themeToken.colorPrimary }} />
-              {t('rankingTitle')}
-            </span>
-          }
-          loading={loadingRanking}
-          styles={{ body: { padding: 0 } }}
-        >
-          <Table
-            dataSource={usageRanking}
-            rowKey="username"
-            pagination={false}
-            size="middle"
-            columns={[
-              { title: t('rankingUser'), dataIndex: 'username', key: 'username' },
-              {
-                title: t('rankingRole'),
-                dataIndex: 'role',
-                key: 'role',
-                width: 80,
-                render: (r: string) => <Tag color={r === 'admin' ? 'red' : 'blue'}>{r}</Tag>,
-              },
-              {
-                title: t('rankingTokens'),
-                dataIndex: 'total_tokens',
-                key: 'total_tokens',
-                render: (v: number) => v.toLocaleString(),
-              },
-            ]}
-          />
-        </Card>
-      )}
+      <Row gutter={[20, 20]}>
+        <Col xs={24} xl={12}>
+          <PageCard
+            title={
+              <PageCardTitle
+                icon={
+                  <PageCardIcon color={themeToken.colorPrimary} bg={themeToken.colorPrimaryBg}>
+                    <SafetyCertificateOutlined />
+                  </PageCardIcon>
+                }
+              >
+                {t('basicInfo')}
+              </PageCardTitle>
+            }
+            styles={{ body: { padding: '22px 24px' } }}
+          >
+            <div className="page-info-grid">
+              <PageInfoItem label={t('username')} value={account.username} />
+              <PageInfoItem label={t('email')} value={account.email} />
+              <PageInfoItem
+                label={t('role')}
+                value={<Tag color={isAdmin ? 'red' : 'blue'}>{account.role}</Tag>}
+              />
+              <PageInfoItem
+                label={t('registeredAt')}
+                value={dayjs(account.created_at).format('YYYY-MM-DD HH:mm')}
+              />
+            </div>
+          </PageCard>
+        </Col>
 
-      {/* Admin: 用户管理 */}
-      {isAdmin && (
-        <Card
-          variant="borderless"
-          style={cardStyle}
-          title={
-            <span>
-              <TeamOutlined style={{ marginRight: 8, color: themeToken.colorPrimary }} />
-              {t('adminUsers')}
-            </span>
-          }
-          styles={{ body: { padding: 0 } }}
-        >
-          <Table
-            dataSource={users}
-            rowKey="id"
-            loading={loadingUsers}
-            pagination={false}
-            size="middle"
-            columns={[
-              { title: t('adminId'), dataIndex: 'id', key: 'id', width: 60 },
-              { title: t('adminUsername'), dataIndex: 'username', key: 'username' },
-              { title: t('adminEmail'), dataIndex: 'email', key: 'email' },
-              {
-                title: t('adminRole'),
-                dataIndex: 'role',
-                key: 'role',
-                width: 160,
-                render: (role: string, record: AdminUserInfo) => (
-                  <Select
-                    size="small"
-                    value={role}
-                    style={{ width: 120 }}
-                    disabled={record.id === account.id}
-                    onChange={(value) => handleRoleChange(record.id, value)}
-                    options={[
-                      { label: 'admin', value: 'admin' },
-                      { label: 'user', value: 'user' },
-                    ]}
-                  />
-                ),
-              },
-              {
-                title: t('adminQuota'),
-                dataIndex: 'daily_token_limit',
-                key: 'daily_token_limit',
-                width: 140,
-                render: (v: number, record: AdminUserInfo) => (
-                  <InputNumber
-                    size="small"
-                    min={0}
-                    value={v}
-                    style={{ width: 120 }}
-                    onPressEnter={() => handleQuotaChange(record.id, record.daily_token_limit)}
-                    onBlur={(e) => {
-                      const val = parseInt((e.target as HTMLInputElement).value, 10);
-                      if (!isNaN(val) && val !== v) handleQuotaChange(record.id, val);
-                    }}
-                  />
-                ),
-              },
-              {
-                title: t('adminRegisteredAt'),
-                dataIndex: 'created_at',
-                key: 'created_at',
-                render: (v: string) => dayjs(v).format('YYYY-MM-DD HH:mm'),
-              },
-            ]}
-          />
-        </Card>
-      )}
+        <Col xs={24} xl={12}>
+          <PageCard
+            title={
+              <PageCardTitle
+                icon={
+                  <PageCardIcon color="#ff9500" bg="rgba(255,149,0,0.12)">
+                    <ThunderboltOutlined />
+                  </PageCardIcon>
+                }
+              >
+                {t('todayUsage')}
+              </PageCardTitle>
+            }
+            styles={{ body: { padding: '22px 24px' } }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: 28, flexWrap: 'wrap' }}>
+              <Progress
+                type="circle"
+                percent={usagePercent}
+                size={120}
+                strokeWidth={8}
+                strokeColor={usageStroke}
+                format={() => (
+                  <div style={{ textAlign: 'center' }}>
+                    <div style={{ fontSize: 22, fontWeight: 600, letterSpacing: '-0.03em' }}>
+                      {usagePercent}%
+                    </div>
+                    <div style={{ fontSize: 11, opacity: 0.55, marginTop: 2 }}>used</div>
+                  </div>
+                )}
+              />
+              <div style={{ display: 'flex', gap: 32, flexWrap: 'wrap' }}>
+                <div>
+                  <div className="page-info-item__label">{t('used')}</div>
+                  <div style={{ fontSize: 22, fontWeight: 600, color: usageStroke }}>
+                    {account.today_tokens_used.toLocaleString()}
+                  </div>
+                  <Typography.Text type="secondary" style={{ fontSize: 12 }}>tokens</Typography.Text>
+                </div>
+                <div>
+                  <div className="page-info-item__label">{t('dailyQuota')}</div>
+                  <div style={{ fontSize: 22, fontWeight: 600 }}>
+                    {account.daily_token_limit.toLocaleString()}
+                  </div>
+                  <Typography.Text type="secondary" style={{ fontSize: 12 }}>tokens</Typography.Text>
+                </div>
+              </div>
+            </div>
+          </PageCard>
+        </Col>
 
-      {/* 创建 Token 弹窗 */}
+        <Col span={24}>
+          <PageCard
+            table
+            title={
+              <PageCardTitle
+                icon={
+                  <PageCardIcon color="#5856d6" bg="rgba(88,86,214,0.12)">
+                    <KeyOutlined />
+                  </PageCardIcon>
+                }
+              >
+                {t('tokens')}
+              </PageCardTitle>
+            }
+            extra={
+              <Button
+                type="primary"
+                icon={<PlusOutlined />}
+                style={{ borderRadius: 10, background: '#007aff', boxShadow: '0 4px 12px rgba(0,122,255,0.25)' }}
+                onClick={() => {
+                  setNewToken(null);
+                  setTokenName('');
+                  setShowCreateModal(true);
+                }}
+              >
+                {t('createToken')}
+              </Button>
+            }
+            styles={{ body: { padding: 0 } }}
+          >
+            <Table
+              dataSource={tokens}
+              columns={tokenColumns}
+              rowKey="id"
+              loading={loadingTokens}
+              pagination={false}
+              size="middle"
+            />
+          </PageCard>
+        </Col>
+
+        {isAdmin && (
+          <Col xs={24} xl={12}>
+            <PageCard
+              table
+              title={
+                <PageCardTitle
+                  icon={
+                    <PageCardIcon color="#34c759" bg="rgba(52,199,89,0.12)">
+                      <BarChartOutlined />
+                    </PageCardIcon>
+                  }
+                >
+                  {t('rankingTitle')}
+                </PageCardTitle>
+              }
+              loading={loadingRanking}
+              styles={{ body: { padding: 0 } }}
+            >
+              <Table
+                dataSource={usageRanking}
+                rowKey="username"
+                pagination={false}
+                size="middle"
+                locale={{ emptyText: t('rankingEmpty', { defaultValue: 'No usage data yet' }) }}
+                columns={[
+                  { title: t('rankingUser'), dataIndex: 'username', key: 'username' },
+                  {
+                    title: t('rankingRole'),
+                    dataIndex: 'role',
+                    key: 'role',
+                    width: 90,
+                    render: (r: string) => <Tag color={r === 'admin' ? 'red' : 'blue'}>{r}</Tag>,
+                  },
+                  {
+                    title: t('rankingTokens'),
+                    dataIndex: 'total_tokens',
+                    key: 'total_tokens',
+                    render: (v: number) => (
+                      <span style={{ fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>
+                        {v.toLocaleString()}
+                      </span>
+                    ),
+                  },
+                ]}
+              />
+            </PageCard>
+          </Col>
+        )}
+
+        {isAdmin && (
+          <Col xs={24} xl={12}>
+            <PageCard
+              table
+              title={
+                <PageCardTitle
+                  icon={
+                    <PageCardIcon color={themeToken.colorPrimary} bg={themeToken.colorPrimaryBg}>
+                      <TeamOutlined />
+                    </PageCardIcon>
+                  }
+                >
+                  {t('adminUsers')}
+                </PageCardTitle>
+              }
+              styles={{ body: { padding: 0 } }}
+            >
+              <Table
+                dataSource={users}
+                rowKey="id"
+                loading={loadingUsers}
+                pagination={false}
+                size="middle"
+                scroll={{ x: 720 }}
+                columns={[
+                  { title: t('adminId'), dataIndex: 'id', key: 'id', width: 60 },
+                  { title: t('adminUsername'), dataIndex: 'username', key: 'username' },
+                  { title: t('adminEmail'), dataIndex: 'email', key: 'email', ellipsis: true },
+                  {
+                    title: t('adminRole'),
+                    dataIndex: 'role',
+                    key: 'role',
+                    width: 140,
+                    render: (role: string, record: AdminUserInfo) => (
+                      <Select
+                        size="small"
+                        value={role}
+                        style={{ width: 110 }}
+                        disabled={record.id === account.id}
+                        onChange={(value) => handleRoleChange(record.id, value)}
+                        options={[
+                          { label: 'admin', value: 'admin' },
+                          { label: 'user', value: 'user' },
+                        ]}
+                      />
+                    ),
+                  },
+                  {
+                    title: t('adminQuota'),
+                    dataIndex: 'daily_token_limit',
+                    key: 'daily_token_limit',
+                    width: 130,
+                    render: (v: number, record: AdminUserInfo) => (
+                      <InputNumber
+                        size="small"
+                        min={0}
+                        value={v}
+                        style={{ width: 110 }}
+                        onPressEnter={() => handleQuotaChange(record.id, record.daily_token_limit)}
+                        onBlur={(e) => {
+                          const val = parseInt((e.target as HTMLInputElement).value, 10);
+                          if (!isNaN(val) && val !== v) handleQuotaChange(record.id, val);
+                        }}
+                      />
+                    ),
+                  },
+                  {
+                    title: t('adminRegisteredAt'),
+                    dataIndex: 'created_at',
+                    key: 'created_at',
+                    width: 150,
+                    render: (v: string) => dayjs(v).format('YYYY-MM-DD HH:mm'),
+                  },
+                ]}
+              />
+            </PageCard>
+          </Col>
+        )}
+      </Row>
+
       <Modal
         title={t('createTokenModal')}
         open={showCreateModal}
         onCancel={() => setShowCreateModal(false)}
-        footer={newToken ? [
-          <Button key="close" onClick={() => setShowCreateModal(false)}>
-            {t('close')}
-          </Button>,
-        ] : [
-          <Button key="cancel" onClick={() => setShowCreateModal(false)}>
-            {t('revokeCancel')}
-          </Button>,
-          <Button key="create" type="primary" loading={creating} onClick={handleCreate}>
-            {t('create')}
-          </Button>,
-        ]}
+        footer={
+          newToken
+            ? [
+                <Button key="close" onClick={() => setShowCreateModal(false)}>
+                  {t('close')}
+                </Button>,
+              ]
+            : [
+                <Button key="cancel" onClick={() => setShowCreateModal(false)}>
+                  {t('revokeCancel')}
+                </Button>,
+                <Button key="create" type="primary" loading={creating} onClick={handleCreate}>
+                  {t('create')}
+                </Button>,
+              ]
+        }
       >
         {newToken ? (
-          <div>
-            <Space direction="vertical" style={{ width: '100%' }}>
-              <Typography.Text strong>
-                {t('tokenCreatedHint')}
-              </Typography.Text>
-              <Input.TextArea
-                value={newToken.token}
-                readOnly
-                rows={2}
-                style={{ fontFamily: 'monospace' }}
-              />
-              <Button
-                icon={<CopyOutlined />}
-                onClick={() => copyToken(newToken.token)}
-              >
-                {t('copyToken')}
-              </Button>
-            </Space>
-          </div>
+          <Space direction="vertical" style={{ width: '100%' }}>
+            <Typography.Text strong>{t('tokenCreatedHint')}</Typography.Text>
+            <Input.TextArea
+              value={newToken.token}
+              readOnly
+              rows={2}
+              style={{ fontFamily: FONT_MONO }}
+            />
+            <Button icon={<CopyOutlined />} onClick={() => copyToken(newToken.token)}>
+              {t('copyToken')}
+            </Button>
+          </Space>
         ) : (
           <div>
-            <Typography.Paragraph type="secondary">
-              {t('tokenNameHint')}
-            </Typography.Paragraph>
+            <Typography.Paragraph type="secondary">{t('tokenNameHint')}</Typography.Paragraph>
             <Input
               prefix={<KeyOutlined />}
               placeholder={t('tokenNamePlaceholder')}
@@ -516,6 +560,6 @@ export function AccountPage() {
           </div>
         )}
       </Modal>
-    </div>
+    </PageShell>
   );
 }

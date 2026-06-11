@@ -6,6 +6,7 @@ import {
   ToolOutlined,
   MonitorOutlined,
   HistoryOutlined,
+  ExperimentOutlined,
   MessageOutlined,
   PlayCircleOutlined,
   MoonOutlined,
@@ -19,8 +20,11 @@ import { useTranslation } from 'react-i18next';
 import { useDarkMode } from '@/hooks/useDarkMode';
 import { useAuthStore } from '@/stores/authStore';
 import { useLocaleStore } from '@/stores/localeStore';
+import './AppLayout.css';
 
 const { Header, Sider, Content } = Layout;
+
+const SIDER_WIDTH = 220;
 
 const NAV_ITEMS = [
   { key: '/chat', icon: <MessageOutlined />, label: 'Chat' },
@@ -30,6 +34,7 @@ const NAV_ITEMS = [
   { key: '/skills', icon: <ToolOutlined />, label: 'Skills' },
   { key: '/system', icon: <MonitorOutlined />, label: 'System' },
   { key: '/runs', icon: <HistoryOutlined />, label: 'Runs' },
+  { key: '/evals', icon: <ExperimentOutlined />, label: 'Evals' },
   { key: '/account', icon: <SettingOutlined />, label: 'Account' },
 ];
 
@@ -88,15 +93,14 @@ export function AppLayout() {
   ];
 
   return (
-    <Layout style={{ minHeight: '100vh' }}>
+    <Layout
+      className="app-layout"
+      data-theme={dark ? 'dark' : 'light'}
+      style={{ ['--app-sider-width' as string]: `${SIDER_WIDTH}px` }}
+    >
       <Sider
-        width={220}
-        style={{
-          background: token.colorBgContainer,
-          boxShadow: '1px 0 8px rgba(0,0,0,0.04)',
-          borderRight: 'none',
-          zIndex: 10,
-        }}
+        width={SIDER_WIDTH}
+        className="app-layout__sider"
       >
         <div
           className="sider-logo"
@@ -122,29 +126,35 @@ export function AppLayout() {
         </div>
         <Menu
           mode="inline"
+          className="app-layout__menu"
           selectedKeys={[selectedKey]}
-          style={{ borderRight: 0, paddingTop: 4 }}
+          style={{ borderRight: 0, paddingTop: 8, paddingBottom: 12 }}
           items={NAV_ITEMS}
           onClick={({ key }) => navigate(key)}
         />
       </Sider>
-      <Layout>
+
+      <Layout className="app-layout__main">
         <Header
+          className="app-layout__header"
           style={{
-            background: token.colorBgContainer,
-            boxShadow: '0 1px 4px rgba(0,0,0,0.04)',
-            borderBottom: 'none',
             paddingInline: 24,
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
             gap: 16,
-            zIndex: 9,
-            position: 'sticky',
-            top: 0,
+            height: 56,
+            lineHeight: '56px',
           }}
         >
-          <Typography.Text type="secondary" style={{ fontSize: 13 }}>
+          <Typography.Text
+            style={{
+              fontSize: 16,
+              fontWeight: 600,
+              letterSpacing: '-0.02em',
+              color: token.colorText,
+            }}
+          >
             {t('app.subtitle')}
           </Typography.Text>
           <Space size={8}>
@@ -174,7 +184,11 @@ export function AppLayout() {
             </Dropdown>
           </Space>
         </Header>
-        <Content style={{ padding: 24, background: token.colorBgLayout, minHeight: 'calc(100vh - 56px)' }}>
+
+        <Content
+          className="app-layout__content"
+          style={{ padding: 24, background: token.colorBgLayout }}
+        >
           <Outlet />
         </Content>
       </Layout>

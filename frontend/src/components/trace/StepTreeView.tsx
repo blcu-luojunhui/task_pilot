@@ -1,7 +1,9 @@
 import { Tree, Tag, Typography, Space, Alert } from 'antd';
 import { useTranslation } from 'react-i18next';
 import type { TraceEvent } from '@/api/types';
+import { useSemanticColors } from '@/hooks/useSemanticColors';
 import { SOURCE_COLOR } from '@/utils/colors';
+import { FONT_MONO } from '@/utils/fonts';
 
 interface ToolCallInfo {
   id: string;
@@ -102,6 +104,7 @@ function buildStepNodes(events: TraceEvent[]): StepNode[] {
 
 export function StepTreeView({ events }: { events: TraceEvent[] }) {
   const { t } = useTranslation('trace');
+  const palette = useSemanticColors();
   const nodes = buildStepNodes(events);
 
   if (nodes.length === 0) {
@@ -149,8 +152,8 @@ export function StepTreeView({ events }: { events: TraceEvent[] }) {
                       padding: '4px 8px',
                       borderRadius: 4,
                       fontSize: 12,
-                      background: result.is_error ? '#fff2f0' : '#f6ffed',
-                      fontFamily: 'ui-monospace, SFMono-Regular, monospace',
+                      background: result.is_error ? palette.stepErrorBg : palette.roleToolBg,
+                      fontFamily: FONT_MONO,
                       maxHeight: 120,
                       overflow: 'auto',
                     }}
@@ -168,7 +171,7 @@ export function StepTreeView({ events }: { events: TraceEvent[] }) {
               key: `step-${node.step}-answer`,
               title: (
                 <Typography.Paragraph
-                  style={{ margin: 0, fontSize: 12, background: '#fafafa', padding: 8, borderRadius: 4 }}
+                  style={{ margin: 0, fontSize: 12, background: palette.stepBg, padding: 8, borderRadius: 4 }}
                 >
                   {node.thinkContent}
                 </Typography.Paragraph>

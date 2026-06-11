@@ -1,0 +1,24 @@
+{
+  "title": "评测看板",
+  "subtitle": "Agent 基准评测报告、成功率趋势与用例下钻",
+  "trendTitle": "成功率趋势",
+  "casesTitle": "用例列表",
+  "metrics": {
+    "successRate": "成功率",
+    "avgSteps": "平均步数",
+    "avgTokens": "平均 Token",
+    "toolErrorRate": "工具错误率"
+  },
+  "table": {
+    "goal": "目标",
+    "success": "结果",
+    "pass": "通过",
+    "fail": "失败",
+    "steps": "步数",
+    "tokens": "Tokens",
+    "judge": "Judge 分",
+    "trace": "轨迹",
+    "viewTrace": "查看",
+    "noReason": "无评判理由"
+  }
+}

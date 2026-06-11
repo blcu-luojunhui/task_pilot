@@ -60,6 +60,9 @@ apiClient.interceptors.response.use(
     return response;
   },
   (error: AxiosError) => {
+    if (error.code === 'ERR_CANCELED' || error.name === 'CanceledError') {
+      return Promise.reject(error);
+    }
     // 401 自动清除登录态
     if (error.response?.status === 401) {
       const body = (error.response.data as { code?: number; message?: string }) || {};

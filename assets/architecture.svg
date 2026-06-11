@@ -1,0 +1,106 @@
+<svg width="100%" viewBox="0 0 720 780" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+      <path d="M2 1L8 5L2 9" fill="none" stroke="#8B8A87" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+    </marker>
+  </defs>
+
+  <style>
+    text { font-family: "Inter", -apple-system, "Segoe UI", sans-serif; }
+  </style>
+
+  <!-- L1: api -->
+  <rect x="60" y="40" width="600" height="56" rx="12" fill="#F5F3FF" stroke="#7C6FF7" stroke-width="1"/>
+  <text x="360" y="63" text-anchor="middle" font-size="15" font-weight="600" fill="#4F3FCF">api</text>
+  <text x="360" y="83" text-anchor="middle" font-size="12" fill="#7C6FF7">HTTP 接入 · auth · chat · tasks · skills · health · replay</text>
+
+  <line x1="360" y1="96" x2="360" y2="124" stroke="#8B8A87" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+  <!-- L2: jobs -->
+  <rect x="60" y="126" width="600" height="56" rx="12" fill="#F5F3FF" stroke="#7C6FF7" stroke-width="1"/>
+  <text x="360" y="149" text-anchor="middle" font-size="15" font-weight="600" fill="#4F3FCF">jobs</text>
+  <text x="360" y="169" text-anchor="middle" font-size="12" fill="#7C6FF7">任务引擎 · MySQL 状态机 · 并发控制 · 超时/取消 · 优雅关闭</text>
+
+  <line x1="360" y1="182" x2="360" y2="210" stroke="#8B8A87" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+  <!-- L3: core/agents -->
+  <rect x="60" y="212" width="600" height="380" rx="14" fill="#EEF4FB" stroke="#5B9BD5" stroke-width="1"/>
+  <text x="360" y="244" text-anchor="middle" font-size="16" font-weight="600" fill="#2B5F8E">core / agents</text>
+  <text x="360" y="264" text-anchor="middle" font-size="12" fill="#5B9BD5">Agent 智能引擎 — 六层架构</text>
+
+  <!-- Row 1 labels -->
+  <text x="162" y="294" text-anchor="middle" font-size="12" fill="#595956">决策与编排</text>
+  <text x="360" y="294" text-anchor="middle" font-size="12" fill="#595956">能力</text>
+  <text x="558" y="294" text-anchor="middle" font-size="12" fill="#595956">状态</text>
+
+  <!-- engine -->
+  <rect x="66" y="304" width="192" height="156" rx="10" fill="#F8FBFF" stroke="#5B9BD5" stroke-width="0.8"/>
+  <text x="162" y="328" text-anchor="middle" font-size="14" font-weight="600" fill="#2B5F8E">engine</text>
+  <text x="162" y="352" text-anchor="middle" font-size="11" fill="#5B9BD5">主循环 Loop / Runner</text>
+  <text x="162" y="374" text-anchor="middle" font-size="11" fill="#5B9BD5">决策策略 ReAct / PlanExecute / Reflexion</text>
+  <text x="162" y="396" text-anchor="middle" font-size="11" fill="#5B9BD5">Prompt 组装 Assembler / Knowledge</text>
+  <text x="162" y="418" text-anchor="middle" font-size="11" fill="#5B9BD5">生命周期 Lifecycle</text>
+  <text x="162" y="440" text-anchor="middle" font-size="11" fill="#5B9BD5">类型定义 Types</text>
+
+  <!-- capabilities -->
+  <rect x="264" y="304" width="192" height="156" rx="10" fill="#F8FBFF" stroke="#5B9BD5" stroke-width="0.8"/>
+  <text x="360" y="328" text-anchor="middle" font-size="14" font-weight="600" fill="#2B5F8E">capabilities</text>
+  <text x="360" y="352" text-anchor="middle" font-size="11" fill="#5B9BD5">LLM Provider</text>
+  <text x="360" y="374" text-anchor="middle" font-size="11" fill="#5B9BD5">Skill Executor</text>
+  <text x="360" y="396" text-anchor="middle" font-size="11" fill="#5B9BD5">MCP Loader</text>
+  <text x="360" y="418" text-anchor="middle" font-size="11" fill="#5B9BD5">Tool Adapter</text>
+  <text x="360" y="440" text-anchor="middle" font-size="11" fill="#5B9BD5">OpenAI / Claude 双格式</text>
+
+  <!-- state -->
+  <rect x="462" y="304" width="192" height="156" rx="10" fill="#F8FBFF" stroke="#5B9BD5" stroke-width="0.8"/>
+  <text x="558" y="328" text-anchor="middle" font-size="14" font-weight="600" fill="#2B5F8E">state</text>
+  <text x="558" y="352" text-anchor="middle" font-size="11" fill="#5B9BD5">State Machine</text>
+  <text x="558" y="374" text-anchor="middle" font-size="11" fill="#5B9BD5">Memory（短期 + 长期）</text>
+  <text x="558" y="396" text-anchor="middle" font-size="11" fill="#5B9BD5">Context Window Manager</text>
+  <text x="558" y="418" text-anchor="middle" font-size="11" fill="#5B9BD5">Snapshot</text>
+  <text x="558" y="440" text-anchor="middle" font-size="11" fill="#5B9BD5">Artifact</text>
+
+  <!-- Row 2 labels -->
+  <text x="162" y="488" text-anchor="middle" font-size="12" fill="#595956">执行</text>
+  <text x="360" y="488" text-anchor="middle" font-size="12" fill="#595956">运行时</text>
+  <text x="558" y="488" text-anchor="middle" font-size="12" fill="#595956">multi-agents</text>
+
+  <!-- execution -->
+  <rect x="66" y="498" width="192" height="82" rx="10" fill="#F8FBFF" stroke="#5B9BD5" stroke-width="0.8"/>
+  <text x="162" y="518" text-anchor="middle" font-size="14" font-weight="600" fill="#2B5F8E">execution</text>
+  <text x="162" y="540" text-anchor="middle" font-size="11" fill="#5B9BD5">Dispatcher · Router</text>
+  <text x="162" y="560" text-anchor="middle" font-size="11" fill="#5B9BD5">Budget · Cancel Signal</text>
+
+  <!-- runtime -->
+  <rect x="264" y="498" width="192" height="82" rx="10" fill="#F8FBFF" stroke="#5B9BD5" stroke-width="0.8"/>
+  <text x="360" y="518" text-anchor="middle" font-size="14" font-weight="600" fill="#2B5F8E">runtime</text>
+  <text x="360" y="540" text-anchor="middle" font-size="11" fill="#5B9BD5">Harness · Evaluator</text>
+  <text x="360" y="560" text-anchor="middle" font-size="11" fill="#5B9BD5">Hooks · Debugger</text>
+
+  <!-- multi-agents -->
+  <rect x="462" y="498" width="192" height="82" rx="10" fill="#F8FBFF" stroke="#5B9BD5" stroke-width="0.8"/>
+  <text x="558" y="518" text-anchor="middle" font-size="14" font-weight="600" fill="#2B5F8E">multi-agents</text>
+  <text x="558" y="540" text-anchor="middle" font-size="11" fill="#5B9BD5">Coordinator · MessageBus</text>
+  <text x="558" y="560" text-anchor="middle" font-size="11" fill="#5B9BD5">Handoff · SubAgent</text>
+
+  <line x1="360" y1="592" x2="360" y2="622" stroke="#8B8A87" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+  <!-- L4: infra -->
+  <rect x="60" y="624" width="600" height="52" rx="12" fill="#F5F4F0" stroke="#A09E99" stroke-width="1"/>
+  <text x="360" y="646" text-anchor="middle" font-size="15" font-weight="600" fill="#5E5C58">infra</text>
+  <text x="360" y="666" text-anchor="middle" font-size="12" fill="#A09E99">MySQL · 异步日志 · Prometheus · TraceEventBus · 告警</text>
+
+  <!-- Side annotations -->
+  <rect x="60" y="700" width="290" height="40" rx="8" fill="#E8F6F0" stroke="#4DAA85" stroke-width="0.8"/>
+  <text x="205" y="724" text-anchor="middle" font-size="13" font-weight="600" fill="#2D6E54">skills/</text>
+  <text x="320" y="724" text-anchor="start" font-size="11" fill="#4DAA85">execute（@skill）· knowledge · MCP</text>
+
+  <rect x="370" y="700" width="290" height="40" rx="8" fill="#E8F6F0" stroke="#4DAA85" stroke-width="0.8"/>
+  <text x="515" y="724" text-anchor="middle" font-size="13" font-weight="600" fill="#2D6E54">frontend</text>
+  <text x="630" y="724" text-anchor="start" font-size="11" fill="#4DAA85">Chat · Trace · Skill · Replay</text>
+
+  <!-- Loop annotation -->
+  <path d="M666 332 Q700 332 700 410 Q700 540 666 540" fill="none" stroke="#A09E99" stroke-width="1" stroke-dasharray="4 3" marker-end="url(#arrow)"/>
+  <text x="706" y="440" font-size="11" fill="#8B8A87" transform="rotate(90 706 440)">Think → Act → Observe</text>
+
+</svg>

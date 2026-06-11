@@ -4,7 +4,6 @@ import {
   Alert,
   Breadcrumb,
   Button,
-  Card,
   Form,
   Input,
   Layout,
@@ -24,6 +23,7 @@ import {
   PlusOutlined,
   ReloadOutlined,
   RightOutlined,
+  ToolOutlined,
 } from '@ant-design/icons';
 import { useLocation } from 'react-router-dom';
 import {
@@ -48,6 +48,9 @@ import {
   resolveSelectedCategory,
 } from '@/utils/skillTree';
 import { useTranslation } from 'react-i18next';
+import { useSemanticColors } from '@/hooks/useSemanticColors';
+import { PageShell } from '@/components/common/PageShell';
+import { PageHero } from '@/components/common/PageHero';
 import './SkillsPage.css';
 
 const { Sider, Content } = Layout;
@@ -155,7 +158,16 @@ export function SkillsPage() {
     [searchedSkills, sourceView]
   );
 
-  const treeData = useMemo(() => buildSkillTree(skills), [skills]);
+  const palette = useSemanticColors();
+  const treeData = useMemo(
+    () =>
+      buildSkillTree(skills, {
+        skill: palette.chartAccent,
+        system: palette.chartNeutral,
+        personal: palette.chartSuccess,
+      }),
+    [skills, palette],
+  );
   const categoryGroups = useMemo<CategoryGroup[]>(() => {
     const categoryMap = new Map<string, SkillInfo[]>();
     for (const skill of filteredSkills) {
@@ -416,22 +428,14 @@ export function SkillsPage() {
   const editing = selectedSkill?.editable === true;
 
   return (
-    <Space direction="vertical" size={16} style={{ width: '100%' }}>
-      <Card
-        variant="borderless"
-        styles={{ body: { padding: '14px 18px' } }}
-        style={{ boxShadow: '0 1px 2px rgba(0, 0, 0, 0.03)' }}
-      >
-        <Space align="center" style={{ width: '100%', justifyContent: 'space-between' }}>
-          <div>
-            <Typography.Title level={4} style={{ margin: 0 }}>
-              {t('title')}
-            </Typography.Title>
-            <Typography.Text type="secondary">
-              {t('subtitle')}
-            </Typography.Text>
-          </div>
-          <Space>
+    <PageShell>
+      <PageHero
+        title={t('title')}
+        subtitle={t('subtitle')}
+        icon={<ToolOutlined />}
+        gradient="indigo"
+        extra={
+          <Space wrap>
             <Typography.Text type="secondary">
               {t('countLabel', { system: systemCount, personal: personalCount })}
             </Typography.Text>
@@ -442,8 +446,8 @@ export function SkillsPage() {
               {t('refresh')}
             </Button>
           </Space>
-        </Space>
-      </Card>
+        }
+      />
 
       {error && (
         <Alert
@@ -467,10 +471,9 @@ export function SkillsPage() {
         <EmptyState description={t('emptyHint')} />
       ) : (
         <Layout
+          className="page-panel"
           style={{
             background: token.colorBgLayout,
-            border: `1px solid ${token.colorBorderSecondary}`,
-            borderRadius: token.borderRadius,
             overflow: 'hidden',
             minHeight: 620,
           }}
@@ -692,6 +695,6 @@ export function SkillsPage() {
         open={drawerSkill !== null}
         onClose={() => setDrawerSkill(null)}
       />
-    </Space>
+    </PageShell>
   );
 }

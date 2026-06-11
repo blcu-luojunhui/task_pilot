@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
-import { Col, Empty, Row, Statistic, Typography } from 'antd';
+import { Col, Empty, Row, Statistic, Typography, theme } from 'antd';
 import { useTranslation } from 'react-i18next';
+import { useSemanticColors } from '@/hooks/useSemanticColors';
 import {
   BarChart,
   Bar,
@@ -17,8 +18,6 @@ import {
   ResponsiveContainer,
 } from 'recharts';
 import type { TraceEvent } from '@/api/types';
-
-const PIE_COLORS = ['#1890ff', '#52c41a', '#faad14', '#ff4d4f', '#722ed1', '#13c2c2', '#eb2f96', '#fa8c16'];
 
 interface StepTiming {
   step: number;
@@ -119,6 +118,8 @@ function parseToolCounts(events: TraceEvent[]): ToolCount[] {
 
 export function StatsView({ events }: { events: TraceEvent[] }) {
   const { t } = useTranslation('trace');
+  const { token } = theme.useToken();
+  const palette = useSemanticColors();
   const timings = useMemo(() => parseTimestamps(events), [events]);
   const tokens = useMemo(() => parseTokens(events), [events]);
   const toolCounts = useMemo(() => parseToolCounts(events), [events]);
@@ -157,13 +158,13 @@ export function StatsView({ events }: { events: TraceEvent[] }) {
           <Typography.Title level={5}>{t('stats.perStepTiming')}</Typography.Title>
           <ResponsiveContainer width="100%" height={200}>
             <BarChart data={timings}>
-              <CartesianGrid strokeDasharray="3 3" />
+              <CartesianGrid strokeDasharray="3 3" stroke={token.colorBorderSecondary} />
               <XAxis dataKey="step" label={{ value: 'Step', position: 'insideBottom', offset: -5 }} />
               <YAxis />
               <Tooltip />
               <Legend />
-              <Bar dataKey="thinkMs" name="Think" fill="#8884d8" stackId="a" />
-              <Bar dataKey="actMs" name="Act" fill="#82ca9d" stackId="a" />
+              <Bar dataKey="thinkMs" name="Think" fill={palette.chartSeries[0]} stackId="a" />
+              <Bar dataKey="actMs" name="Act" fill={palette.chartSeries[1]} stackId="a" />
             </BarChart>
           </ResponsiveContainer>
         </div>
@@ -174,14 +175,14 @@ export function StatsView({ events }: { events: TraceEvent[] }) {
           <Typography.Title level={5}>{t('stats.tokenCurve')}</Typography.Title>
           <ResponsiveContainer width="100%" height={200}>
             <LineChart data={tokens}>
-              <CartesianGrid strokeDasharray="3 3" />
+              <CartesianGrid strokeDasharray="3 3" stroke={token.colorBorderSecondary} />
               <XAxis dataKey="step" label={{ value: 'Step', position: 'insideBottom', offset: -5 }} />
               <YAxis />
               <Tooltip />
               <Legend />
-              <Line type="monotone" dataKey="prompt" name="Prompt" stroke="#8884d8" />
-              <Line type="monotone" dataKey="completion" name="Completion" stroke="#82ca9d" />
-              <Line type="monotone" dataKey="total" name="Total" stroke="#ff7300" />
+              <Line type="monotone" dataKey="prompt" name="Prompt" stroke={palette.chartSeries[0]} />
+              <Line type="monotone" dataKey="completion" name="Completion" stroke={palette.chartSeries[1]} />
+              <Line type="monotone" dataKey="total" name="Total" stroke={palette.chartWarning} />
             </LineChart>
           </ResponsiveContainer>
         </div>
@@ -202,7 +203,7 @@ export function StatsView({ events }: { events: TraceEvent[] }) {
                 label={({ name, value }) => `${name} (${value})`}
               >
                 {toolCounts.map((_, i) => (
-                  <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />
+                  <Cell key={i} fill={palette.chartSeries[i % palette.chartSeries.length]} />
                 ))}
               </Pie>
               <Tooltip />

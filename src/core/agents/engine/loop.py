@@ -68,7 +68,17 @@ class Think:
 
         # 注入相关记忆（插在 system prompt 之后）
         if self.memory_manager:
-            relevant = self.memory_manager.retrieve(query=state.goal, k=3)
+            query = self.memory_manager.build_memory_query(state)
+            # 优先使用异步检索（支持语义后端），回退同步检索
+            if hasattr(self.memory_manager, "aretrieve"):
+                import inspect
+                result = self.memory_manager.aretrieve(query=query, k=3)
+                if inspect.isawaitable(result):
+                    relevant = await result
+                else:
+                    relevant = self.memory_manager.retrieve(query=query, k=3)
+            else:
+                relevant = self.memory_manager.retrieve(query=query, k=3)
             if relevant:
                 memory_msg = {
                     "role": "system",
@@ -192,6 +202,9 @@ class Act:
     max_tool_result_length: int = 2000
     max_concurrency: int = 5
     is_cancelled: Optional[Callable[[], bool]] = None  # 暂停/停止检查回调
+    artifact_store: Optional[Any] = None  # OPT-5: ArtifactStore
+    enable_offload: bool = False  # OPT-5: 上下文卸载开关
+    offload_threshold_chars: int = 4000
 
     def __post_init__(self):
         if self.max_concurrency > 0:
@@ -243,14 +256,35 @@ class Act:
         try:
             result = await self.executor.execute(skill, context, **arguments)
             duration = time.monotonic() - started
+            result_str = str(result)
             state.tool_calls.append(
                 ToolCallRecord(
                     tool_name=tool_name,
                     tool_input=arguments,
-                    tool_output=str(result),
+                    tool_output=result_str,
                     duration_ms=duration * 1000,
                 )
             )
+
+            # OPT-5: 上下文卸载 — 超长结果落盘，对话保留引用
+            if self.enable_offload and self.artifact_store and len(result_str) > self.offload_threshold_chars:
+                try:
+                    ref = await self.artifact_store.put(
+                        trace_id=state.trace_id,
+                        tool_name=tool_name,
+                        step=state.step,
+                        content=result_str,
+                    )
+                    return tool_result_message(
+                        call_id,
+                        f"[Large result offloaded to artifact://{ref.id}, "
+                        f"{ref.total_lines} lines / {ref.total_chars} chars. "
+                        f"Preview: {ref.preview}]\n"
+                        f"Call read_artifact(id=\"{ref.id}\") to read the full content.",
+                    )
+                except Exception:
+                    logger.warning("Artifact offload failed, falling back to truncation", exc_info=True)
+
             return tool_result_message(call_id, self._smart_truncate(result, self.max_tool_result_length))
         except asyncio.CancelledError:
             raise
@@ -342,6 +376,7 @@ class Observe:
             state.consecutive_tool_errors = 0
         # 部分失败不累加也不清零，保留之前的状态
 
+        has_errors = error_count > 0
         if self.abort_on_tool_error and has_errors:
             state.stop_reason = StopReason.TOOL_ERROR_ABORT
         elif state.consecutive_tool_errors >= self.max_consecutive_errors:

@@ -42,8 +42,13 @@ class PromptAssembler:
         sections = [
             ("base", self.base_instructions.strip()),
             ("goal", self._goal_section(state)),
-            ("budget", self._budget_section(state)),
         ]
+
+        plan_section = self._plan_section(state)
+        if plan_section:
+            sections.append(("plan", plan_section))
+
+        sections.append(("budget", self._budget_section(state)))
 
         error_hint = self._error_hint_section(state)
         if error_hint:
@@ -82,6 +87,24 @@ class PromptAssembler:
 
     def _goal_section(self, state: AgentLoopState) -> str:
         return f"## Goal\n{state.goal}"
+
+    def _plan_section(self, state: AgentLoopState) -> str:
+        plan = getattr(state, "plan", []) or []
+        if not plan:
+            return ""
+        status_icon = {
+            "pending": "⬜",
+            "in_progress": "🔄",
+            "done": "✅",
+            "failed": "❌",
+            "skipped": "⏭️",
+        }
+        lines = ["## Plan"]
+        for s in plan:
+            icon = status_icon.get(s.status.value if hasattr(s, "status") else s.get("status", "pending"), "⬜")
+            goal = s.goal if hasattr(s, "goal") else s.get("goal", "")
+            lines.append(f"  {icon} [{s.status}] {goal}")
+        return "\n".join(lines)
 
     def _budget_section(self, state: AgentLoopState) -> str:
         remaining = max(state.max_steps - state.step, 0)

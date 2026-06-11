@@ -9,6 +9,9 @@ TOOL_AREAS = {
     "task": "src.core.agents.capabilities.tools.task",
     "utils": "src.core.agents.capabilities.tools.utils",
     "chat_ops": "src.core.agents.capabilities.tools.chat_ops",
+    "plan": "src.core.agents.capabilities.tools.plan",
+    "artifact": "src.core.agents.capabilities.tools.artifact",
+    "handoff": "src.core.agents.capabilities.tools.handoff",
 }
 DEFAULT_TOOL_AREAS = ("utils",)
 

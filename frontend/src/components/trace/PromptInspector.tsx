@@ -3,6 +3,8 @@ import { Collapse, Empty, Select, Space, Tag, Typography } from 'antd';
 import { DiffOutlined } from '@ant-design/icons';
 import { useTranslation } from 'react-i18next';
 import type { TraceEvent } from '@/api/types';
+import { useSemanticColors } from '@/hooks/useSemanticColors';
+import { FONT_MONO } from '@/utils/fonts';
 
 interface PromptSnapshot {
   step: number;
@@ -35,15 +37,15 @@ function extractPrompts(events: TraceEvent[]): PromptSnapshot[] {
     });
 }
 
-const ROLE_BG: Record<string, string> = {
-  system: '#f5f5f5',
-  user: '#e6f4ff',
-  assistant: '#fffbe6',
-  tool: '#f6ffed',
-};
-
 export function PromptInspector({ events }: { events: TraceEvent[] }) {
   const { t } = useTranslation('trace');
+  const palette = useSemanticColors();
+  const roleBg: Record<string, string> = {
+    system: palette.roleSystemBg,
+    user: palette.roleUserBg,
+    assistant: palette.roleAssistantBg,
+    tool: palette.roleToolBg,
+  };
   const prompts = useMemo(() => extractPrompts(events), [events]);
   const [compareStep, setCompareStep] = useState<number | null>(null);
 
@@ -138,13 +140,13 @@ export function PromptInspector({ events }: { events: TraceEvent[] }) {
           children: (
             <div
               style={{
-                background: ROLE_BG[msg.role] || '#fafafa',
+                background: roleBg[msg.role] || palette.stepBg,
                 padding: 8,
                 borderRadius: 4,
                 maxHeight: 400,
                 overflow: 'auto',
                 fontSize: 12,
-                fontFamily: 'ui-monospace, SFMono-Regular, monospace',
+                fontFamily: FONT_MONO,
                 whiteSpace: 'pre-wrap',
                 wordBreak: 'break-word',
               }}

@@ -13,7 +13,10 @@ import {
   Tag,
   Typography,
   message,
+  theme,
 } from 'antd';
+import { useSemanticColors } from '@/hooks/useSemanticColors';
+import { FONT_MONO } from '@/utils/fonts';
 import {
   PlayCircleOutlined,
   ReloadOutlined,
@@ -32,6 +35,8 @@ interface Props {
 
 export function CompareView({ traceId, open, onClose }: Props) {
   const { t } = useTranslation('replay');
+  const { token } = theme.useToken();
+  const palette = useSemanticColors();
   const [result, setResult] = useState<ReplayResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [model, setModel] = useState('');
@@ -114,10 +119,10 @@ export function CompareView({ traceId, open, onClose }: Props) {
               <Col span={12}>
                 <div
                   style={{
-                    background: '#fafafa',
+                    background: palette.stepBg,
                     borderRadius: 8,
                     padding: 12,
-                    border: '1px solid #e8e8e8',
+                    border: `1px solid ${token.colorBorderSecondary}`,
                   }}
                 >
                   <Typography.Title level={5} style={{ margin: 0 }}>
@@ -143,7 +148,7 @@ export function CompareView({ traceId, open, onClose }: Props) {
                         maxHeight: 300,
                         overflow: 'auto',
                         fontSize: 12,
-                        fontFamily: 'ui-monospace, monospace',
+                        fontFamily: FONT_MONO,
                         whiteSpace: 'pre-wrap',
                         marginTop: 8,
                       }}
@@ -159,10 +164,10 @@ export function CompareView({ traceId, open, onClose }: Props) {
               <Col span={12}>
                 <div
                   style={{
-                    background: '#f6ffed',
+                    background: palette.roleToolBg,
                     borderRadius: 8,
                     padding: 12,
-                    border: '1px solid #b7eb8f',
+                    border: `1px solid ${palette.agentAvatarBorder}`,
                   }}
                 >
                   <Typography.Title level={5} style={{ margin: 0 }}>
@@ -188,7 +193,7 @@ export function CompareView({ traceId, open, onClose }: Props) {
                         maxHeight: 300,
                         overflow: 'auto',
                         fontSize: 12,
-                        fontFamily: 'ui-monospace, monospace',
+                        fontFamily: FONT_MONO,
                         whiteSpace: 'pre-wrap',
                         marginTop: 8,
                       }}

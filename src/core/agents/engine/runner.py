@@ -66,6 +66,12 @@ class AgentLoopRunner:
     memory_manager: Optional[MemoryManager] = None
     stream_callback: Optional[Callable[[str], Any]] = None
     chat_mode: bool = False
+    strategy: Optional[str] = None
+    enable_reflection: bool = False
+    reflection_trigger_errors: int = 2
+    memory_backend: str = "keyword"
+    long_term_memory_path: Optional[str] = None
+    embedding_provider: Optional[str] = None
 
     def __post_init__(self) -> None:
         if self.budget is None:
@@ -82,6 +88,17 @@ class AgentLoopRunner:
 
         if self.memory_manager is None:
             self.memory_manager = MemoryManager()
+
+        # OPT-4: 记忆后端配置
+        if self.memory_backend == "embedding" and self.embedding_provider:
+            from src.core.agents.state.memory.backends import EmbeddingRetriever
+            embed_fn = self._resolve_embed_fn(self.embedding_provider)
+            if embed_fn:
+                self.memory_manager.retriever = EmbeddingRetriever(embed_fn=embed_fn)
+        if self.long_term_memory_path:
+            from pathlib import Path
+            from src.core.agents.state.memory.long_term import LongTermMemory
+            self.memory_manager.long_term = LongTermMemory(Path(self.long_term_memory_path))
 
         if self.thinker is None:
             context_manager = ContextWindowManager(
@@ -129,6 +146,12 @@ class AgentLoopRunner:
             assert self.feedback_loop is not None
             assert self.continuous_improvement is not None
 
+            # 解析策略
+            strategy_instance = None
+            if self.strategy:
+                from .planning import resolve_strategy
+                strategy_instance = resolve_strategy(self.strategy)
+
             self.harness = AgentLoopHarness(
                 thinker=self.thinker,
                 actor=self.actor,
@@ -141,9 +164,49 @@ class AgentLoopRunner:
                 continuous_improvement=self.continuous_improvement,
                 workflow=self.workflow,
                 lifecycle=self.lifecycle,
+                strategy=strategy_instance,
             )
+        # OPT-3: 启用反思
+        if self.enable_reflection:
+            from src.core.agents.runtime.harness.reflection import ReflectionProvider
+            self.feedback_loop.providers.append(
+                ReflectionProvider(
+                    planner=self.planner,
+                    trigger_errors=self.reflection_trigger_errors,
+                )
+            )
+
         if self.router is None:
             self.router = TaskRouter(planner=self.planner)
+
+    @staticmethod
+    def _resolve_embed_fn(provider_name: str):
+        """解析 embedding provider。复用 LLM provider 体系或独立 embedding API。"""
+        if provider_name == "openai":
+            try:
+                from openai import AsyncOpenAI
+                import os
+                client = AsyncOpenAI(api_key=os.getenv("OPENAI_API_KEY", ""))
+
+                async def embed(text: str):
+                    resp = await client.embeddings.create(
+                        model="text-embedding-3-small", input=text
+                    )
+                    return resp.data[0].embedding
+
+                return embed
+            except ImportError:
+                return None
+        # 简单 stub：mock embedding（供测试用）
+        if provider_name == "mock":
+            import hashlib
+
+            async def mock_embed(text: str):
+                h = hashlib.md5(text.encode()).digest()
+                return [float(b) / 255.0 for b in h[:16]]
+
+            return mock_embed
+        return None
 
     async def run(
         self,

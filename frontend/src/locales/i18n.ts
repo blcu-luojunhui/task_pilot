@@ -14,6 +14,7 @@ import enRunTask from './en/runTask.json';
 import enSystem from './en/system.json';
 import enTrace from './en/trace.json';
 import enReplay from './en/replay.json';
+import enEvals from './en/evals.json';
 
 import zhCommon from './zh/common.json';
 import zhAuth from './zh/auth.json';
@@ -27,6 +28,7 @@ import zhRunTask from './zh/runTask.json';
 import zhSystem from './zh/system.json';
 import zhTrace from './zh/trace.json';
 import zhReplay from './zh/replay.json';
+import zhEvals from './zh/evals.json';
 
 const resources = {
   en: {
@@ -42,6 +44,7 @@ const resources = {
     system: enSystem,
     trace: enTrace,
     replay: enReplay,
+    evals: enEvals,
   },
   zh: {
     common: zhCommon,
@@ -56,6 +59,7 @@ const resources = {
     system: zhSystem,
     trace: zhTrace,
     replay: zhReplay,
+    evals: zhEvals,
   },
 };
 

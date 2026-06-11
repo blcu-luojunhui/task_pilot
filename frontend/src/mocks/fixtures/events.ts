@@ -311,3 +311,148 @@ export function buildFailedTraceEvents(traceId: string): TraceEvent[] {
     },
   ];
 }
+
+/** FE-1 mock：plan / strategy / reflection / reasoning 事件流 */
+export function buildChatAgentEvents(traceId: string): TraceEvent[] {
+  const now = new Date();
+  const base = (s: number) => isoSecondsAgo(now, s);
+  let seq = 0;
+  const next = () => ++seq;
+
+  return [
+    {
+      sequence: next(),
+      type: 'chat.strategy',
+      trace_id: traceId,
+      step: null,
+      source: 'chat',
+      timestamp: base(30),
+      data: { mode: 'plan_execute' },
+    },
+    {
+      sequence: next(),
+      type: 'chat.plan_updated',
+      trace_id: traceId,
+      step: null,
+      source: 'chat',
+      timestamp: base(28),
+      data: {
+        steps: [
+          { id: '1', goal: '查询近期任务列表', status: 'done' },
+          { id: '2', goal: '分析失败原因', status: 'in_progress' },
+          { id: '3', goal: '生成修复建议', status: 'pending' },
+        ],
+      },
+    },
+    {
+      sequence: next(),
+      type: 'chat.reasoning_delta',
+      trace_id: traceId,
+      step: null,
+      source: 'chat',
+      timestamp: base(25),
+      data: { delta: '需要先拉取最近 24h 的失败任务…' },
+    },
+    {
+      sequence: next(),
+      type: 'chat.reflection',
+      trace_id: traceId,
+      step: null,
+      source: 'chat',
+      timestamp: base(20),
+      data: { text: '上一步工具返回为空，应缩小时间窗口重试。' },
+    },
+    {
+      sequence: next(),
+      type: 'chat.token_delta',
+      trace_id: traceId,
+      step: null,
+      source: 'chat',
+      timestamp: base(15),
+      data: { delta: '根据分析，建议优先检查 MySQL 连接池。' },
+    },
+    {
+      sequence: next(),
+      type: 'chat.turn_end',
+      trace_id: traceId,
+      step: null,
+      source: 'chat',
+      timestamp: base(10),
+      data: {
+        content: '根据分析，建议优先检查 MySQL 连接池。',
+        token_usage: { prompt: 1200, completion: 180, total: 1380 },
+      },
+    },
+  ];
+}
+
+/** FE-2 mock：菱形依赖 DAG（A→B,C→D） */
+export function buildDagTraceEvents(traceId: string): TraceEvent[] {
+  const now = new Date();
+  const base = (s: number) => isoSecondsAgo(now, s);
+  let seq = 0;
+  const next = () => ++seq;
+
+  const mkThink = (step: number, content: string, tools: string[] = []) => ({
+    sequence: next(),
+    type: 'think_end' as const,
+    trace_id: traceId,
+    step,
+    source: 'harness' as const,
+    timestamp: base(900 - step * 50),
+    data: {
+      assistant_message: {
+        content,
+        tool_calls: tools.map((name, i) => ({
+          id: `call_${step}_${i}`,
+          function: { name, arguments: '{}' },
+        })),
+      },
+    },
+  });
+
+  return [
+    {
+      sequence: next(),
+      type: 'run_start',
+      trace_id: traceId,
+      step: 0,
+      source: 'harness',
+      timestamp: base(950),
+      data: { metadata: { goal: 'DAG demo: parallel subtasks' }, goal: 'DAG demo' },
+    },
+    { sequence: next(), type: 'step_start', trace_id: traceId, step: 1, source: 'harness', timestamp: base(940), data: {} },
+    mkThink(1, '分解任务 A'),
+    { sequence: next(), type: 'step_end', trace_id: traceId, step: 1, source: 'harness', timestamp: base(935), data: {} },
+    { sequence: next(), type: 'step_start', trace_id: traceId, step: 2, source: 'harness', timestamp: base(930), data: { deps: [1] } },
+    mkThink(2, '并行子任务 B', ['list_recent_tasks']),
+    { sequence: next(), type: 'step_end', trace_id: traceId, step: 2, source: 'harness', timestamp: base(925), data: {} },
+    { sequence: next(), type: 'step_start', trace_id: traceId, step: 3, source: 'harness', timestamp: base(920), data: { deps: [1] } },
+    mkThink(3, '并行子任务 C', ['plan_tasks']),
+    {
+      sequence: next(),
+      type: 'subagent_spawned',
+      trace_id: traceId,
+      step: 3,
+      source: 'harness',
+      timestamp: base(918),
+      data: { child_trace_id: `${traceId}-sub-1` },
+    },
+    { sequence: next(), type: 'step_end', trace_id: traceId, step: 3, source: 'harness', timestamp: base(915), data: {} },
+    { sequence: next(), type: 'step_start', trace_id: traceId, step: 4, source: 'harness', timestamp: base(910), data: { deps: [2, 3] } },
+    mkThink(4, '汇总 B+C 结果'),
+    {
+      sequence: next(),
+      type: 'handoff',
+      trace_id: traceId,
+      step: 4,
+      source: 'harness',
+      timestamp: base(908),
+      data: { from_step: 4, to_step: 5, target_agent_id: 'reviewer' },
+    },
+    { sequence: next(), type: 'step_end', trace_id: traceId, step: 4, source: 'harness', timestamp: base(905), data: {} },
+    { sequence: next(), type: 'step_start', trace_id: traceId, step: 5, source: 'harness', timestamp: base(900), data: { deps: [4] } },
+    mkThink(5, '最终答复'),
+    { sequence: next(), type: 'run_end', trace_id: traceId, step: 5, source: 'harness', timestamp: base(880), data: { result: { final_answer: 'done' } } },
+  ];
+}

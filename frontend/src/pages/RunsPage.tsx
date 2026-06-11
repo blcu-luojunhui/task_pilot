@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react';
 import {
-  Card,
   Form,
   Input,
   Select,
@@ -15,15 +14,20 @@ import {
   Row,
   Col,
 } from 'antd';
-import { SearchOutlined, ReloadOutlined, HistoryOutlined, SwapOutlined } from '@ant-design/icons';
+import { SearchOutlined, ReloadOutlined, HistoryOutlined, SwapOutlined, FilterOutlined } from '@ant-design/icons';
+import { PageShell } from '@/components/common/PageShell';
+import { PageHero } from '@/components/common/PageHero';
+import { PageCard, PageCardIcon, PageCardTitle } from '@/components/common/PageCard';
 import { useNavigate } from 'react-router-dom';
 import { listRuns } from '@/api/runs';
 import { CompareView } from '@/components/replay/CompareView';
 import { useTranslation } from 'react-i18next';
 import type { RunSummary } from '@/api/types';
+import { useSemanticColors } from '@/hooks/useSemanticColors';
 
 export function RunsPage() {
   const { t } = useTranslation('runs');
+  const palette = useSemanticColors();
   const navigate = useNavigate();
   const [items, setItems] = useState<RunSummary[]>([]);
   const [total, setTotal] = useState(0);
@@ -157,15 +161,29 @@ export function RunsPage() {
   ];
 
   return (
-    <Space direction="vertical" size={16} style={{ width: '100%' }}>
-      <Typography.Title level={4} style={{ margin: 0 }}>
-        <HistoryOutlined /> {t('title')}
-      </Typography.Title>
-      <Typography.Text type="secondary">
-        {t('subtitle')}
-      </Typography.Text>
+    <PageShell>
+      <PageHero
+        title={t('title')}
+        subtitle={t('subtitle')}
+        icon={<HistoryOutlined />}
+        gradient="orange"
+      />
 
-      <Card variant="borderless">
+      <PageCard
+        title={
+          <PageCardTitle
+            icon={
+              <PageCardIcon color="#ff9500" bg="rgba(255,149,0,0.12)">
+                <FilterOutlined />
+              </PageCardIcon>
+            }
+          >
+            {t('filter')}
+          </PageCardTitle>
+        }
+        styles={{ body: { padding: '18px 22px' } }}
+        style={{ marginBottom: 20 }}
+      >
         <Form layout="inline" form={filterForm} onFinish={() => fetch(1)}>
           <Form.Item name="success" label={t('columnStatus')}>
             <Select
@@ -197,9 +215,9 @@ export function RunsPage() {
             </Space>
           </Form.Item>
         </Form>
-      </Card>
+      </PageCard>
 
-      <Card variant="borderless" styles={{ body: { padding: 0 } }}>
+      <PageCard table styles={{ body: { padding: 0 } }}>
         <Table
           rowKey="id"
           dataSource={items}
@@ -218,7 +236,7 @@ export function RunsPage() {
             showTotal: (count) => t('totalCount', { count }),
           }}
         />
-      </Card>
+      </PageCard>
 
       {/* Run 详情 Drawer */}
       <Drawer
@@ -281,7 +299,7 @@ export function RunsPage() {
 
             <div>
               <Typography.Text strong>Goal</Typography.Text>
-              <Typography.Paragraph style={{ marginTop: 4, background: '#fafafa', padding: 8, borderRadius: 4 }}>
+              <Typography.Paragraph style={{ marginTop: 4, background: palette.stepBg, padding: 8, borderRadius: 4 }}>
                 {detail.goal}
               </Typography.Paragraph>
             </div>
@@ -289,7 +307,7 @@ export function RunsPage() {
             {detail.final_answer && (
               <div>
                 <Typography.Text strong>Final Answer</Typography.Text>
-                <Typography.Paragraph style={{ marginTop: 4, background: '#f6ffed', padding: 8, borderRadius: 4 }}>
+                <Typography.Paragraph style={{ marginTop: 4, background: palette.roleToolBg, padding: 8, borderRadius: 4 }}>
                   {detail.final_answer}
                 </Typography.Paragraph>
               </div>
@@ -300,7 +318,7 @@ export function RunsPage() {
                 <Typography.Text strong type="danger">
                   {t('failedToolCalls', { n: detail.failed_tool_calls.length })}
                 </Typography.Text>
-                <pre style={{ fontSize: 11, marginTop: 4, background: '#fff2f0', padding: 8, borderRadius: 4 }}>
+                <pre style={{ fontSize: 11, marginTop: 4, background: palette.stepErrorBg, padding: 8, borderRadius: 4 }}>
                   {JSON.stringify(detail.failed_tool_calls, null, 2)}
                 </pre>
               </div>
@@ -313,6 +331,6 @@ export function RunsPage() {
         open={replayTraceId !== null}
         onClose={() => setReplayTraceId(null)}
       />
-    </Space>
+    </PageShell>
   );
 }

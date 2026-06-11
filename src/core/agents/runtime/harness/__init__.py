@@ -23,6 +23,7 @@ from .improvement import (
 )
 from .logging import HarnessEventLogger
 from .workflow import WorkflowController, WorkflowDecision
+from .reflection import ReflectionProvider
 
 __all__ = [
     "HarnessEvent",

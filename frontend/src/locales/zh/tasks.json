@@ -1,4 +1,6 @@
 {
+  "pageTitle": "任务列表",
+  "pageSubtitle": "浏览、筛选与管理定时任务执行记录",
   "status": {
     "init": "待调度",
     "processing": "执行中",

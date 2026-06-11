@@ -328,3 +328,76 @@ export interface ConfirmPlanResponse {
   message?: string;
   trace_id?: string;
 }
+
+// ============ Chat Agent Events (FE-1) ============
+
+export type PlanStepStatus = 'pending' | 'in_progress' | 'done' | 'failed' | 'skipped';
+
+export interface PlanStep {
+  id?: string;
+  goal: string;
+  status: PlanStepStatus;
+  error?: string;
+}
+
+/** chat.* SSE 事件常量（FE-1 / FE-5 / FE-6） */
+export const CHAT_EVENTS = {
+  TOKEN_DELTA: 'chat.token_delta',
+  REASONING_DELTA: 'chat.reasoning_delta',
+  TOOL_CALL_START: 'chat.tool_call_start',
+  TOOL_CALL_END: 'chat.tool_call_end',
+  TOOL_CALL_PROPOSED: 'chat.tool_call_proposed',
+  TURN_PAUSED: 'chat.turn_paused',
+  TURN_END: 'chat.turn_end',
+  TURN_ERROR: 'chat.turn_error',
+  MODE_CHANGED: 'chat.mode_changed',
+  PLAN_UPDATED: 'chat.plan_updated',
+  REFLECTION: 'chat.reflection',
+  STRATEGY: 'chat.strategy',
+  ARTIFACT_CREATED: 'chat.artifact_created',
+  CONTEXT_COMPACTED: 'chat.context_compacted',
+  CACHE_HIT: 'chat.cache_hit',
+  LIFECYCLE_CHANGED: 'chat.lifecycle_changed',
+} as const;
+
+export type AgentLifecycleState = 'idle' | 'running' | 'paused' | 'stopped';
+
+export interface TokenUsage {
+  prompt: number;
+  completion: number;
+  total: number;
+}
+
+export interface ArtifactRef {
+  id: string;
+  summary?: string;
+  mime_type?: string;
+}
+
+export interface ArtifactContent {
+  id: string;
+  content: string;
+  offset: number;
+  has_more: boolean;
+  total_size?: number;
+}
+
+/** 消息结构化片段（FE-5 parts 模型） */
+export type MessagePart =
+  | { kind: 'text'; text: string }
+  | { kind: 'reasoning'; text: string }
+  | {
+      kind: 'tool';
+      toolName: string;
+      arguments: Record<string, unknown> | string;
+      status?: 'running' | 'completed' | 'failed';
+      result?: unknown;
+      callId?: string;
+    }
+  | { kind: 'plan'; steps: PlanStep[] }
+  | { kind: 'artifact'; ref: ArtifactRef }
+  | { kind: 'subagent'; traceId: string; goal: string; summary?: string };
+
+export interface ApiRequestOptions {
+  signal?: AbortSignal;
+}

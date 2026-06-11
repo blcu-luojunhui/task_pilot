@@ -12,8 +12,12 @@ import {
   Spin,
   Tag,
   Typography,
+  theme,
 } from 'antd';
-import { ArrowLeftOutlined, ReloadOutlined, SwapOutlined } from '@ant-design/icons';
+import { ArrowLeftOutlined, FileSearchOutlined, ReloadOutlined, SwapOutlined } from '@ant-design/icons';
+import { PageShell } from '@/components/common/PageShell';
+import { PageHero } from '@/components/common/PageHero';
+import { PageCard, PageCardIcon, PageCardTitle } from '@/components/common/PageCard';
 import { useNavigate, useParams } from 'react-router-dom';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -39,6 +43,7 @@ const STREAM_STATUS_COLORS: Record<StreamStatus, 'green' | 'blue' | 'red' | 'ora
 
 
 export function TaskDetailPage() {
+  const { token } = theme.useToken();
   const { t } = useTranslation('tasks');
   const { traceId = '' } = useParams<{ traceId: string }>();
   const navigate = useNavigate();
@@ -115,33 +120,31 @@ export function TaskDetailPage() {
   }
 
   return (
-    <Space direction="vertical" size={16} style={{ width: '100%' }}>
-        <Space style={{ justifyContent: 'space-between', width: '100%' }}>
-          <Space>
+    <PageShell>
+      <PageHero
+        title={t('taskDetail')}
+        subtitle={detail.trace_id}
+        icon={<FileSearchOutlined />}
+        gradient="purple"
+        extra={
+          <Space wrap>
             <Button icon={<ArrowLeftOutlined />} onClick={() => navigate(-1)}>
               {t('back')}
             </Button>
-            <Typography.Title level={4} style={{ margin: 0 }}>
-              {t('taskDetail')}
-            </Typography.Title>
             <TaskStatusTag status={detail.task_status} />
             {isLive && (
               <Badge
                 status={
                   streamColor === 'orange'
                     ? 'processing'
-                    : (streamColor === 'green' ? 'success' : 'default')
+                    : streamColor === 'green'
+                      ? 'success'
+                      : 'default'
                 }
                 text={streamStatusText[streamStatus]}
               />
             )}
-          </Space>
-          <Space>
-            <Button
-              icon={<SwapOutlined />}
-              onClick={() => setReplayOpen(true)}
-              disabled={!detail}
-            >
+            <Button icon={<SwapOutlined />} onClick={() => setReplayOpen(true)} disabled={!detail}>
               Time Travel
             </Button>
             <Button
@@ -152,11 +155,25 @@ export function TaskDetailPage() {
               {t('refresh')}
             </Button>
           </Space>
-        </Space>
+        }
+      />
 
-        <Row gutter={16}>
+      <Row gutter={[20, 20]}>
           <Col xs={24} lg={9}>
-            <Card title={t('taskStateMachine')} variant="borderless">
+            <PageCard
+              title={
+                <PageCardTitle
+                  icon={
+                    <PageCardIcon color={token.colorPrimary} bg={token.colorPrimaryBg}>
+                      <FileSearchOutlined />
+                    </PageCardIcon>
+                  }
+                >
+                  {t('taskStateMachine')}
+                </PageCardTitle>
+              }
+              styles={{ body: { padding: '16px 20px' } }}
+            >
               <Descriptions column={1} size="small" bordered>
                 <Descriptions.Item label="trace_id">
                   <code style={{ fontSize: 12 }}>{detail.trace_id}</code>
@@ -169,12 +186,22 @@ export function TaskDetailPage() {
                   <DataDisplay data={detail.data} />
                 </Descriptions.Item>
               </Descriptions>
-            </Card>
+            </PageCard>
           </Col>
 
           <Col xs={24} lg={15}>
-            <Card
-              title={t('agentTrace')}
+            <PageCard
+              title={
+                <PageCardTitle
+                  icon={
+                    <PageCardIcon color="#32ade6" bg="rgba(50,173,230,0.12)">
+                      <SwapOutlined />
+                    </PageCardIcon>
+                  }
+                >
+                  {t('agentTrace')}
+                </PageCardTitle>
+              }
               extra={
                 agent != null ? (
                   <Space size={[6, 0]} wrap>
@@ -186,7 +213,7 @@ export function TaskDetailPage() {
                   </Space>
                 ) : null
               }
-              variant="borderless"
+              styles={{ body: { padding: '16px 20px' } }}
             >
               {agent?.goal ? (
                 <Alert
@@ -212,7 +239,7 @@ export function TaskDetailPage() {
               ) : null}
 
               <TraceView events={traceEvents ?? []} />
-            </Card>
+            </PageCard>
           </Col>
         </Row>
         <CompareView
@@ -220,7 +247,7 @@ export function TaskDetailPage() {
           open={replayOpen}
           onClose={() => setReplayOpen(false)}
         />
-      </Space>
+    </PageShell>
   );
 }
 

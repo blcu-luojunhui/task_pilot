@@ -1,6 +1,6 @@
 {
   "app": {
-    "subtitle": "从定时任务到 Agentic 执行 — Web Console v1",
+    "subtitle": "从定时任务到 Agentic 执行",
     "searchPlaceholder": "搜索 trace_id 或任务名",
     "darkModeTooltipOn": "切换亮色模式",
     "darkModeTooltipOff": "切换暗色模式",

@@ -5,6 +5,8 @@
   "goalPlaceholder": "描述你要完成的目标…\n例如：查最近 24h 任务执行情况，汇总成功率并分析失败原因",
   "skills": "Skills",
   "skillsCount": "{{count}} 项",
+  "selectAll": "全选",
+  "deselectAll": "全不选",
   "executing": "执行中…",
   "run": "Run",
   "cancelExecution": "取消执行",

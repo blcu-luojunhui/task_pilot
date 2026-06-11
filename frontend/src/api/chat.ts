@@ -1,5 +1,6 @@
 import { apiClient, unwrap } from './client';
 import type {
+  ApiRequestOptions,
   ChatConversation,
   ConfirmPlanRequest,
   ConfirmPlanResponse,
@@ -34,22 +35,27 @@ export async function createConversation(
 }
 
 export async function listConversations(
-  params: ListConversationsParams = {}
+  params: ListConversationsParams = {},
+  options?: ApiRequestOptions,
 ): Promise<ListConversationsData> {
   return unwrap(
-    apiClient.get<{ data: ListConversationsData }>('/chat/conversations', { params })
+    apiClient.get<{ data: ListConversationsData }>('/chat/conversations', {
+      params,
+      signal: options?.signal,
+    }),
   );
 }
 
 export async function getConversation(
   conversationId: string,
-  params: GetConversationParams = {}
+  params: GetConversationParams = {},
+  options?: ApiRequestOptions,
 ): Promise<ConversationDetailData> {
   return unwrap(
     apiClient.get<{ data: ConversationDetailData }>(
       `/chat/conversations/${encodeURIComponent(conversationId)}`,
-      { params }
-    )
+      { params, signal: options?.signal },
+    ),
   );
 }
 

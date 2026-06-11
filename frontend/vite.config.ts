@@ -27,11 +27,24 @@ export default defineConfig({
     rollupOptions: {
       output: {
         manualChunks(id) {
-          if (id.includes('node_modules/react') || id.includes('node_modules/react-dom') || id.includes('node_modules/react-router-dom')) {
+          if (
+            id.includes('node_modules/react') ||
+            id.includes('node_modules/react-dom') ||
+            id.includes('node_modules/react-router-dom')
+          ) {
             return 'react-vendor';
           }
           if (id.includes('node_modules/antd') || id.includes('node_modules/@ant-design/icons')) {
             return 'antd-vendor';
+          }
+          if (id.includes('node_modules/@xyflow')) {
+            return 'react-flow';
+          }
+          if (id.includes('node_modules/recharts') || id.includes('node_modules/d3-')) {
+            return 'charts';
+          }
+          if (id.includes('node_modules/highlight.js') || id.includes('node_modules/rehype-highlight')) {
+            return 'highlight';
           }
         },
       },

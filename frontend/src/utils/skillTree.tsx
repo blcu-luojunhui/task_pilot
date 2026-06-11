@@ -27,9 +27,16 @@ function groupByCategory(skills: SkillInfo[]): Map<string, SkillInfo[]> {
   return map;
 }
 
+export interface SkillTreeIconColors {
+  skill: string;
+  system: string;
+  personal: string;
+}
+
 function buildCategoryNodes(
   source: SkillSource,
-  grouped: Map<string, SkillInfo[]>
+  grouped: Map<string, SkillInfo[]>,
+  iconColors: SkillTreeIconColors,
 ): SkillTreeNode[] {
   if (grouped.size === 0) {
     return [
@@ -70,12 +77,20 @@ function buildCategoryNodes(
           category,
           skill,
           isLeaf: true,
-          icon: <FileMarkdownOutlined style={{ color: '#1677ff' }} />,
+          icon: <FileMarkdownOutlined style={{ color: iconColors.skill }} />,
         })),
     }));
 }
 
-export function buildSkillTree(skills: SkillInfo[]): SkillTreeNode[] {
+export function buildSkillTree(
+  skills: SkillInfo[],
+  iconColors?: SkillTreeIconColors,
+): SkillTreeNode[] {
+  const colors: SkillTreeIconColors = iconColors ?? {
+    skill: 'var(--ant-color-primary)',
+    system: 'var(--ant-color-text-quaternary)',
+    personal: 'var(--ant-color-success)',
+  };
   const systemSkills = skills.filter((s) => s.source === 'system');
   const personalSkills = skills.filter((s) => s.source === 'personal');
 
@@ -87,8 +102,8 @@ export function buildSkillTree(skills: SkillInfo[]): SkillTreeNode[] {
       count: systemSkills.length,
       nodeType: 'root',
       source: 'system',
-      icon: <LockOutlined style={{ color: '#8c8c8c' }} />,
-      children: buildCategoryNodes('system', groupByCategory(systemSkills)),
+      icon: <LockOutlined style={{ color: colors.system }} />,
+      children: buildCategoryNodes('system', groupByCategory(systemSkills), colors),
     },
     {
       key: PERSONAL_ROOT_KEY,
@@ -97,8 +112,8 @@ export function buildSkillTree(skills: SkillInfo[]): SkillTreeNode[] {
       count: personalSkills.length,
       nodeType: 'root',
       source: 'personal',
-      icon: <UserOutlined style={{ color: '#52c41a' }} />,
-      children: buildCategoryNodes('personal', groupByCategory(personalSkills)),
+      icon: <UserOutlined style={{ color: colors.personal }} />,
+      children: buildCategoryNodes('personal', groupByCategory(personalSkills), colors),
     },
   ];
 }

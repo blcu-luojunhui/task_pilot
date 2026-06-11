@@ -107,8 +107,20 @@ class Message:
         )
 
 
+@dataclass
+class SubTask:
+    """DAG 子任务定义 — OPT-7"""
+
+    id: str
+    goal: str
+    deps: list = field(default_factory=list)  # list of id (dependencies)
+    status: str = "pending"  # pending, running, done, failed, skipped
+    result: Optional[str] = None
+
+
 __all__ = [
     "Message",
     "MessageType",
     "MessagePriority",
+    "SubTask",
 ]

@@ -56,6 +56,9 @@ class LLMConfig:
     temperature: float = 0.7
     max_tokens: Optional[int] = None
     timeout: float = 60.0
+    thinking_budget: int = 0  # OPT-14: 0=关闭, >0=thinking token 配额
+    reasoning_effort: Optional[str] = None  # OPT-14: low/medium/high (OpenAI)
+    enable_cache: bool = False  # OPT-13: prompt caching
 
 
 class LLMProvider(ABC):
@@ -102,22 +105,11 @@ class LLMProvider(ABC):
         temperature: Optional[float] = None,
         max_tokens: Optional[int] = None,
         response_format: Optional[Dict] = None,
+        thinking_budget: int = 0,  # OPT-14
+        enable_cache: bool = False,  # OPT-13
         **kwargs,
     ) -> LLMResponse:
-        """
-        发送聊天请求
-
-        Args:
-            messages: 消息列表
-            tools: 工具定义列表
-            temperature: 温度参数
-            max_tokens: 最大 token 数
-            response_format: 结构化输出格式（如 {"type": "json_schema", "json_schema": {...}}）
-            **kwargs: 其他参数
-
-        Returns:
-            LLM 响应
-        """
+        """发送聊天请求"""
         pass
 
     @abstractmethod

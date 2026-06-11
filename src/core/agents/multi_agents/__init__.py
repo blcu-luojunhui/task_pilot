@@ -7,19 +7,23 @@ Multi-Agent Module - 多 Agent 系统
 - coordinator: 协调器
 """
 
-from .protocol import Message, MessageType, MessagePriority
+from .protocol import Message, MessageType, MessagePriority, SubTask
 from .bus import MessageBus, MessageHandler
 from .coordinator import MultiAgentCoordinator, TaskAssignment
+from .subagent import SubAgentSpawner
 
 __all__ = [
     # Protocol
     "Message",
     "MessageType",
     "MessagePriority",
+    "SubTask",
     # Bus
     "MessageBus",
     "MessageHandler",
     # Coordinator
     "MultiAgentCoordinator",
     "TaskAssignment",
+    # SubAgent
+    "SubAgentSpawner",
 ]

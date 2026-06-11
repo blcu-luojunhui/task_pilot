@@ -1,11 +1,12 @@
 import { useState, type ReactNode } from 'react';
-import { Button, Timeline, Tag, Typography, Space, Alert } from 'antd';
+import { Button, Timeline, Tag, Typography, Space, Alert, theme } from 'antd';
 import { PlayCircleOutlined } from '@ant-design/icons';
 import { useTranslation } from 'react-i18next';
 import i18n from '@/locales/i18n';
 import type { TraceEvent } from '@/api/types';
 import { formatIso } from '@/utils/format';
 import { SOURCE_COLOR } from '@/utils/colors';
+import { FONT_MONO } from '@/utils/fonts';
 import { ToolCallReplayModal } from './ToolCallReplayModal';
 
 export function TimelineView({ events }: { events: TraceEvent[] }) {
@@ -52,7 +53,12 @@ export function TimelineView({ events }: { events: TraceEvent[] }) {
 }
 
 function EventLine({ event, onReplay }: { event: TraceEvent; onReplay?: (e: TraceEvent) => void }) {
-  const summary = summarizeEvent(event, onReplay);
+  const { token } = theme.useToken();
+  const summary = summarizeEvent(event, onReplay, {
+    fillBg: token.colorFillQuaternary,
+    errorBg: token.colorErrorBg,
+    successBg: token.colorSuccessBg,
+  });
   return (
     <Space direction="vertical" size={2} style={{ width: '100%' }}>
       <Space size={6}>
@@ -66,7 +72,11 @@ function EventLine({ event, onReplay }: { event: TraceEvent; onReplay?: (e: Trac
   );
 }
 
-function summarizeEvent(event: TraceEvent, onReplay?: (e: TraceEvent) => void): ReactNode {
+function summarizeEvent(
+  event: TraceEvent,
+  onReplay: ((e: TraceEvent) => void) | undefined,
+  colors: { fillBg: string; errorBg: string; successBg: string },
+): ReactNode {
   const data = event.data ?? {};
   if (event.type === 'think_end') {
     const msg = (data as { assistant_message?: { content?: string; tool_calls?: unknown[] } })
@@ -75,7 +85,7 @@ function summarizeEvent(event: TraceEvent, onReplay?: (e: TraceEvent) => void): 
       <Space direction="vertical" size={4} style={{ width: '100%' }}>
         {msg?.content && (
           <Typography.Paragraph
-            style={{ margin: 0, background: '#fafafa', padding: 8, borderRadius: 4, fontSize: 13 }}
+            style={{ margin: 0, background: colors.fillBg, padding: 8, borderRadius: 4, fontSize: 13 }}
           >
             {msg.content}
           </Typography.Paragraph>
@@ -105,8 +115,8 @@ function summarizeEvent(event: TraceEvent, onReplay?: (e: TraceEvent) => void): 
                 padding: 8,
                 borderRadius: 4,
                 fontSize: 12,
-                background: isError ? '#fff2f0' : '#f6ffed',
-                fontFamily: 'ui-monospace, SFMono-Regular, monospace',
+                background: isError ? colors.errorBg : colors.successBg,
+                fontFamily: FONT_MONO,
               }}
             >
               {r.content}

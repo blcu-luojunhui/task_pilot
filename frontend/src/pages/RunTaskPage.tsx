@@ -26,6 +26,8 @@ import { useRunTaskStore } from '@/stores/runTaskStore';
 import { useChatTurnStream } from '@/hooks/useChatTurnStream';
 import { useTranslation } from 'react-i18next';
 import { ToolCallBlock } from '@/components/chat/ToolCallBlock';
+import { PageShell } from '@/components/common/PageShell';
+import { PageHero } from '@/components/common/PageHero';
 import '@/components/chat/ChatMessage.css';
 
 const { TextArea } = Input;
@@ -139,6 +141,8 @@ export function RunTaskPage() {
   const fetchToolAreas = useRunTaskStore((s) => s.fetchToolAreas);
   const setGoal = useRunTaskStore((s) => s.setGoal);
   const toggleArea = useRunTaskStore((s) => s.toggleArea);
+  const selectAllAreas = useRunTaskStore((s) => s.selectAllAreas);
+  const clearAreas = useRunTaskStore((s) => s.clearAreas);
   const run = useRunTaskStore((s) => s.run);
   const cancel = useRunTaskStore((s) => s.cancel);
   const handleLiveEvent = useRunTaskStore((s) => s.handleLiveEvent);
@@ -181,16 +185,22 @@ export function RunTaskPage() {
   const hasOutput = inFlight || finalResult || error || streamingText || toolCalls.length > 0;
 
   return (
-    <Layout
-      hasSider
-      style={{
-        height: 'calc(100vh - 56px - 48px)',
-        background: token.colorBgContainer,
-        border: `1px solid ${token.colorBorderSecondary}`,
-        borderRadius: 8,
-        overflow: 'hidden',
-      }}
-    >
+    <PageShell className="page-shell--fill">
+      <PageHero
+        title={t('title')}
+        subtitle={t('subtitle')}
+        icon={<PlayCircleOutlined />}
+        gradient="cyan"
+      />
+
+      <Layout
+        hasSider
+        className="page-panel"
+        style={{
+          background: token.colorBgContainer,
+          overflow: 'hidden',
+        }}
+      >
       {/* ═══ 左栏：配置区 ═══ */}
       <div
         style={{
@@ -202,22 +212,6 @@ export function RunTaskPage() {
           background: token.colorBgContainer,
         }}
       >
-        {/* 标题 */}
-        <div
-          style={{
-            padding: '16px 16px 12px',
-            borderBottom: `1px solid ${token.colorBorderSecondary}`,
-          }}
-        >
-          <Space align="center" size={8}>
-            <ThunderboltOutlined style={{ fontSize: 18, color: token.colorPrimary }} />
-            <Typography.Text strong style={{ fontSize: 15 }}>{t('title')}</Typography.Text>
-          </Space>
-          <Typography.Text type="secondary" style={{ fontSize: 12, display: 'block', marginTop: 4 }}>
-            {t('subtitle')}
-          </Typography.Text>
-        </div>
-
         <div style={{ flex: 1, overflowY: 'auto' }}>
           {/* Goal */}
           <div style={{ padding: '16px 16px 8px' }}>
@@ -237,13 +231,49 @@ export function RunTaskPage() {
 
           {/* Skills */}
           <div style={{ padding: '8px 16px' }}>
-            <Space size={4} style={{ marginBottom: 8 }}>
-              <SettingOutlined style={{ color: token.colorWarning }} />
-              <Typography.Text strong style={{ fontSize: 13 }}>{t('skills')}</Typography.Text>
-              {selectedAreas.length > 0 && (
-                <Tag style={{ marginLeft: 4 }}>{t('skillsCount', { count: selectedAreas.length })}</Tag>
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                marginBottom: 8,
+                gap: 8,
+              }}
+            >
+              <Space size={4}>
+                <SettingOutlined style={{ color: token.colorWarning }} />
+                <Typography.Text strong style={{ fontSize: 13 }}>{t('skills')}</Typography.Text>
+                {selectedAreas.length > 0 && (
+                  <Tag style={{ marginLeft: 4 }}>{t('skillsCount', { count: selectedAreas.length })}</Tag>
+                )}
+              </Space>
+              {toolAreas.length > 0 && (
+                <Space size={8}>
+                  <Typography.Link
+                    style={{
+                      fontSize: 12,
+                      opacity: inFlight || selectedAreas.length === toolAreas.length ? 0.45 : 1,
+                      pointerEvents:
+                        inFlight || selectedAreas.length === toolAreas.length ? 'none' : 'auto',
+                    }}
+                    onClick={() => selectAllAreas()}
+                  >
+                    {t('selectAll')}
+                  </Typography.Link>
+                  <Typography.Text type="secondary" style={{ fontSize: 12 }}>|</Typography.Text>
+                  <Typography.Link
+                    style={{
+                      fontSize: 12,
+                      opacity: inFlight || selectedAreas.length === 0 ? 0.45 : 1,
+                      pointerEvents: inFlight || selectedAreas.length === 0 ? 'none' : 'auto',
+                    }}
+                    onClick={() => clearAreas()}
+                  >
+                    {t('deselectAll')}
+                  </Typography.Link>
+                </Space>
               )}
-            </Space>
+            </div>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
               {toolAreas.map((area) => {
@@ -469,5 +499,6 @@ export function RunTaskPage() {
         )}
       </div>
     </Layout>
+    </PageShell>
   );
 }

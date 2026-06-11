@@ -1,4 +1,6 @@
 {
+  "pageTitle": "Tasks",
+  "pageSubtitle": "Browse, filter, and manage scheduled task executions",
   "status": {
     "init": "Pending",
     "processing": "Running",
