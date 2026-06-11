@@ -24,7 +24,7 @@ class AccountRepository:
 
     async def find_by_id(self, account_id: int) -> Optional[dict]:
         return await self._db.async_fetch_one(
-            "SELECT id, username, email, password_hash, password_salt, "
+            "SELECT id, username, email, role, password_hash, password_salt, "
             "daily_token_limit, created_at, updated_at "
             "FROM accounts WHERE id = %s",
             params=(account_id,),
@@ -51,6 +51,31 @@ class AccountRepository:
             "UPDATE accounts SET email = %s WHERE id = %s",
             (email, account_id),
         )
+
+    async def list_all(self, page: int = 1, page_size: int = 20) -> tuple[list[dict], int]:
+        total_row = await self._db.async_fetch_one(
+            "SELECT COUNT(*) AS c FROM accounts"
+        )
+        total = total_row["c"] if total_row else 0
+        rows = await self._db.async_fetch(
+            "SELECT id, username, email, role, daily_token_limit, created_at, updated_at "
+            "FROM accounts ORDER BY id ASC LIMIT %s OFFSET %s",
+            params=(page_size, (page - 1) * page_size),
+        )
+        return rows, total
+
+    async def update_role(self, account_id: int, role: str) -> bool:
+        affected = await self._db.async_save(
+            "UPDATE accounts SET role = %s WHERE id = %s", (role, account_id)
+        )
+        return affected > 0
+
+    async def update_daily_limit(self, account_id: int, limit: int) -> bool:
+        affected = await self._db.async_save(
+            "UPDATE accounts SET daily_token_limit = %s WHERE id = %s",
+            (limit, account_id),
+        )
+        return affected > 0
 
     async def delete(self, account_id: int) -> None:
         await self._db.async_save(

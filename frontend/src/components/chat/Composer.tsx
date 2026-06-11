@@ -1,6 +1,7 @@
 import { KeyboardEvent, useRef, useState } from 'react';
 import { Button, Input, Space } from 'antd';
 import { SendOutlined } from '@ant-design/icons';
+import { useTranslation } from 'react-i18next';
 
 interface Props {
   disabled?: boolean;
@@ -10,6 +11,7 @@ interface Props {
 export function Composer({ disabled, onSend }: Props) {
   const [value, setValue] = useState('');
   const textAreaRef = useRef<HTMLTextAreaElement>(null);
+  const { t } = useTranslation('chat');
 
   const submit = () => {
     const text = value.trim();
@@ -20,7 +22,6 @@ export function Composer({ disabled, onSend }: Props) {
   };
 
   const onKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
-    // Enter 发送，Shift+Enter 换行
     if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
       e.preventDefault();
       submit();
@@ -32,7 +33,7 @@ export function Composer({ disabled, onSend }: Props) {
       <Input.TextArea
         ref={textAreaRef}
         autoSize={{ minRows: 1, maxRows: 6 }}
-        placeholder="输入消息  (Enter 发送, Shift+Enter 换行)"
+        placeholder={t('composerPlaceholder')}
         value={value}
         onChange={(e) => setValue(e.target.value)}
         onKeyDown={onKeyDown}
@@ -50,7 +51,7 @@ export function Composer({ disabled, onSend }: Props) {
           minWidth: 60,
         }}
       >
-        发送
+        {t('send')}
       </Button>
     </Space.Compact>
   );

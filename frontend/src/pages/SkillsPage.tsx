@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import i18n from '@/locales/i18n';
 import {
   Alert,
   Breadcrumb,
@@ -27,10 +28,14 @@ import {
 import { useLocation } from 'react-router-dom';
 import {
   createPersonalSkill,
+  createSystemSkill,
   deletePersonalSkill,
+  deleteSystemSkill,
   listSkills,
   updatePersonalSkill,
+  updateSystemSkill,
 } from '@/api/skills';
+import { useAuthStore } from '@/stores/authStore';
 import type { SkillInfo } from '@/api/types';
 import { SkillCallHistoryDrawer } from '@/components/skill/SkillCallHistoryDrawer';
 import { SkillMarkdownPanel } from '@/components/skill/SkillMarkdownPanel';
@@ -42,6 +47,7 @@ import {
   getSelectedPath,
   resolveSelectedCategory,
 } from '@/utils/skillTree';
+import { useTranslation } from 'react-i18next';
 import './SkillsPage.css';
 
 const { Sider, Content } = Layout;
@@ -63,6 +69,7 @@ interface CreateSkillFormValues {
   description: string;
   category: string;
   scope: string;
+  target: 'personal' | 'system';
   skill_type: 'knowledge';
   detail: string;
   guidelines: string;
@@ -95,7 +102,7 @@ function buildSkillMarkdown(values: CreateSkillFormValues): string {
     '',
     '## Description',
     '',
-    values.detail.trim() || '在此描述 skill 的用途与触发场景。',
+    values.detail.trim() || i18n.t('skills:formDetailDefault'),
     '',
     '## Guidelines',
     '',
@@ -105,8 +112,11 @@ function buildSkillMarkdown(values: CreateSkillFormValues): string {
 }
 
 export function SkillsPage() {
+  const { t } = useTranslation('skills');
   const location = useLocation();
   const { token } = theme.useToken();
+  const account = useAuthStore((s) => s.account);
+  const isAdmin = account?.role === 'admin';
   const [skills, setSkills] = useState<SkillInfo[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -187,11 +197,11 @@ export function SkillsPage() {
       data.map((skill) => ({
         ...skill,
         source: skill.source ?? 'system',
-        editable: skill.editable ?? skill.source === 'personal',
+        editable: skill.editable ?? (skill.source === 'personal' || (isAdmin && skill.source === 'system')),
         markdown: skill.markdown ?? '',
         parameters: skill.parameters ?? {},
       })),
-    []
+    [isAdmin]
   );
 
   const load = useCallback(async (cancelled: () => boolean, autoSelect = false) => {
@@ -218,7 +228,7 @@ export function SkillsPage() {
     } catch (err) {
       if (cancelled()) return;
       setSkills([]);
-      setError(err instanceof Error ? err.message : '加载 Skills 失败');
+      setError(err instanceof Error ? err.message : t('loadFailed'));
     } finally {
       if (!cancelled()) setLoading(false);
     }
@@ -284,10 +294,10 @@ export function SkillsPage() {
 
     if (dirty && selectedSkill?.editable) {
       Modal.confirm({
-        title: '未保存的修改',
-        content: '当前 Markdown 有未保存内容，切换后将丢失。是否继续？',
-        okText: '继续',
-        cancelText: '取消',
+        title: t('unsavedTitle'),
+        content: t('unsavedContent'),
+        okText: t('continueAnyway'),
+        cancelText: t('cancel'),
         onOk: () => {
           setSelectedKey(key);
           setDirty(false);
@@ -305,11 +315,11 @@ export function SkillsPage() {
       selectedCategory && selectedCategory !== 'general' ? selectedCategory : 'chat_ops';
     createForm.setFieldsValue({
       name: 'new-skill',
-      description: '在此填写简短描述',
+      description: t('formDescriptionPlaceholder'),
       category,
       scope: 'agent:*',
       skill_type: 'knowledge',
-      detail: '在此描述 skill 的用途与触发场景。',
+      detail: t('formDetailDefault'),
       guidelines: '',
     });
     setCreateOpen(true);
@@ -320,25 +330,29 @@ export function SkillsPage() {
       const values = await createForm.validateFields();
       setCreateSubmitting(true);
       const markdown = buildSkillMarkdown(values);
-      const created = await createPersonalSkill(markdown);
+      const created =
+        values.target === 'system'
+          ? await createSystemSkill(markdown)
+          : await createPersonalSkill(markdown);
       const refreshed = normalizeSkills(await listSkills());
       setSkills(refreshed);
-      setSourceView('personal');
+      const targetSource = values.target === 'system' ? 'system' : 'personal';
+      setSourceView(targetSource as 'system' | 'personal');
       const keys = Array.from(
         new Set(
           refreshed
-            .filter((skill) => skill.source === 'personal')
-            .map((skill) => `category:personal:${skill.category || 'general'}`)
+            .filter((skill) => skill.source === targetSource)
+            .map((skill) => `category:${targetSource}:${skill.category || 'general'}`)
         )
       );
       setExpandedKeys(keys);
       setSelectedKey(findSkillNodeKey(refreshed, created.skill_id));
       setCreateOpen(false);
       createForm.resetFields();
-      message.success('Skill 已创建');
+      message.success(t('created'));
     } catch (err) {
       if (err instanceof Error) {
-        message.error(err.message || '创建失败');
+        message.error(err.message || t('createFailed'));
       }
     } finally {
       setCreateSubmitting(false);
@@ -346,43 +360,54 @@ export function SkillsPage() {
   };
 
   const handleSave = async () => {
-    if (!selectedSkill || selectedSkill.source !== 'personal') {
-      message.warning('请选择一个个人 Skill 后再保存');
+    if (!selectedSkill) {
+      message.warning(t('selectOneFirst'));
+      return;
+    }
+    if (!selectedSkill.editable) {
+      message.warning(t('readOnly'));
       return;
     }
 
     setSaving(true);
     try {
-      const updated = await updatePersonalSkill(selectedSkill.skill_id, draft);
-      message.success('Skill 已保存');
+      const updated =
+        selectedSkill.source === 'system'
+          ? await updateSystemSkill(selectedSkill.skill_id, draft)
+          : await updatePersonalSkill(selectedSkill.skill_id, draft);
+      message.success(t('saved'));
       setDirty(false);
       const normalized = normalizeSkills(await listSkills());
       setSkills(normalized);
       setSelectedKey(findSkillNodeKey(normalized, updated.skill_id));
     } catch (err) {
-      message.error(err instanceof Error ? err.message : '保存失败');
+      message.error(err instanceof Error ? err.message : t('saveFailed'));
     } finally {
       setSaving(false);
     }
   };
 
   const handleDelete = () => {
-    if (!selectedSkill || selectedSkill.source !== 'personal') return;
+    if (!selectedSkill || !selectedSkill.editable) return;
     Modal.confirm({
-      title: `删除 ${selectedSkill.name}.md？`,
-      content: '删除后不可恢复。',
-      okText: '删除',
+      title: t('deleteConfirmTitle', { name: selectedSkill.name }),
+      content: t('deleteConfirmContent'),
+      okText: t('delete'),
       okButtonProps: { danger: true },
-      cancelText: '取消',
+      cancelText: t('cancel'),
       onOk: async () => {
         try {
-          await deletePersonalSkill(selectedSkill.skill_id);
-          message.success('Skill 已删除');
-          setSelectedKey(PERSONAL_ROOT_KEY);
+          if (selectedSkill.source === 'system') {
+            await deleteSystemSkill(selectedSkill.skill_id);
+          } else {
+            await deletePersonalSkill(selectedSkill.skill_id);
+          }
+          message.success(t('deleted'));
+          setSelectedKey(selectedSkill.source === 'system' ? 'root:system' : PERSONAL_ROOT_KEY);
           setDirty(false);
           await load(() => false, false);
         } catch (err) {
-          message.error(err instanceof Error ? err.message : '删除失败');
+          message.error(err instanceof Error ? err.message : t('deleteFailed'));
         }
       },
     });
@@ -400,21 +425,21 @@ export function SkillsPage() {
         <Space align="center" style={{ width: '100%', justifyContent: 'space-between' }}>
           <div>
             <Typography.Title level={4} style={{ margin: 0 }}>
-              Skills 注册表
+              {t('title')}
             </Typography.Title>
             <Typography.Text type="secondary">
-              系统默认 Skill 只读，个人 Skill 以 Markdown 文件维护。
+              {t('subtitle')}
             </Typography.Text>
           </div>
           <Space>
             <Typography.Text type="secondary">
-              系统 {systemCount} / 个人 {personalCount}
+              {t('countLabel', { system: systemCount, personal: personalCount })}
             </Typography.Text>
             <Button type="primary" icon={<PlusOutlined />} onClick={openCreateModal}>
-              新建个人 Skill
+              {t('createButton')}
             </Button>
             <Button icon={<ReloadOutlined />} onClick={() => void load(() => false, false)} loading={loading}>
-              刷新
+              {t('refresh')}
             </Button>
           </Space>
         </Space>
@@ -424,11 +449,11 @@ export function SkillsPage() {
         <Alert
           type="error"
           showIcon
-          message="加载失败"
+          message={t('loadFailedTitle')}
           description={error}
           action={
             <Button size="small" onClick={() => void load(() => false, false)}>
-              重试
+              {t('retry')}
             </Button>
           }
         />
@@ -439,7 +464,7 @@ export function SkillsPage() {
           <Spin />
         </div>
       ) : skills.length === 0 ? (
-        <EmptyState description="当前没有 Skill。点击「新建个人 Skill」创建 Markdown 文件。" />
+        <EmptyState description={t('emptyHint')} />
       ) : (
         <Layout
           style={{
@@ -462,20 +487,20 @@ export function SkillsPage() {
             <Space direction="vertical" size={8} style={{ width: '100%', marginBottom: 10 }}>
               <Space style={{ width: '100%', justifyContent: 'space-between' }}>
                 <Typography.Text strong style={{ fontSize: 14 }}>
-                  Skill 文件
+                  {t('fileTree')}
                 </Typography.Text>
                 <Typography.Text type="secondary" style={{ fontSize: 12 }}>
                   {filteredSkills.length}
                 </Typography.Text>
               </Space>
               <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-                系统默认只读，个人可编辑
+                {t('treeHint')}
               </Typography.Text>
             </Space>
             <Input.Search
               allowClear
               size="small"
-              placeholder="搜索 Skill"
+              placeholder={t('searchPlaceholder')}
               value={treeSearch}
               onChange={(event) => setTreeSearch(event.target.value)}
               style={{ marginBottom: 12 }}
@@ -485,15 +510,15 @@ export function SkillsPage() {
               size="small"
               value={sourceView}
               options={[
-                { label: `系统 ${systemCount}`, value: 'system' },
-                { label: `个人 ${personalCount}`, value: 'personal' },
+                { label: `${t('systemRootLabel').split(' ')[0]} ${systemCount}`, value: 'system' },
+                { label: `${t('personalRootLabel').split(' ')[0]} ${personalCount}`, value: 'personal' },
               ]}
               onChange={(value) => setSourceView(value as 'system' | 'personal')}
               style={{ marginBottom: 10 }}
             />
             <div className="skill-explorer">
               {categoryGroups.length === 0 ? (
-                <div className="skill-explorer-empty">暂无 Markdown 文件</div>
+                <div className="skill-explorer-empty">{t('noFiles')}</div>
               ) : (
                 categoryGroups.map((group) =>
                   group.categories.map((category) => {
@@ -582,10 +607,10 @@ export function SkillsPage() {
       )}
 
       <Modal
-        title="新建个人 Skill"
+        title={t('createModalTitle')}
         open={createOpen}
-        okText="创建"
-        cancelText="取消"
+        okText={t('createModalOk')}
+        cancelText={t('createModalCancel')}
         confirmLoading={createSubmitting}
         onOk={() => void handleCreate()}
         onCancel={() => {
@@ -595,28 +620,28 @@ export function SkillsPage() {
       >
         <Form<CreateSkillFormValues> layout="vertical" form={createForm}>
           <Form.Item
-            label="Skill 名称"
+            label={t('formSkillName')}
             name="name"
             rules={[
-              { required: true, message: '请输入 skill 名称' },
-              { max: 128, message: '长度不能超过 128' },
+              { required: true, message: t('formSkillNameRequired') },
+              { max: 128, message: t('formSkillNameMax') },
             ]}
           >
-            <Input placeholder="例如: new-skill" />
+            <Input placeholder={t('formSkillNamePlaceholder')} />
           </Form.Item>
           <Form.Item
-            label="描述"
+            label={t('formDescription')}
             name="description"
-            rules={[{ required: true, message: '请输入描述' }]}
+            rules={[{ required: true, message: t('formDescriptionRequired') }]}
           >
-            <Input placeholder="在此填写简短描述" />
+            <Input placeholder={t('formDescriptionPlaceholder')} />
           </Form.Item>
           <Space style={{ width: '100%' }} size={12}>
             <Form.Item
               label="Category"
               name="category"
               style={{ flex: 1 }}
-              rules={[{ required: true, message: '请选择或输入 category' }]}
+              rules={[{ required: true, message: t('formCategoryRequired') }]}
             >
               <Select showSearch options={CATEGORY_OPTIONS} />
             </Form.Item>
@@ -627,22 +652,37 @@ export function SkillsPage() {
           <Form.Item
             label="Scope"
             name="scope"
-            rules={[{ required: true, message: '请输入 scope' }]}
+            rules={[{ required: true, message: t('formScopeRequired') }]}
           >
             <Input placeholder="agent:*" />
           </Form.Item>
+          {isAdmin && (
+            <Form.Item
+              label={t('formTarget')}
+              name="target"
+              initialValue="personal"
+              rules={[{ required: true }]}
+            >
+              <Select
+                options={[
+                  { label: t('formTargetPersonal'), value: 'personal' },
+                  { label: t('formTargetSystem'), value: 'system' },
+                ]}
+              />
+            </Form.Item>
+          )}
           <Form.Item
-            label="Description 详情"
+            label={t('formDetail')}
             name="detail"
-            rules={[{ required: true, message: '请输入用途说明' }]}
+            rules={[{ required: true, message: t('formDetailRequired') }]}
           >
             <Input.TextArea autoSize={{ minRows: 3, maxRows: 6 }} />
           </Form.Item>
           <Form.Item
-            label="Guidelines（每行一条，可留空）"
+            label={t('formGuidelines')}
             name="guidelines"
           >
-            <Input.TextArea autoSize={{ minRows: 3, maxRows: 8 }} placeholder="例如：\n先校验参数\n失败时返回可读错误" />
+            <Input.TextArea autoSize={{ minRows: 3, maxRows: 8 }} placeholder={t('formGuidelinesPlaceholder')} />
           </Form.Item>
         </Form>
       </Modal>

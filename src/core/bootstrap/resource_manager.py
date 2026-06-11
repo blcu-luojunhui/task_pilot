@@ -41,6 +41,29 @@ class AppContext:
         logger.info("=== Phase 1: Initializing MySQL pools ===")
         pool = self.container.async_mysql_pool()
         await pool.init_pools()
+
+        logger.info("=== Phase 1.5: Loading system skills from DB ===")
+        from src.core.skills.system_repository import SystemSkillRepository
+        from src.core.agents.capabilities.skills import get_global_registry
+        from src.core.agents.capabilities.skills.model import Skill
+
+        try:
+            sys_repo = SystemSkillRepository(pool)
+            rows = await sys_repo.list_all()
+            registry = get_global_registry()
+            for row in rows:
+                skill = Skill.knowledge(
+                    name=row["name"],
+                    description=row["description"],
+                    domain=row["category"],
+                    scope=row["scope"],
+                    content=row.get("content", ""),
+                )
+                registry.register(skill)
+                logger.debug("Loaded system skill from DB: %s", row["name"])
+            logger.info("System skills loaded from DB: %d", len(rows))
+        except Exception:
+            logger.warning("Failed to load system skills from DB (table may not exist yet)", exc_info=True)
         logger.info("MySQL pools initialized")
 
         logger.info("=== Phase 2: Starting log service ===")

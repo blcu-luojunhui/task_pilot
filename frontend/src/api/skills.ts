@@ -49,3 +49,24 @@ export async function getSkillCalls(
     )
   );
 }
+
+export async function createSystemSkill(content: string): Promise<SkillInfo> {
+  return unwrap(
+    apiClient.post<{ data: SkillInfo }>('/skills/system', { content })
+  );
+}
+
+export async function updateSystemSkill(
+  skillId: string,
+  content: string
+): Promise<SkillInfo> {
+  return unwrap(
+    apiClient.put<{ data: SkillInfo }>(`/skills/system/${skillId}`, { content })
+  );
+}
+
+export async function deleteSystemSkill(skillId: string): Promise<void> {
+  await unwrap(
+    apiClient.delete<{ data: { deleted: boolean } }>(`/skills/system/${skillId}`)
+  );
+}

@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import { Button, Card, Input, Space, Tag, Typography, theme } from 'antd';
 import { DeleteOutlined, HistoryOutlined, SaveOutlined } from '@ant-design/icons';
+import { useTranslation } from 'react-i18next';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import type { SkillInfo } from '@/api/types';
@@ -51,6 +52,7 @@ export function SkillMarkdownPanel({
   onDelete,
   onShowCalls,
 }: Props) {
+  const { t } = useTranslation('skills');
   const { token } = theme.useToken();
   const content = editing ? draft : skill?.markdown ?? '';
   const { frontmatter, body } = useMemo(() => splitFrontmatter(content), [content]);
@@ -126,7 +128,7 @@ export function SkillMarkdownPanel({
           color: token.colorTextSecondary,
         }}
       >
-        选择左侧 Markdown 文件查看内容
+        {t('chooseFile')}
       </div>
     );
   }
@@ -142,12 +144,12 @@ export function SkillMarkdownPanel({
           <Space direction="vertical" size={4}>
             <Space wrap>
               <Typography.Title level={5} style={{ margin: 0 }}>
-                {skill?.name ?? '新建 Skill'}
+                {skill?.name ?? t('newSkill')}
               </Typography.Title>
               {skill && <Tag color={riskTagColor(String(skill.risk_level))}>{skill.risk_level}</Tag>}
               {skill && <Tag>{skill.category}</Tag>}
-              {skill?.source === 'system' && <Tag color="blue">只读</Tag>}
-              {(skill?.source === 'personal' || editing) && <Tag color="green">可编辑</Tag>}
+              {skill?.source === 'system' && <Tag color="blue">{t('readOnlyTag')}</Tag>}
+              {(skill?.source === 'personal' || editing) && <Tag color="green">{t('editableTag')}</Tag>}
             </Space>
             {skill?.description && (
               <Typography.Text type="secondary" style={{ fontSize: 13 }}>
@@ -171,11 +173,11 @@ export function SkillMarkdownPanel({
                   disabled={!dirty}
                   onClick={onSave}
                 >
-                  保存
+                  {t('save')}
                 </Button>
                 {skill && (
                   <Button danger size="small" icon={<DeleteOutlined />} onClick={onDelete}>
-                    删除
+                    {t('delete')}
                   </Button>
                 )}
               </>
@@ -186,7 +188,7 @@ export function SkillMarkdownPanel({
 
       {frontmatter && !editing && (
         <Typography.Text type="secondary" style={{ fontSize: 12, paddingInline: 4 }}>
-          frontmatter 已隐藏，用于保存 name / category / scope 等元数据
+          {t('frontmatterHidden')}
         </Typography.Text>
       )}
 

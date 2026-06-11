@@ -19,14 +19,11 @@ import { SearchOutlined, ReloadOutlined, HistoryOutlined, SwapOutlined } from '@
 import { useNavigate } from 'react-router-dom';
 import { listRuns } from '@/api/runs';
 import { CompareView } from '@/components/replay/CompareView';
+import { useTranslation } from 'react-i18next';
 import type { RunSummary } from '@/api/types';
 
-const SUCCESS_OPTIONS = [
-  { value: 1, label: '成功' },
-  { value: 0, label: '失败' },
-];
-
 export function RunsPage() {
+  const { t } = useTranslation('runs');
   const navigate = useNavigate();
   const [items, setItems] = useState<RunSummary[]>([]);
   const [total, setTotal] = useState(0);
@@ -35,6 +32,11 @@ export function RunsPage() {
   const [detail, setDetail] = useState<RunSummary | null>(null);
   const [replayTraceId, setReplayTraceId] = useState<string | null>(null);
   const [filterForm] = Form.useForm<{ success?: number; goal_keyword?: string }>();
+
+  const successOptions = [
+    { value: 1, label: t('success') },
+    { value: 0, label: t('failed') },
+  ];
 
   const fetch = async (p: number = page) => {
     setLoading(true);
@@ -61,7 +63,7 @@ export function RunsPage() {
 
   const columns = [
     {
-      title: 'Trace',
+      title: t('columnTrace'),
       dataIndex: 'trace_id',
       key: 'trace_id',
       width: 170,
@@ -72,15 +74,15 @@ export function RunsPage() {
       ),
     },
     {
-      title: '状态',
+      title: t('columnStatus'),
       dataIndex: 'success',
       key: 'success',
       width: 60,
       render: (v: number) =>
-        v ? <Tag color="green">成功</Tag> : <Tag color="red">失败</Tag>,
+        v ? <Tag color="green">{t('success')}</Tag> : <Tag color="red">{t('failed')}</Tag>,
     },
     {
-      title: 'Goal',
+      title: t('columnGoal'),
       dataIndex: 'goal',
       key: 'goal',
       ellipsis: true,
@@ -91,28 +93,28 @@ export function RunsPage() {
       ),
     },
     {
-      title: 'Stop Reason',
+      title: t('columnStopReason'),
       dataIndex: 'stop_reason',
       key: 'stop_reason',
       width: 100,
       render: (v: string) => <Tag>{v}</Tag>,
     },
     {
-      title: 'Steps',
+      title: t('columnSteps'),
       dataIndex: 'total_steps',
       key: 'total_steps',
       width: 60,
       align: 'center' as const,
     },
     {
-      title: 'Tools',
+      title: t('columnTools'),
       dataIndex: 'tool_calls_count',
       key: 'tool_calls_count',
       width: 60,
       align: 'center' as const,
     },
     {
-      title: 'Tokens',
+      title: t('columnTokens'),
       key: 'tokens',
       width: 80,
       align: 'right' as const,
@@ -126,7 +128,7 @@ export function RunsPage() {
         ),
     },
     {
-      title: '时间',
+      title: t('columnTime'),
       dataIndex: 'created_at',
       key: 'created_at',
       width: 150,
@@ -135,7 +137,7 @@ export function RunsPage() {
       ),
     },
     {
-      title: '操作',
+      title: t('columnActions'),
       key: 'actions',
       width: 80,
       render: (_: unknown, r: RunSummary) => (
@@ -148,7 +150,7 @@ export function RunsPage() {
             setReplayTraceId(r.trace_id);
           }}
         >
-          Replay
+          {t('replay')}
         </Button>
       ),
     },
@@ -157,29 +159,29 @@ export function RunsPage() {
   return (
     <Space direction="vertical" size={16} style={{ width: '100%' }}>
       <Typography.Title level={4} style={{ margin: 0 }}>
-        <HistoryOutlined /> Runs 运行历史
+        <HistoryOutlined /> {t('title')}
       </Typography.Title>
       <Typography.Text type="secondary">
-        Agent 每次完整运行后由 ContinuousImprovement 落库。可对比不同 run 的 token 消耗、步骤数、工具调用成功率。
+        {t('subtitle')}
       </Typography.Text>
 
       <Card variant="borderless">
         <Form layout="inline" form={filterForm} onFinish={() => fetch(1)}>
-          <Form.Item name="success" label="状态">
+          <Form.Item name="success" label={t('columnStatus')}>
             <Select
-              placeholder="全部"
+              placeholder={t('statusAll')}
               allowClear
               style={{ width: 100 }}
-              options={SUCCESS_OPTIONS}
+              options={successOptions}
             />
           </Form.Item>
-          <Form.Item name="goal_keyword" label="Goal">
-            <Input placeholder="关键词" allowClear style={{ width: 200 }} />
+          <Form.Item name="goal_keyword" label={t('columnGoal')}>
+            <Input placeholder={t('columnGoal')} allowClear style={{ width: 200 }} />
           </Form.Item>
           <Form.Item>
             <Space>
               <Button type="primary" icon={<SearchOutlined />} htmlType="submit">
-                筛选
+                {t('filter')}
               </Button>
               <Button
                 onClick={() => {
@@ -187,10 +189,10 @@ export function RunsPage() {
                   fetch(1);
                 }}
               >
-                重置
+                {t('reset')}
               </Button>
               <Button icon={<ReloadOutlined />} onClick={() => fetch(page)}>
-                刷新
+                {t('refresh')}
               </Button>
             </Space>
           </Form.Item>
@@ -213,7 +215,7 @@ export function RunsPage() {
             pageSize: 20,
             total,
             onChange: (p) => fetch(p),
-            showTotal: (t) => `共 ${t} 条`,
+            showTotal: (count) => t('totalCount', { count }),
           }}
         />
       </Card>
@@ -223,10 +225,10 @@ export function RunsPage() {
         title={
           <Space>
             <HistoryOutlined />
-            <span>Run 详情</span>
+            <span>{t('detailTitle')}</span>
             {detail && (
               <Tag color={detail.success ? 'green' : 'red'}>
-                {detail.success ? '成功' : '失败'}
+                {detail.success ? t('success') : t('failed')}
               </Tag>
             )}
           </Space>
@@ -248,7 +250,7 @@ export function RunsPage() {
               <Descriptions.Item label="stop_reason">
                 <Tag>{detail.stop_reason}</Tag>
               </Descriptions.Item>
-              <Descriptions.Item label="时间">{detail.created_at}</Descriptions.Item>
+              <Descriptions.Item label={t('detailTime')}>{detail.created_at}</Descriptions.Item>
             </Descriptions>
 
             <Row gutter={16}>
@@ -268,7 +270,7 @@ export function RunsPage() {
 
             {detail.token_usage && (
               <div>
-                <Typography.Text strong>Token 分布</Typography.Text>
+                <Typography.Text strong>{t('tokenDistribution')}</Typography.Text>
                 <pre style={{ fontSize: 11, marginTop: 4 }}>
                   prompt: {detail.token_usage.prompt.toLocaleString()}
                   {'\n'}completion: {detail.token_usage.completion.toLocaleString()}
@@ -296,7 +298,7 @@ export function RunsPage() {
             {detail.failed_tool_calls && detail.failed_tool_calls.length > 0 && (
               <div>
                 <Typography.Text strong type="danger">
-                  失败的工具调用 ({detail.failed_tool_calls.length})
+                  {t('failedToolCalls', { n: detail.failed_tool_calls.length })}
                 </Typography.Text>
                 <pre style={{ fontSize: 11, marginTop: 4, background: '#fff2f0', padding: 8, borderRadius: 4 }}>
                   {JSON.stringify(detail.failed_tool_calls, null, 2)}

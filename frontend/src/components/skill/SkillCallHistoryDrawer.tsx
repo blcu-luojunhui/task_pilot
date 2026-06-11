@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Button, Drawer, Empty, Space, Spin, Table, Tag, Typography } from 'antd';
 import { LinkOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import type { SkillCallRecord, SkillInfo } from '@/api/types';
 import { getSkillCalls } from '@/api/skills';
 
@@ -12,6 +13,7 @@ interface Props {
 }
 
 export function SkillCallHistoryDrawer({ skill, open, onClose }: Props) {
+  const { t } = useTranslation('skills');
   const [loading, setLoading] = useState(false);
   const [calls, setCalls] = useState<SkillCallRecord[]>([]);
   const navigate = useNavigate();
@@ -54,7 +56,7 @@ export function SkillCallHistoryDrawer({ skill, open, onClose }: Props) {
         step !== null ? <Tag color="blue">{step}</Tag> : '-',
     },
     {
-      title: '参数',
+      title: t('paramsLabel'),
       dataIndex: 'arguments',
       key: 'arguments',
       ellipsis: true,
@@ -65,7 +67,7 @@ export function SkillCallHistoryDrawer({ skill, open, onClose }: Props) {
       ),
     },
     {
-      title: '时间',
+      title: t('timeLabel'),
       dataIndex: 'created_at',
       key: 'created_at',
       width: 180,
@@ -92,7 +94,7 @@ export function SkillCallHistoryDrawer({ skill, open, onClose }: Props) {
       {loading ? (
         <Spin />
       ) : calls.length === 0 ? (
-        <Empty description={`${skill?.name ?? '未知'} 暂无调用记录`} />
+        <Empty description={t('noCallsRecord', { name: skill?.name ?? t('unknown') })} />
       ) : (
         <Table
           dataSource={calls}

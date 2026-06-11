@@ -16,13 +16,13 @@ export enum TaskStatus {
   FAILED = 99,
 }
 
-export const TASK_STATUS_LABEL: Record<TaskStatus, string> = {
-  [TaskStatus.INIT]: '待调度',
-  [TaskStatus.PROCESSING]: '执行中',
-  [TaskStatus.SUCCESS]: '成功',
-  [TaskStatus.CANCELLED]: '已取消',
-  [TaskStatus.CANCEL_REQUESTED]: '取消中',
-  [TaskStatus.FAILED]: '失败',
+export const TASK_STATUS_LABEL_KEYS: Record<TaskStatus, string> = {
+  [TaskStatus.INIT]: 'tasks.status.init',
+  [TaskStatus.PROCESSING]: 'tasks.status.processing',
+  [TaskStatus.SUCCESS]: 'tasks.status.success',
+  [TaskStatus.CANCELLED]: 'tasks.status.cancelled',
+  [TaskStatus.CANCEL_REQUESTED]: 'tasks.status.cancelRequested',
+  [TaskStatus.FAILED]: 'tasks.status.failed',
 };
 
 // ============ 通用响应包装 ============

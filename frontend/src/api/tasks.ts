@@ -50,3 +50,21 @@ export async function cancelTask(payload: CancelTaskRequest): Promise<RunTaskRes
   const response = await apiClient.post<RunTaskResponse>('/cancel_task', payload);
   return response.data;
 }
+
+/** Admin: 列出所有用户的任务 */
+export async function listAdminTasks(params: ListTasksParams = {}): Promise<ListTasksData> {
+  return unwrap(
+    apiClient.get<{ data: ListTasksData }>('/auth/admin/tasks', {
+      params,
+      paramsSerializer: { indexes: null },
+    })
+  );
+}
+
+/** Admin: 取消任意用户的任务 */
+export async function cancelAdminTask(traceId: string): Promise<RunTaskResponse> {
+  const response = await apiClient.post<RunTaskResponse>(
+    `/auth/admin/tasks/${encodeURIComponent(traceId)}/cancel`
+  );
+  return response.data;
+}

@@ -4,6 +4,7 @@ import { RobotOutlined, ToolOutlined, UserOutlined } from '@ant-design/icons';
 import { Link } from 'react-router-dom';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import { useTranslation } from 'react-i18next';
 import type { ChatMessage, ChatToolCall } from '@/api/types';
 import { PlanCard } from './PlanCard';
 import './ChatMessage.css';
@@ -33,6 +34,7 @@ function CodeBlock({ className, children }: { className?: string; children: Reac
   const [copied, setCopied] = useState(false);
   const lang = className?.replace('language-', '') || '';
   const codeStr = String(children).replace(/\n$/, '');
+  const { t } = useTranslation('chat');
 
   const handleCopy = useCallback(() => {
     navigator.clipboard.writeText(codeStr).then(() => {
@@ -46,7 +48,7 @@ function CodeBlock({ className, children }: { className?: string; children: Reac
       <div className="code-block-header">
         <span className="code-block-lang">{lang || 'code'}</span>
         <button className={`code-block-copy ${copied ? 'copied' : ''}`} onClick={handleCopy}>
-          {copied ? '已复制' : '复制'}
+          {copied ? t('copied') : t('copyCode')}
         </button>
       </div>
       <pre>
@@ -61,9 +63,9 @@ function formatTime(iso: string): string {
     const d = new Date(iso);
     const now = new Date();
     const isToday = d.toDateString() === now.toDateString();
-    const time = d.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' });
+    const time = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     if (isToday) return time;
-    return `${d.toLocaleDateString('zh-CN', { month: 'short', day: 'numeric' })} ${time}`;
+    return `${d.toLocaleDateString([], { month: 'short', day: 'numeric' })} ${time}`;
   } catch {
     return '';
   }
@@ -71,6 +73,7 @@ function formatTime(iso: string): string {
 
 export function MessageBubble({ message, streaming = false }: Props) {
   const { token } = theme.useToken();
+  const { t } = useTranslation('chat');
 
   if (message.role === 'system') return null;
 
@@ -112,7 +115,7 @@ export function MessageBubble({ message, streaming = false }: Props) {
         {/* 元信息：名称 + 时间 + trace 链接 */}
         <div className="msg-meta">
           <Typography.Text type="secondary" style={{ fontSize: 12, fontWeight: 500 }}>
-            {isUser ? '你' : isAssistant ? 'Agent' : `Tool · ${message.tool_call_id ?? ''}`}
+            {isUser ? t('you') : isAssistant ? t('agent') : `${t('toolPrefix')} ${message.tool_call_id ?? ''}`}
           </Typography.Text>
           {message.created_at && (
             <Typography.Text type="secondary" style={{ fontSize: 11, opacity: 0.6 }}>
@@ -248,7 +251,7 @@ export function MessageBubble({ message, streaming = false }: Props) {
                       <Space size={6}>
                         <ToolOutlined />
                         <Typography.Text strong>{name}</Typography.Text>
-                        <Tag color="orange">tool_call</Tag>
+                        <Tag color="orange">{t('toolCallTag')}</Tag>
                       </Space>
                     }
                   >

@@ -181,6 +181,22 @@ CREATE TABLE IF NOT EXISTS account_skills (
     INDEX idx_account_category (account_id, category)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+CREATE TABLE IF NOT EXISTS system_skills (
+    id              BIGINT AUTO_INCREMENT PRIMARY KEY,
+    name            VARCHAR(128) NOT NULL
+        COMMENT 'Skill 唯一标识（slug）',
+    category        VARCHAR(64)  NOT NULL DEFAULT 'general',
+    description     VARCHAR(512) NOT NULL DEFAULT '',
+    scope           VARCHAR(64)  NOT NULL DEFAULT 'agent:*',
+    content         MEDIUMTEXT   NOT NULL
+        COMMENT '完整 Markdown 文件内容',
+    skill_type      VARCHAR(16)  NOT NULL DEFAULT 'knowledge'
+        COMMENT 'executable / knowledge',
+    created_at      TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
+    updated_at      TIMESTAMP    DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE INDEX uk_system_skill_name (name)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
 -- ============================================================
 -- 数据隔离迁移：为已有数据库添加 account_id 列
 -- MySQL 5.7 不兼容 IF NOT EXISTS for ALTER TABLE ADD COLUMN，

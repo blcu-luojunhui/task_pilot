@@ -1,5 +1,6 @@
 import { Component, ReactNode } from 'react';
 import { Result, Button } from 'antd';
+import { useTranslation } from 'react-i18next';
 
 interface Props {
   children: ReactNode;
@@ -9,7 +10,7 @@ interface State {
   error: Error | null;
 }
 
-export class ErrorBoundary extends Component<Props, State> {
+class ErrorBoundaryInner extends Component<Props & { t: ReturnType<typeof useTranslation>['t'] }, State> {
   override state: State = { error: null };
 
   static getDerivedStateFromError(error: Error): State {
@@ -25,11 +26,11 @@ export class ErrorBoundary extends Component<Props, State> {
       return (
         <Result
           status="error"
-          title="界面崩溃"
+          title={this.props.t('error.crashTitle')}
           subTitle={this.state.error.message}
           extra={
             <Button type="primary" onClick={() => this.setState({ error: null })}>
-              重试
+              {this.props.t('error.retry')}
             </Button>
           }
         />
@@ -37,4 +38,9 @@ export class ErrorBoundary extends Component<Props, State> {
     }
     return this.props.children;
   }
+}
+
+export function ErrorBoundary({ children }: Props) {
+  const { t } = useTranslation('common');
+  return <ErrorBoundaryInner t={t}>{children}</ErrorBoundaryInner>;
 }

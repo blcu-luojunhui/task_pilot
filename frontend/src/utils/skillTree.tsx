@@ -1,5 +1,6 @@
 import type { DataNode } from 'antd/es/tree';
 import { FileMarkdownOutlined, LockOutlined, UserOutlined } from '@ant-design/icons';
+import i18n from '@/locales/i18n';
 import type { SkillInfo, SkillSource } from '@/api/types';
 
 export const SYSTEM_ROOT_KEY = 'root:system';
@@ -34,8 +35,8 @@ function buildCategoryNodes(
     return [
       {
         key: `empty:${source}`,
-        title: '（空）',
-        label: '（空）',
+        title: i18n.t('skills:emptyCategory'),
+        label: i18n.t('skills:emptyCategory'),
         count: 0,
         nodeType: 'category',
         source,
@@ -81,8 +82,8 @@ export function buildSkillTree(skills: SkillInfo[]): SkillTreeNode[] {
   return [
     {
       key: SYSTEM_ROOT_KEY,
-      title: '系统默认 Skill',
-      label: '系统默认 Skill',
+      title: i18n.t('skills:systemRootLabel'),
+      label: i18n.t('skills:systemRootLabel'),
       count: systemSkills.length,
       nodeType: 'root',
       source: 'system',
@@ -91,8 +92,8 @@ export function buildSkillTree(skills: SkillInfo[]): SkillTreeNode[] {
     },
     {
       key: PERSONAL_ROOT_KEY,
-      title: '个人 Skill',
-      label: '个人 Skill',
+      title: i18n.t('skills:personalRootLabel'),
+      label: i18n.t('skills:personalRootLabel'),
       count: personalSkills.length,
       nodeType: 'root',
       source: 'personal',

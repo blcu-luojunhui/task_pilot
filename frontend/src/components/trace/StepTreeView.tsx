@@ -1,4 +1,5 @@
 import { Tree, Tag, Typography, Space, Alert } from 'antd';
+import { useTranslation } from 'react-i18next';
 import type { TraceEvent } from '@/api/types';
 import { SOURCE_COLOR } from '@/utils/colors';
 
@@ -100,10 +101,11 @@ function buildStepNodes(events: TraceEvent[]): StepNode[] {
 }
 
 export function StepTreeView({ events }: { events: TraceEvent[] }) {
+  const { t } = useTranslation('trace');
   const nodes = buildStepNodes(events);
 
   if (nodes.length === 0) {
-    return <Alert type="warning" showIcon message="无结构化步骤数据" />;
+    return <Alert type="warning" showIcon message={t('stepTree.noData')} />;
   }
 
   const treeData = nodes.map((node) => ({
@@ -119,7 +121,7 @@ export function StepTreeView({ events }: { events: TraceEvent[] }) {
             {node.thinkContent.slice(0, 120)}
           </Typography.Text>
         )}
-        {node.hasError && <Tag color="red">有错误</Tag>}
+        {node.hasError && <Tag color="red">{t('stepTree.hasError')}</Tag>}
       </Space>
     ),
     children: node.toolCalls.length > 0

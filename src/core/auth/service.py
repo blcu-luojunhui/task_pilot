@@ -133,7 +133,88 @@ class AuthService:
             return None
         usage = await self.usage.get_today_usage(account_id)
         account["today_tokens_used"] = usage["tokens_used"]
+        account["role"] = account.get("role", "user")
         return account
+
+    async def list_users(self, page: int = 1, page_size: int = 20) -> dict:
+        rows, total = await self.accounts.list_all(page, page_size)
+        return {"total": total, "page": page, "page_size": page_size, "items": rows}
+
+    async def update_user_role(self, account_id: int, role: str) -> bool:
+        if role not in ("admin", "user"):
+            raise ValueError(f"Invalid role: {role}")
+        return await self.accounts.update_role(account_id, role)
+
+    async def update_user_quota(self, account_id: int, limit: int) -> bool:
+        if limit < 0:
+            raise ValueError("配额不能为负数")
+        return await self.accounts.update_daily_limit(account_id, limit)
+
+    # ── Admin: 任务管理 ────────────────────────────────────────
+
+    async def list_all_tasks(
+        self,
+        page: int = 1,
+        page_size: int = 20,
+        status_filter: list[int] | None = None,
+        task_name: str | None = None,
+        date: str | None = None,
+        trace_id_q: str | None = None,
+    ) -> dict:
+        conditions: list[str] = ["1=1"]
+        params: list = []
+
+        if status_filter:
+            placeholders = ",".join(["%s"] * len(status_filter))
+            conditions.append(f"task_status IN ({placeholders})")
+            params.extend(status_filter)
+
+        if task_name:
+            escaped = "%" + task_name.replace("%", r"\%").replace("_", r"\_") + "%"
+            conditions.append("task_name LIKE %s")
+            params.append(escaped)
+
+        if date:
+            conditions.append("date_string = %s")
+            params.append(date)
+
+        if trace_id_q:
+            escaped = "%" + trace_id_q.replace("%", r"\%").replace("_", r"\_") + "%"
+            conditions.append("trace_id LIKE %s")
+            params.append(escaped)
+
+        where = "WHERE " + " AND ".join(conditions)
+        total_row = await self._db.async_fetch_one(
+            f"SELECT COUNT(*) AS c FROM task_manager {where}", tuple(params)
+        )
+        total = total_row["c"] if total_row else 0
+        rows = await self._db.async_fetch(
+            f"SELECT * FROM task_manager {where} ORDER BY start_timestamp DESC LIMIT %s OFFSET %s",
+            (*params, page_size, (page - 1) * page_size),
+        )
+        return {"total": total, "page": page, "page_size": page_size, "items": rows}
+
+    async def cancel_any_task(self, trace_id: str) -> bool:
+        affected = await self._db.async_save(
+            "UPDATE task_manager SET task_status = 4 WHERE trace_id = %s "
+            "AND task_status IN (0, 1)",
+            (trace_id,),
+        )
+        return affected > 0
+
+    # ── Admin: 用量排名 ────────────────────────────────────────
+
+    async def get_usage_ranking(self, days: int = 7) -> list[dict]:
+        rows = await self._db.async_fetch(
+            "SELECT a.username, a.role, SUM(du.tokens_used) AS total_tokens "
+            "FROM account_daily_usage du "
+            "JOIN accounts a ON a.id = du.account_id "
+            "WHERE du.usage_date >= DATE_SUB(CURDATE(), INTERVAL %s DAY) "
+            "GROUP BY du.account_id "
+            "ORDER BY total_tokens DESC",
+            params=(days,),
+        )
+        return rows
 
     # ── 账号管理 ──────────────────────────────────────────────────
 

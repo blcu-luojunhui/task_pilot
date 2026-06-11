@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Button, DatePicker, Drawer, Form, Input, message, Select, Space, Typography } from 'antd';
 import dayjs, { Dayjs } from 'dayjs';
+import { useTranslation } from 'react-i18next';
 import { getTaskNames, runTask } from '@/api/tasks';
 
 interface Props {
@@ -19,23 +20,23 @@ export function TaskSubmitForm({ open, onClose, onSubmitted }: Props) {
   const [form] = Form.useForm<FormValues>();
   const [taskOptions, setTaskOptions] = useState<{ value: string; label: string }[]>([]);
   const [loadingOptions, setLoadingOptions] = useState(false);
+  const { t } = useTranslation('tasks');
 
   useEffect(() => {
     if (open) {
       form.resetFields();
       form.setFieldsValue({ date_string: dayjs() });
-      // 拉取已注册任务列表
       setLoadingOptions(true);
       getTaskNames()
         .then((names) => {
           setTaskOptions(names.map((n) => ({ value: n, label: n })));
         })
         .catch(() => {
-          message.error('获取任务列表失败');
+          message.error(t('loadTaskNamesFailed'));
         })
         .finally(() => setLoadingOptions(false));
     }
-  }, [open, form]);
+  }, [open, form, t]);
 
   const handleSubmit = async () => {
     const values = await form.validateFields();
@@ -44,7 +45,7 @@ export function TaskSubmitForm({ open, onClose, onSubmitted }: Props) {
       try {
         extra = JSON.parse(values.extra_json);
       } catch {
-        message.error('额外参数不是合法的 JSON');
+        message.error(t('invalidJson'));
         return;
       }
     }
@@ -54,7 +55,7 @@ export function TaskSubmitForm({ open, onClose, onSubmitted }: Props) {
         date_string: values.date_string?.format('YYYY-MM-DD'),
         ...extra,
       });
-      message.success(`任务已提交: ${res.trace_id}`);
+      message.success(t('submitSuccess', { traceId: res.trace_id }));
       onSubmitted(res.trace_id);
       onClose();
     } catch {
@@ -66,14 +67,14 @@ export function TaskSubmitForm({ open, onClose, onSubmitted }: Props) {
     <Drawer
       open={open}
       onClose={onClose}
-      title="提交任务"
+      title={t('formTitle')}
       width={520}
       destroyOnClose
       extra={
         <Space>
-          <Button onClick={onClose}>取消</Button>
+          <Button onClick={onClose}>{t('formCancel')}</Button>
           <Button type="primary" onClick={handleSubmit}>
-            提交
+            {t('formSubmit')}
           </Button>
         </Space>
       }
@@ -82,26 +83,26 @@ export function TaskSubmitForm({ open, onClose, onSubmitted }: Props) {
         <Form.Item
           name="task_name"
           label="task_name"
-          rules={[{ required: true, message: '必填' }]}
-          tooltip="从已注册的任务处理器中选择"
+          rules={[{ required: true, message: t('formRequired') }]}
+          tooltip={t('formTaskNameTooltip')}
         >
           <Select
-            placeholder="选择任务…"
+            placeholder={t('formTaskNamePlaceholder')}
             showSearch
             optionFilterProp="label"
             options={taskOptions}
             loading={loadingOptions}
             autoFocus
-            notFoundContent={loadingOptions ? '加载中…' : '暂无已注册任务'}
+            notFoundContent={loadingOptions ? t('formTaskNameLoading') : t('formTaskNameNoData')}
           />
         </Form.Item>
-        <Form.Item name="date_string" label="业务日期" tooltip="不填则取后端服务器当前日期">
+        <Form.Item name="date_string" label={t('formBizDate')} tooltip={t('formBizDateTooltip')}>
           <DatePicker style={{ width: '100%' }} format="YYYY-MM-DD" />
         </Form.Item>
         <Form.Item
           name="extra_json"
-          label="额外参数 (JSON)"
-          tooltip="会被原样合并到 request body，传递给 task handler"
+          label={t('formExtraJson')}
+          tooltip={t('formExtraJsonTooltip')}
         >
           <Input.TextArea
             rows={6}
@@ -110,7 +111,7 @@ export function TaskSubmitForm({ open, onClose, onSubmitted }: Props) {
           />
         </Form.Item>
         <Typography.Paragraph type="secondary" style={{ fontSize: 12 }}>
-          提交后会立即返回 trace_id 并跳到任务详情页，可在那里观察 Agent 流程追溯。
+          {t('formSubmitHint')}
         </Typography.Paragraph>
       </Form>
     </Drawer>

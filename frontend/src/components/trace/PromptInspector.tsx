@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { Collapse, Empty, Select, Space, Tag, Typography } from 'antd';
 import { DiffOutlined } from '@ant-design/icons';
+import { useTranslation } from 'react-i18next';
 import type { TraceEvent } from '@/api/types';
 
 interface PromptSnapshot {
@@ -42,12 +43,13 @@ const ROLE_BG: Record<string, string> = {
 };
 
 export function PromptInspector({ events }: { events: TraceEvent[] }) {
+  const { t } = useTranslation('trace');
   const prompts = useMemo(() => extractPrompts(events), [events]);
   const [compareStep, setCompareStep] = useState<number | null>(null);
 
   if (prompts.length === 0) {
     return (
-      <Empty description="无 prompt_assembled 事件（需要后端 emit，参见 P3-1）" />
+      <Empty description={t('prompt.noData')} />
     );
   }
 
@@ -59,11 +61,11 @@ export function PromptInspector({ events }: { events: TraceEvent[] }) {
   return (
     <Space direction="vertical" size={16} style={{ width: '100%', padding: '8px 0' }}>
       <Space size={8} wrap>
-        <Typography.Text strong>Prompt 快照</Typography.Text>
-        <Tag color="blue">{prompts.length} 个快照</Tag>
+        <Typography.Text strong>{t('prompt.snapshots')}</Typography.Text>
+        <Tag color="blue">{prompts.length}</Tag>
         <Select
           size="small"
-          placeholder="对比前一步"
+          placeholder={t('prompt.compareStep')}
           allowClear
           style={{ width: 120 }}
           options={prompts

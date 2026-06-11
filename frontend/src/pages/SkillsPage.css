@@ -65,7 +65,7 @@
 
 .skill-explorer-caret {
   align-items: center;
-  color: rgba(0, 0, 0, 0.45);
+  color: rgba(128, 128, 128, 0.65);
   display: inline-flex;
   flex: 0 0 10px;
   font-size: 9px;
@@ -73,7 +73,7 @@
 }
 
 .skill-explorer-folderIcon {
-  color: rgba(0, 0, 0, 0.62);
+  color: rgba(128, 128, 128, 0.65);
   flex: 0 0 auto;
 }
 
@@ -81,7 +81,7 @@
   color: #1677ff;
   flex: 0 0 auto;
   font-size: 12px;
-  opacity: 0.75;
+  opacity: 0.8;
 }
 
 .skill-explorer-categoryTitle,
@@ -99,15 +99,15 @@
 }
 
 .skill-explorer-fileExt {
-  color: rgba(0, 0, 0, 0.45);
+  color: rgba(128, 128, 128, 0.5);
   margin-left: 1px;
 }
 
 .skill-explorer-count {
   align-items: center;
-  background: rgba(0, 0, 0, 0.04);
+  background: rgba(128, 128, 128, 0.1);
   border-radius: 999px;
-  color: rgba(0, 0, 0, 0.56);
+  color: rgba(128, 128, 128, 0.65);
   display: inline-flex;
   flex: 0 0 auto;
   font-size: 11px;
@@ -118,7 +118,7 @@
 }
 
 .skill-explorer-empty {
-  color: rgba(0, 0, 0, 0.45);
+  color: rgba(128, 128, 128, 0.5);
   font-size: 12px;
   padding: 10px 12px;
 }
