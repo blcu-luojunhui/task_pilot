@@ -71,7 +71,7 @@ app.register_blueprint(routes)
 # ── Frontend SPA 静态托管 ──────────────────────────────────────────
 _FRONTEND_DIST = os.environ.get(
     "FRONTEND_DIST",
-    os.path.join(os.path.dirname(__file__), "frontend", "dist"),
+    os.path.join(os.path.dirname(__file__), "dist"),
 )
 _FRONTEND_ENABLED = os.environ.get("FRONTEND_DIST_ENABLED", "true").lower() not in ("0", "false", "no")
 
