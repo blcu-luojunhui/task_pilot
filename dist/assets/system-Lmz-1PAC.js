@@ -1,0 +1,2 @@
+import{f as e,p as t}from"./index-BdAGLId8.js";async function n(n){return t(e.get(`/system/stats`,{signal:n?.signal}))}async function r(){return t(e.get(`/health`))}export{n,r as t};
+//# sourceMappingURL=system-Lmz-1PAC.js.map
