@@ -159,6 +159,6 @@ Replay 用于失败链路复现和回归测试：它应该尽量减少真实 LLM
 
 ## Typical Flow
 
-![典型调用链路](images/api-typical-flow.png)
+<p align="center"><img src="../assets/api-typical-flow.png" alt="典型调用链路" width="85%" style="border-radius: 8px;"/></p>
 
 优先使用 `trace_id` 作为排查主线：它会贯穿 HTTP 请求、任务状态、Agent step、工具调用、事件和日志。

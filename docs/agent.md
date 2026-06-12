@@ -8,7 +8,7 @@ TaskPilot Agent 的核心命题是：**让模型决定下一步，但让工程�
 
 ## 设计总览
 
-![Agent 双层架构：智能层与治理层](images/agent-overview.png)
+<p align="center"><img src="../assets/agent-overview.png" alt="Agent 双层架构：智能层与治理层" width="85%" style="border-radius: 8px;"/></p>
 
 这不是“模型外面包一层 retry”。治理层在每个 step 前后都参与裁决：是否超预算、是否被取消、是否需要反思、是否已经完成、是否需要持久化可恢复状态。
 
@@ -37,7 +37,7 @@ src/core/agents/
 
 ## 主执行链路
 
-![Agent 主执行链路时序](images/agent-execution-sequence.png)
+<p align="center"><img src="../assets/agent-execution-sequence.png" alt="Agent 主执行链路时序" width="85%" style="border-radius: 8px;"/></p>
 
 关键分工：
 
@@ -87,7 +87,7 @@ MemoryManager.retrieve()
 
 TaskPilot 把所有可执行能力统一进 SkillRegistry：
 
-![Skill / Tool 注册与执行体系](images/agent-skill-system.png)
+<p align="center"><img src="../assets/agent-skill-system.png" alt="Skill / Tool 注册与执行体系" width="85%" style="border-radius: 8px;"/></p>
 
 执行前会经过 `PermissionGuard`。每个 Skill 带有风险级别：`READ`、`WRITE`、`DESTRUCTIVE`。MCP 工具默认按更保守的 `WRITE` 处理，避免未知外部能力被低估风险。
 
@@ -114,7 +114,7 @@ logging.py       # HarnessEventLogger
 
 Agent 生命周期独立于任务状态机：
 
-![Agent 生命周期状态机](images/agent-lifecycle.png)
+<p align="center"><img src="../assets/agent-lifecycle.png" alt="Agent 生命周期状态机" width="85%" style="border-radius: 8px;"/></p>
 
 - `pause()`：请求暂停，循环在 step 边界挂起。
 - `resume()`：从暂停点继续。

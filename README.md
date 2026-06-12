@@ -13,13 +13,13 @@ Agentic 任务还会追问“下一步该做什么”。
 
 这一步带来新的能力，也带来新的风险：模型可能多轮漂移，工具调用可能失败，长任务可能被取消，结果可能需要回放排查。TaskPilot 的设计目标，就是把这些不确定性放进可治理的工程边界里。
 
-<p align="center"><img src="assets/readme-evolution.png" alt="从定时任务到 Agentic Backend" width="75%" style="border-radius: 8px;"/></p>
+<p align="center"><img src="assets/readme-evolution.png" alt="从定时任务到 Agentic Backend" width="85%" style="border-radius: 8px;"/></p>
 
 ## 系统架构
 
 TaskPilot 采用四层单向依赖：`api` 只接入协议，`jobs` 收敛确定性任务生命周期，`core` 演进 Agent 能力，`infra` 封装外部世界。
 
-<p align="center"><img src="assets/readme-architecture.png" alt="TaskPilot 四层架构" width="75%" style="border-radius: 8px;"/></p>
+<p align="center"><img src="assets/readme-architecture.png" alt="TaskPilot 四层架构" width="85%" style="border-radius: 8px;"/></p>
 
 这条边界很重要：Agent 可以决定下一步调用哪个 Skill，但不能绕开任务状态机；模型可以失败重试，但不能无限消耗预算；长任务可以暂停恢复，但状态必须能落盘和追踪。
 
@@ -27,7 +27,7 @@ TaskPilot 采用四层单向依赖：`api` 只接入协议，`jobs` 收敛确定
 
 Agent 的主链路由 `Agent.create()` 装配：Provider、SkillRegistry、Think/Act/Observe、Memory、Budget、Constraint、Feedback 和 DecisionStrategy 最终进入 `AgentLoopHarness`。
 
-<p align="center"><img src="assets/readme-agent-loop.png" alt="Agent 执行流程" width="75%" style="border-radius: 8px;"/></p>
+<p align="center"><img src="assets/readme-agent-loop.png" alt="Agent 执行流程" width="85%" style="border-radius: 8px;"/></p>
 
 支持三种策略：
 

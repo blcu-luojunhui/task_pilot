@@ -8,7 +8,7 @@ TaskPilot 的核心不是“跑一个函数”，而是把任务从接入、调�
 
 ## Mental Model
 
-![TaskPilot 心智模型](images/project-mental-model.png)
+<p align="center"><img src="../assets/project-mental-model.png" alt="TaskPilot 心智模型" width="85%" style="border-radius: 8px;"/></p>
 
 目标是：**让任务执行更智能，但不牺牲工程上的可控性。**
 
@@ -70,7 +70,7 @@ api → jobs → core → infra
 | `CANCEL_REQUESTED` | 4 | 已收到取消请求，等待运行中任务响应 |
 | `FAILED` | 99 | 任务异常、超时或被强制释放 |
 
-![任务状态机](images/project-task-state-machine.png)
+<p align="center"><img src="../assets/project-task-state-machine.png" alt="任务状态机" width="85%" style="border-radius: 8px;"/></p>
 
 多进程围绕同一张 MySQL 表协作：抢占任务、观察进度、请求取消，并在异常场景下留下可追踪记录。
 
@@ -78,7 +78,7 @@ api → jobs → core → infra
 
 Agent 自身的生命周期由 `LifecycleManager` 管理，独立于任务状态机：
 
-![Agent 生命周期状态机](images/agent-lifecycle.png)
+<p align="center"><img src="../assets/agent-lifecycle.png" alt="Agent 生命周期状态机" width="85%" style="border-radius: 8px;"/></p>
 
 - `pause()` / `resume()`：暂停和恢复，支持快照持久化。
 - `stop()`：请求停止，当前 step 完成后返回。
