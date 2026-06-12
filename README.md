@@ -1,6 +1,6 @@
 # TaskPilot
 
-TaskPilot 是一个把 **Agentic Workflow** 放进生产级任务引擎里的实验框架。
+TaskPilot 是一个把 **Agentic Workflow** 放进生产级任务引擎里的框架。
 
 它不是“再写一个 cron”。它关心的是：当一个任务需要理解上下文、调用工具、在失败中修正策略、跨多轮判断收敛时，怎样让 Agent 获得足够自由，同时仍被状态机、预算、取消、快照和可观测性托住。
 
