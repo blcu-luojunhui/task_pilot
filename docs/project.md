@@ -1,86 +1,63 @@
 # Project Guide
 
-> The engineering map behind TaskPilot.
-
-TaskPilot 的核心不是"跑一个函数"，而是把任务从接入、调度、执行、观察到关闭组织成一条可靠链路。Agent 能力被放进这条链路里，但底层仍然由清晰的状态机和基础设施边界托住。
+> TaskPilot 的工程地图。Agent 细节见 [Agent Guide](agent.md)，启动方式见 [Quickstart](quickstart.md)。
 
 [Back to README](../README.md)
 
----
+TaskPilot 的核心不是“跑一个函数”，而是把任务从接入、调度、执行、观察到关闭组织成一条可靠链路。Agent 能力被放进这条链路里，但底层仍然由状态机、取消、超时和可观测性托住。
 
 ## Mental Model
 
-```text
-HTTP API (Quart)
-    │
-    ▼
-Task Scheduler
-    │
-    ▼
-Task Lifecycle + State Machine (MySQL)
-    │
-    ▼
-Agent Loop / Skills / Multi-Agent
-    │
-    ▼
-MySQL + Observability + External Tools
-```
+![TaskPilot 心智模型](images/project-mental-model.png)
 
-**让任务执行更智能，但不牺牲工程上的可控性。**
-
----
+目标是：**让任务执行更智能，但不牺牲工程上的可控性。**
 
 ## Layers
 
 ### `api`
 
-HTTP 接入层。负责请求解析、参数校验、响应封装和路由注册。这一层保持轻薄，不放业务逻辑。
+HTTP 接入层。负责请求解析、参数校验、响应封装、路由注册和中间件接入。这里不放业务编排逻辑。
+
+中间件顺序：
+
+```text
+Trace → ErrorHandler → RequestLogger → RateLimit → Auth
+```
 
 ### `jobs`
 
-任务引擎层。负责调度、抢占、并发控制、状态流转、取消和关闭时的任务收敛。**这是 TaskPilot 最核心的确定性边界。**
+任务引擎层。负责调度、抢占、并发控制、状态流转、取消和关闭时的任务收敛。这里是 TaskPilot 最核心的确定性边界。
+
+Agent 可以增强任务执行，但不能绕开 `TaskLifecycleManager`。
 
 ### `core`
 
-Agent 能力中心。Agent Loop、Skills 框架、LLM Provider、Multi-Agent 协作、配置系统和 DI 容器都在这里。Agent 的智能行为被组织成可注册、可执行、可替换的能力。
+能力中心。这里放 Agent Loop、Skills、LLM Provider、Multi-Agent、Chat、Auth、配置、DI 容器和启动关闭协调。
 
-```
-src/core/agents/
-├── engine/          # Agent Loop / Runner / Planner / Lifecycle
-│   └── prompting/   # Prompt 组装 / 路由 / 知识选择
-├── capabilities/    # LLM / Tools / Skills
-│   ├── llm/         #   Provider 抽象 + DeepSeek/OpenAI/Claude 实现
-│   ├── tools/       #   Database / HTTP / Task / Utils
-│   └── skills/      #   注册 / 校验 / 执行 / 序列化 / Guard
-├── runtime/         # Hook / Harness（Budget / Constraint / Feedback）
-├── state/           # 状态管理 / 快照 / 上下文 / 记忆
-├── multi_agents/    # 多智能体协作
-└── execution/       # 执行调度 / 结果
+```text
+src/core/
+├── agents/       # Agent Loop / Skills / Tools / Memory / Runtime / Multi-Agent
+├── chat/         # 会话编排、SSE、风险分级、消息仓库
+├── auth/         # JWT、API Token、账户与权限
+├── skills/       # 系统/个人 Skill 仓库
+├── config/       # pydantic-settings
+├── dependency/   # ServerContainer
+└── bootstrap/    # AppContext 与资源生命周期
 ```
 
 ### `infra`
 
-基础设施层。封装 MySQL、日志、告警、HTTP 客户端等外部依赖。业务层不直接关心底层实现，只通过明确的接口访问能力。
-
----
+基础设施层。封装 MySQL、日志、告警、HTTP 客户端、事件总线和持久化。它不感知业务领域，只提供稳定能力。
 
 ## Dependency Direction
 
 ```text
-api → jobs → core
-               ↑
-               │
-             infra
+api → jobs → core → infra
+       │       │
+       └───────┘
 ```
 
-- `api` 只适配协议
-- `jobs` 负责流程编排
-- `core` 提供可复用能力
-- `infra` 封装外部世界
-
-反向依赖视为设计缺陷。
-
----
+允许上层调用下层，禁止下层反向依赖上层。实际代码中 `jobs` 和 `core` 都会使用 `infra` 能力，但 `infra` 不应该知道任务或 Agent 的业务语义。
 
 ## Task State Machine
 
@@ -93,41 +70,36 @@ api → jobs → core
 | `CANCEL_REQUESTED` | 4 | 已收到取消请求，等待运行中任务响应 |
 | `FAILED` | 99 | 任务异常、超时或被强制释放 |
 
-多进程围绕同一张 MySQL 表协作：抢占任务、观察进度、请求取消，异常场景下留下可追踪记录。
+![任务状态机](images/project-task-state-machine.png)
 
----
+多进程围绕同一张 MySQL 表协作：抢占任务、观察进度、请求取消，并在异常场景下留下可追踪记录。
 
 ## Agent Lifecycle
 
 Agent 自身的生命周期由 `LifecycleManager` 管理，独立于任务状态机：
 
-```text
-IDLE → RUNNING → PAUSED / STOPPED / ERROR
-                    │
-                    ▼
-                  RUNNING (恢复)
-```
+![Agent 生命周期状态机](images/agent-lifecycle.png)
 
-- `pause()` / `resume()` — 暂停和恢复，支持快照持久化
-- `stop()` — 请求停止，当前 step 完成后返回
-- `save_snapshot()` / `run_from_snapshot()` — 状态快照，支持断点续跑
+- `pause()` / `resume()`：暂停和恢复，支持快照持久化。
+- `stop()`：请求停止，当前 step 完成后返回。
+- `save_snapshot()` / `run_from_snapshot()`：保存并恢复 Agent 运行状态。
 
----
+任务状态机回答“任务在平台里是什么状态”；Agent 生命周期回答“模型循环现在能否继续执行”。两者不要混成一个概念。
 
 ## Shutdown Path
 
-1. 停止接收新任务
-2. 等待运行中的任务收敛
-3. 刷新日志、告警、指标
-4. 释放连接池等基础资源
+1. 停止接收新任务。
+2. 等待运行中的任务收敛。
+3. 刷新日志、告警、指标和事件缓冲。
+4. 释放数据库连接池、HTTP 客户端等基础资源。
 
-目标不是"优雅"本身，而是避免任务半途丢失、日志未落盘、连接未释放。
-
----
+优雅关闭的目标不是“看起来干净”，而是避免任务半途丢失、日志未落盘、连接未释放。
 
 ## Design Principles
 
-- API 层保持轻薄，不放编排逻辑
-- 编排收敛在 `jobs` 层
-- 基础设施可替换
-- Agent 智能增强执行，但不绕开任务生命周期
+- `api` 保持轻薄，只做协议适配。
+- `jobs` 收敛任务生命周期，不把 Agent 不确定性泄漏到调度层。
+- `core` 提供可复用能力，围绕 Loop / Skill / Prompt / Provider 演进。
+- `infra` 封装外部依赖，不反向感知业务。
+- 状态优先外置，进程内只保留运行态缓存。
+- trace_id 必须贯穿请求、任务、Agent step、工具调用和日志。

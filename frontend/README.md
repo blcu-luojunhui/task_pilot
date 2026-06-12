@@ -2,7 +2,7 @@
 
 > Vite + React 18 + TypeScript + Ant Design 5 + MSW
 >
-> 设计文档：[`docs/design/frontend-v1.md`](../docs/design/frontend-v1.md)
+> 项目总览见 [README](../README.md)，接口说明见 [API Guide](../docs/api.md)
 
 ## 跑起来
 
@@ -33,11 +33,7 @@ npm run dev
 
 Vite dev server 通过 `vite.config.ts` 的 `proxy` 把 `/api` 透传到 6060。
 
-> **注意**：后端目前只实现了 `POST /api/run_task` / `POST /api/cancel_task` / `GET /api/health` / `GET /api/metrics` / `GET /api/task_events/<trace_id>`(SSE)。
->
-> 前端依赖的 `GET /api/tasks` / `GET /api/tasks/<id>` / `GET /api/tasks/<id>/events` / `GET /api/skills` / `GET /api/system/stats` **都还没有**——参考 [`docs/design/frontend-v1.md`](../docs/design/frontend-v1.md) §6 的后端配套改造清单。
->
-> 这就是为什么开发期默认走 MSW，让前后端能并行推进。
+后端已实现前端依赖的主要接口（task / agent / chat / skills / auth / runs / replay / system），完整列表见 [API Guide](../docs/api.md)。MSW 仍保留为离线开发模式：不起后端也能开发 UI。
 
 ## 构建生产产物
 
@@ -45,7 +41,11 @@ Vite dev server 通过 `vite.config.ts` 的 `proxy` 把 `/api` 透传到 6060。
 npm run build
 ```
 
-产物落在 `frontend/dist/`，可由 Quart 同进程 static 托管（参见 `docs/design/frontend-v1.md` §4.3）。
+产物落在 `frontend/dist/`，可由 Quart 同进程 static 托管：
+
+```bash
+FRONTEND_DIST=frontend/dist hypercorn app:app -c app_config.toml
+```
 
 ## 目录速览
 
@@ -88,8 +88,6 @@ src/
 - [ ] **Phase 4** — Multi-Agent DAG（React Flow）、Runs 页
 
 ## 主要决策
-
-为什么这么选见 [`docs/design/frontend-v1.md`](../docs/design/frontend-v1.md) §4 / §8。简短版：
 
 - **MSW 不是测试工具** — 它是前后端并行开发的契约：前端按 mock schema 写代码，后端按同一份 schema 实现 endpoint，切换只需改一个环境变量
 - **AntD 而不是 shadcn** — 表格 / 表单 / 时间线 / 抽屉全是现成的，AntD 给我们省了 70% UI 工作
