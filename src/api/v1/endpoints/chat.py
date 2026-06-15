@@ -1,10 +1,11 @@
-"""Chat HTTP API：会话 CRUD + 发送消息（驱动 chat.agent_turn task）。
+"""Chat HTTP API：会话 CRUD + 发送消息（驱动 chat turn）。
 
 流式响应不在这里实现——前端拿到 ``trace_id`` 后直接复用 ``/api/task_events/<trace_id>``
 SSE 即可消费 think/act/run_end 等事件。
 """
 from __future__ import annotations
 
+import asyncio
 from typing import Any, Dict
 
 from quart import Blueprint, jsonify, request
@@ -13,14 +14,11 @@ from src.api.middleware.trace import get_current_trace_id
 from src.api.v1.utils import ApiDependencies
 from src.core.auth import get_current_account_id
 from src.core.chat import ChatRepository, ConversationStatus
+from src.core.chat.agent_task import run_chat_turn
+from src.core.chat.cancel import ChatCancelRegistry
 from src.core.chat.service import ChatService
 
-# 触发 chat.agent_turn 的 @register 装饰器（此时 src.jobs.__init__ 已完全加载，
-# 不会引发循环——agent_task 反向依赖 jobs/api 都安全）
-from src.core.chat import agent_task as _chat_agent_task  # noqa: F401
-
 from src.infra.shared import ErrorCode
-from src.jobs import TaskScheduler
 
 
 _CHAT_TASK_NAME = "chat.agent_turn"
@@ -163,38 +161,43 @@ def create_chat_bp(deps: ApiDependencies) -> Blueprint:
         if int(conv.get("status", 0)) == ConversationStatus.DELETED.value:
             return _bad_request("conversation has been deleted")
 
-        # 用 middleware 注入的 trace_id 作为本轮 chat task 的 trace_id；
+        # 用 middleware 注入的 trace_id 作为本轮 chat 的 trace_id；
         # 前端可立即拿它订阅 SSE
         trace_id = get_current_trace_id()
         account_id = get_current_account_id() or 0
-        # 在 task 真正起步前就把 trace 占位到 event bus，
+        # 在 chat turn 真正起步前就把 trace 占位到 event bus，
         # 避免前端 SSE 抢跑命中 404 后无限 backoff 重连
         try:
             deps.events.ensure_trace(trace_id, metadata={"task_name": _CHAT_TASK_NAME, "account_id": account_id})
         except Exception:
             pass
-        scheduler_data = {
-            "task_name": _CHAT_TASK_NAME,
-            "conversation_id": conversation_id,
-            "user_message": user_message,
-        }
-        scheduler = TaskScheduler(scheduler_data, trace_id, deps, account_id=account_id)
-        result = await scheduler.deal()
 
-        if isinstance(result, dict) and result.get("code") == 0:
-            inner = result.get("data") or {}
-            return jsonify(
-                {
-                    "code": 0,
-                    "message": inner.get("message") or "chat turn started",
-                    "trace_id": inner.get("trace_id") or trace_id,
-                    "data": {
-                        "trace_id": inner.get("trace_id") or trace_id,
-                        "conversation_id": conversation_id,
-                    },
-                }
-            )
-        return jsonify(result)
+        # 普通 chat 不创建 task_manager 记录，直接启动轻量 chat turn
+        asyncio.create_task(
+            run_chat_turn(
+                db=deps.mysql,
+                log=deps.log,
+                config=deps.config,
+                events=deps.events,
+                trace_id=trace_id,
+                account_id=account_id,
+                conversation_id=conversation_id,
+                user_message=user_message,
+            ),
+            name=f"chat-turn-{trace_id}",
+        )
+
+        return jsonify(
+            {
+                "code": 0,
+                "message": "chat turn started",
+                "trace_id": trace_id,
+                "data": {
+                    "trace_id": trace_id,
+                    "conversation_id": conversation_id,
+                },
+            }
+        )
 
     @bp.route("/chat/conversations/<conversation_id>/cancel", methods=["POST"])
     async def cancel_turn(conversation_id: str):
@@ -205,9 +208,14 @@ def create_chat_bp(deps: ApiDependencies) -> Blueprint:
             return _bad_request("trace_id is required")
 
         account_id = get_current_account_id() or 0
-        scheduler_data = {"task_name": _CHAT_TASK_NAME, "trace_id": trace_id}
-        scheduler = TaskScheduler(scheduler_data, trace_id, deps, account_id=account_id)
-        success = await scheduler.cancel_task(trace_id)
+        # 优先走轻量取消（普通 chat），fallback 到 task_manager 取消（已升级的 task）
+        success = ChatCancelRegistry.cancel(trace_id)
+        if not success:
+            # 可能已升级或从未注册，尝试 task_manager
+            from src.jobs import TaskScheduler
+            scheduler_data = {"task_name": _CHAT_TASK_NAME, "trace_id": trace_id}
+            scheduler = TaskScheduler(scheduler_data, trace_id, deps, account_id=account_id)
+            success = await scheduler.cancel_task(trace_id)
         return jsonify(
             {
                 "code": 0 if success else 1,

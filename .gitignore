@@ -42,3 +42,4 @@ package-lock.json
 node_modudles/
 docs/design
 frontend/
+nginx/certs/

@@ -52,6 +52,7 @@ class ChatTurnRunner:
         event_bus: TraceEventBus,
         cancel_checker: Callable[[], Awaitable[bool]],
         tool_dependencies: Optional[Dict[str, Any]] = None,
+        on_escalate: Optional[Callable[[], Awaitable[None]]] = None,
     ):
         self._provider = llm_provider
         self._tools = tools
@@ -62,6 +63,7 @@ class ChatTurnRunner:
         self._executor = SkillExecutor(validate_params=False)
         self._serializer = ToolSpecSerializer(OpenAIAdapter())
         self._mode = "chat"  # "chat" | "agentic"
+        self._on_escalate = on_escalate
 
     def _active_tools(self) -> List[Skill]:
         """根据当前 mode 过滤暴露给 LLM 的工具。"""
@@ -79,6 +81,11 @@ class ChatTurnRunner:
         # confirm 续跑意味着之前已经升级到 agentic 模式
         if confirmed_tool_calls:
             self._mode = "agentic"
+            if self._on_escalate:
+                try:
+                    await self._on_escalate()
+                except Exception:
+                    pass
             await self._publish(ChatEventType.MODE_CHANGED, {
                 "mode": "agentic",
                 "reason": "confirm 续跑",
@@ -136,6 +143,12 @@ class ChatTurnRunner:
                     ).get("reason", "")
                 except Exception:
                     pass
+                # 通知外层按需创建 task_manager 记录
+                if self._on_escalate:
+                    try:
+                        await self._on_escalate()
+                    except Exception:
+                        pass
                 await self._publish(ChatEventType.MODE_CHANGED, {
                     "mode": "agentic",
                     "reason": escalate_reason,

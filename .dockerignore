@@ -1,0 +1,38 @@
+__pycache__
+*.py[cod]
+.venv
+env/
+venv/
+.git
+.gitignore
+.dockerignore
+.claude
+.idea
+.vscode
+.DS_Store
+
+# 环境文件（通过 docker-compose env_file 注入）
+.env
+.env.*
+
+# 前端构建产物（多阶段构建会在镜像内重新 build）
+frontend/node_modules
+frontend/dist
+
+# 测试和文档
+tests
+docs
+*.md
+
+# 部署相关（不进镜像）
+nginx
+docker-compose*.yml
+docker-compose*.yaml
+Dockerfile
+
+# 截图和静态资源
+assets
+
+# 日志和临时文件
+logs
+*.log

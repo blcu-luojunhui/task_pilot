@@ -1,9 +1,12 @@
 """ChatService：chat 模块门面，编排 turn 启动 / confirm / cancel 流程。"""
 from __future__ import annotations
 
+import asyncio
 import logging
 from typing import Any, Dict, Optional, TYPE_CHECKING
 
+from src.core.chat.agent_task import run_chat_turn
+from src.core.chat.cancel import ChatCancelRegistry
 from src.core.chat.repository import (
     ChatRepository,
     MSG_STATUS_COMPLETED,
@@ -45,16 +48,28 @@ class ChatService:
     async def start_turn(
         self, conversation_id: str, user_message: str, trace_id: str, deps: "ApiDependencies"
     ) -> Dict[str, Any]:
-        """发起一轮 chat turn，返回 {code, trace_id, data}。"""
-        from src.jobs import TaskScheduler
-
-        scheduler_data = {
-            "task_name": _CHAT_TASK_NAME,
-            "conversation_id": conversation_id,
-            "user_message": user_message,
+        """发起一轮 chat turn（轻量，不创建 task_manager 记录）。"""
+        asyncio.create_task(
+            run_chat_turn(
+                db=self._db,
+                log=self._log,
+                config=self._config,
+                events=self._event_bus,
+                trace_id=trace_id,
+                account_id=self._account_id,
+                conversation_id=conversation_id,
+                user_message=user_message,
+            ),
+            name=f"chat-turn-{trace_id}",
+        )
+        return {
+            "code": 0,
+            "data": {
+                "code": 0,
+                "message": "chat turn started",
+                "trace_id": trace_id,
+            },
         }
-        scheduler = TaskScheduler(scheduler_data, trace_id, deps, account_id=self._account_id)
-        return await scheduler.deal()
 
     async def confirm_plan(
         self,
@@ -73,7 +88,7 @@ class ChatService:
         pending = await repo.get_pending_message(conversation_id)
 
         if not pending or int(pending.get("id", 0)) != message_id:
-            return "__not_found__"  # sentinel: 与 reject 成功的 None 区分
+            return "__not_found__"
 
         if action == "reject":
             await repo.update_message_status(message_id, MSG_STATUS_REJECTED)
@@ -96,26 +111,28 @@ class ChatService:
         if not tool_calls:
             return None
 
-        # 将 pending 消息状态改为 completed
         await repo.update_message_status(message_id, MSG_STATUS_COMPLETED)
 
-        # 占位 trace 避免前端 SSE 抢跑 404
         try:
             self._event_bus.ensure_trace(trace_id, metadata={"task_name": _CHAT_TASK_NAME, "account_id": self._account_id})
         except Exception:
             pass
 
-        # 派发新 turn 携带 confirmed_tool_calls
-        from src.jobs import TaskScheduler
-
-        scheduler_data = {
-            "task_name": _CHAT_TASK_NAME,
-            "conversation_id": conversation_id,
-            "user_message": "",  # confirm 续跑不需要新 user 消息
-            "confirmed_tool_calls": tool_calls,
-        }
-        scheduler = TaskScheduler(scheduler_data, trace_id, deps, account_id=self._account_id)
-        await scheduler.deal()
+        # 续跑 chat turn（confirm 时已在 agentic 模式，escalation 已触发 task 创建）
+        asyncio.create_task(
+            run_chat_turn(
+                db=self._db,
+                log=self._log,
+                config=self._config,
+                events=self._event_bus,
+                trace_id=trace_id,
+                account_id=self._account_id,
+                conversation_id=conversation_id,
+                user_message="",
+                confirmed_tool_calls=tool_calls,
+            ),
+            name=f"chat-confirm-{trace_id}",
+        )
 
         await self._log.log({
             "event": "chat_plan_confirmed",
@@ -127,6 +144,10 @@ class ChatService:
 
     async def cancel_turn(self, trace_id: str, deps: "ApiDependencies") -> bool:
         """取消指定 trace_id 的正在运行的 turn。"""
+        # 优先轻量取消
+        if ChatCancelRegistry.cancel(trace_id):
+            return True
+        # fallback 到 task_manager 取消
         from src.jobs import TaskScheduler
 
         scheduler_data = {"task_name": _CHAT_TASK_NAME, "trace_id": trace_id}
