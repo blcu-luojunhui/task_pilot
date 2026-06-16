@@ -43,6 +43,10 @@ RateLimitMiddleware(
     max_requests=60,
     window_seconds=60,
     rate_limit_paths={"/api/run_task", "/api/cancel_task"},
+    path_limits={
+        "/api/auth/register": (3, 3600),   # 每 IP 每小时最多 3 次注册
+        "/api/auth/login": (20, 60),        # 每 IP 每分钟最多 20 次登录
+    },
 )
 
 server_container = ServerContainer()

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import secrets
+import string
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 
@@ -8,7 +10,13 @@ from src.core.auth.token import (
     hash_password,
     verify_password_with_legacy,
 )
-from src.core.auth.repository import AccountRepository, TokenRepository, UsageRepository
+from src.core.auth.repository import (
+    AccountRepository,
+    TokenRepository,
+    UsageRepository,
+    InviteCodeRepository,
+    LoginFailureRepository,
+)
 from src.core.config.auth_config import AuthConfig
 from src.infra.database import AsyncMySQLPool
 
@@ -20,27 +28,50 @@ class AuthService:
         self.accounts = AccountRepository(db)
         self.tokens = TokenRepository(db)
         self.usage = UsageRepository(db)
+        self.invite_codes = InviteCodeRepository(db)
+        self.login_failures = LoginFailureRepository(db)
 
     # ── 注册 / 登录 ──────────────────────────────────────────────
 
-    async def register(self, username: str, email: str, password: str) -> dict:
-        existing = await self.accounts.find_by_username(username)
-        if existing:
-            raise DuplicateError("用户名已存在")
-        existing = await self.accounts.find_by_email(email)
-        if existing:
-            raise DuplicateError("邮箱已注册")
+    async def register(
+        self, username: str, email: str, password: str, invite_code: Optional[str] = None
+    ) -> dict:
+        if self._config.registration_require_invite:
+            if not invite_code:
+                raise DuplicateError("注册失败，请检查输入或联系管理员")
+            reserved = await self.invite_codes.reserve(invite_code)
+            if not reserved:
+                raise DuplicateError("注册失败，请检查输入或联系管理员")
 
-        pw_hash = hash_password(password)
+        allowed = [d.strip() for d in self._config.allowed_email_domains.split(",") if d.strip()]
+        domain = email.rsplit("@", 1)[-1].lower() if "@" in email else ""
+        if domain not in allowed:
+            raise DuplicateError("注册失败，请检查输入或联系管理员")
 
-        account_id = await self.accounts.create(
-            username=username,
-            email=email,
-            password_hash=pw_hash,
-            daily_limit=self._config.default_daily_token_limit,
-        )
+        try:
+            existing = await self.accounts.find_by_username(username)
+            if existing:
+                raise DuplicateError("注册失败，请检查输入或联系管理员")
+            existing = await self.accounts.find_by_email(email)
+            if existing:
+                raise DuplicateError("注册失败，请检查输入或联系管理员")
 
-        return await self._issue_tokens(account_id, username)
+            pw_hash = hash_password(password)
+            account_id = await self.accounts.create(
+                username=username,
+                email=email,
+                password_hash=pw_hash,
+                daily_limit=self._config.default_daily_token_limit,
+            )
+
+            if invite_code:
+                await self.invite_codes.assign(invite_code, account_id)
+
+            return await self._issue_tokens(account_id, username)
+        except Exception:
+            if invite_code:
+                await self.invite_codes.release(invite_code)
+            raise
 
     async def login(
         self, username: str, password: str, revoke_others: bool = False
@@ -49,22 +80,67 @@ class AuthService:
         if not account:
             raise UnauthorizedError("用户名或密码错误")
 
+        account_id = account["id"]
+
+        locked, remaining = await self.login_failures.check_locked(account_id)
+        if locked:
+            minutes = max(1, remaining // 60)
+            raise LockedError(
+                f"账户已锁定，请 {minutes} 分钟后重试", remaining
+            )
+
         ok, new_hash = verify_password_with_legacy(
             password, account["password_hash"], account.get("password_salt", "")
         )
         if not ok:
+            await self.login_failures.record_failure(account_id, "")
+            row = await self._db.async_fetch_one(
+                "SELECT fail_count FROM account_login_failures WHERE account_id = %s",
+                params=(account_id,),
+            )
+            if row and row["fail_count"] >= self._config.login_max_failures:
+                await self.login_failures.lock_account(account_id, self._config.login_lock_minutes)
+                raise LockedError(
+                    f"密码错误次数过多，账户已锁定 {self._config.login_lock_minutes} 分钟",
+                    self._config.login_lock_minutes * 60,
+                )
             raise UnauthorizedError("用户名或密码错误")
 
+        await self.login_failures.reset_failures(account_id)
+
         if new_hash:
-            await self.accounts.update_password_hash(account["id"], new_hash)
+            await self.accounts.update_password_hash(account_id, new_hash)
 
         if revoke_others:
-            await self.tokens.revoke_all_for_account(account["id"])
+            await self.tokens.revoke_all_for_account(account_id)
             await self._db.async_save(
-                "DELETE FROM refresh_tokens WHERE account_id = %s", (account["id"],)
+                "DELETE FROM refresh_tokens WHERE account_id = %s", (account_id,)
             )
 
-        return await self._issue_tokens(account["id"], account["username"])
+        return await self._issue_tokens(account_id, account["username"])
+
+    # ── 邀请码管理 ──────────────────────────────────────────────
+
+    async def create_invite_codes(
+        self, admin_id: int, *, count: int = 0, codes: list[str] | None = None
+    ) -> list[str]:
+        """生成邀请码。codes 非空时使用手动指定的码，否则按 count 随机生成。"""
+        if codes:
+            if len(codes) > 100:
+                raise ValueError("单次手动输入最多 100 个")
+            for c in codes:
+                if not c.strip() or len(c) > 32:
+                    raise ValueError(f"邀请码无效: {c}")
+            return await self.invite_codes.create_batch(admin_id, codes)
+        else:
+            if count < 1 or count > 100:
+                raise ValueError("单次随机生成数量需在 1-100 之间")
+            generated = [_random_code() for _ in range(count)]
+            return await self.invite_codes.create_batch(admin_id, generated)
+
+    async def list_invite_codes(self, page: int = 1, page_size: int = 20) -> dict:
+        rows, total = await self.invite_codes.list_all(page, page_size)
+        return {"total": total, "page": page, "page_size": page_size, "items": rows}
 
     # ── Token 管理 ──────────────────────────────────────────────
 
@@ -118,7 +194,6 @@ class AuthService:
         if row["expires_at"] and row["expires_at"] < _mysql_now():
             raise UnauthorizedError("Refresh Token 已过期")
 
-        # 吊销旧 refresh token，签发新的（轮换）
         await self._db.async_save(
             "DELETE FROM refresh_tokens WHERE id = %s", (row["id"],)
         )
@@ -252,7 +327,6 @@ class AuthService:
     # ── 内部方法 ──────────────────────────────────────────────────
 
     async def _issue_tokens(self, account_id: int, username: str) -> dict:
-        """签发 access_token + refresh_token，返回完整凭证。"""
         raw_token, token_hash, token_prefix = generate_token(self._config.token_prefix)
         expires_at = self._compute_expires_at()
         access_id = await self.tokens.create(account_id, token_hash, token_prefix, None, expires_at)
@@ -299,5 +373,19 @@ class UnauthorizedError(Exception):
     pass
 
 
+class LockedError(Exception):
+    def __init__(self, message: str, remaining_seconds: int = 0):
+        super().__init__(message)
+        self.remaining_seconds = remaining_seconds
+
+
 def _mysql_now():
     return datetime.now(timezone.utc).replace(tzinfo=None)
+
+
+_ALPHABET = string.ascii_uppercase + string.digits  # 去掉易混淆字符
+_ALPHABET = _ALPHABET.translate(str.maketrans("", "", "0O1IL"))
+
+
+def _random_code(length: int = 8) -> str:
+    return "".join(secrets.choice(_ALPHABET) for _ in range(length))

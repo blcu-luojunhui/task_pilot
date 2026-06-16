@@ -10,7 +10,7 @@ from pydantic import BaseModel, Field
 from quart import Blueprint, request
 
 from src.api.v1.utils import ApiDependencies
-from src.core.auth import get_current_account_id, DuplicateError, UnauthorizedError
+from src.core.auth import get_current_account_id, DuplicateError, UnauthorizedError, LockedError
 from src.core.auth.context import current_account_id
 from src.core.auth.decorators import require_role
 from src.api.v1.utils.json_columns import decode_json_columns
@@ -23,6 +23,7 @@ class RegisterRequest(BaseModel):
     username: str = Field(..., min_length=2, max_length=64)
     email: str = Field(..., min_length=1, max_length=128)
     password: str = Field(..., min_length=6, max_length=128)
+    invite_code: str | None = Field(default=None, description="邀请码")
 
 
 class LoginRequest(BaseModel):
@@ -83,7 +84,9 @@ def create_auth_bp(deps: ApiDependencies) -> Blueprint:
             return _error(ErrorCode.VALIDATION_ERROR, "请求参数校验失败", 400)
 
         try:
-            result = await deps.auth.register(body.username, body.email, body.password)
+            result = await deps.auth.register(
+                body.username, body.email, body.password, body.invite_code
+            )
         except DuplicateError as e:
             return _error(ErrorCode.BAD_REQUEST, str(e), 409)
         except Exception as e:
@@ -101,6 +104,8 @@ def create_auth_bp(deps: ApiDependencies) -> Blueprint:
 
         try:
             result = await deps.auth.login(body.username, body.password, body.revoke_others)
+        except LockedError as e:
+            return _error(ErrorCode.LOGIN_LOCKED, str(e), 423)
         except UnauthorizedError as e:
             return _error(ErrorCode.UNAUTHORIZED, str(e), 401)
         except Exception as e:
@@ -309,6 +314,48 @@ def create_auth_bp(deps: ApiDependencies) -> Blueprint:
             return _error(ErrorCode.BAD_REQUEST, "用户不存在", 404)
 
         return _ok(None, "配额已更新")
+
+    # ── Admin: 邀请码管理 ─────────────────────────────────────
+
+    class CreateInviteCodesRequest(BaseModel):
+        count: int = Field(default=0, ge=0, le=100)
+        codes: list[str] | None = Field(default=None, description="手动指定邀请码列表")
+
+    @bp.route("/auth/admin/invite-codes", methods=["POST"])
+    @require_role("admin")
+    async def admin_create_invite_codes():
+        try:
+            body = CreateInviteCodesRequest.model_validate(await request.get_json())
+        except Exception:
+            return _error(ErrorCode.VALIDATION_ERROR, "请提供 count (1-100) 或 codes 列表", 400)
+
+        if not body.codes and body.count < 1:
+            return _error(ErrorCode.VALIDATION_ERROR, "请提供 count (1-100) 或 codes 列表", 400)
+
+        account_id = get_current_account_id()
+        try:
+            codes = await deps.auth.create_invite_codes(
+                account_id, count=body.count, codes=body.codes
+            )
+        except ValueError as e:
+            return _error(ErrorCode.BAD_REQUEST, str(e), 400)
+        except Exception as e:
+            logger.exception("生成邀请码失败: %s", e)
+            return _error(ErrorCode.INTERNAL_ERROR, "生成邀请码失败", 500)
+
+        return _ok({"codes": codes, "count": len(codes)}, "已生成")
+
+    @bp.route("/auth/admin/invite-codes", methods=["GET"])
+    @require_role("admin")
+    async def admin_list_invite_codes():
+        try:
+            page = max(int(request.args.get("page", 1)), 1)
+            page_size = min(int(request.args.get("page_size", 20)), 100)
+        except (TypeError, ValueError):
+            page, page_size = 1, 20
+
+        result = await deps.auth.list_invite_codes(page, page_size)
+        return _ok(result)
 
     # ── Admin: 任务管理 ──────────────────────────────────────
 

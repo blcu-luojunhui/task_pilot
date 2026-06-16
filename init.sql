@@ -181,6 +181,38 @@ CREATE TABLE IF NOT EXISTS account_skills (
     INDEX idx_account_category (account_id, category)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+CREATE TABLE IF NOT EXISTS invite_codes (
+    id              BIGINT AUTO_INCREMENT PRIMARY KEY,
+    code            VARCHAR(32)  NOT NULL
+        COMMENT '邀请码字符串',
+    created_by      BIGINT       NOT NULL
+        COMMENT '生成该邀请码的 admin account_id',
+    used_by         BIGINT       NULL
+        COMMENT '使用该邀请码注册的 account_id',
+    status          TINYINT      NOT NULL DEFAULT 0
+        COMMENT '0=未使用, 1=已使用',
+    created_at      TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
+    used_at         TIMESTAMP    NULL,
+    UNIQUE INDEX uk_code (code),
+    INDEX idx_status (status),
+    INDEX idx_created_by (created_by)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS account_login_failures (
+    account_id      BIGINT       NOT NULL,
+    ip_address      VARCHAR(45)  NOT NULL
+        COMMENT '最近一次登录失败的 IP',
+    fail_count      INT          NOT NULL DEFAULT 1
+        COMMENT '连续失败次数',
+    first_fail_at   TIMESTAMP    DEFAULT CURRENT_TIMESTAMP
+        COMMENT '首次失败时间',
+    last_fail_at    TIMESTAMP    DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+        COMMENT '最近失败时间',
+    locked_until    TIMESTAMP    NULL
+        COMMENT '锁定到期时间',
+    PRIMARY KEY (account_id)
+) ENGINE=InnoDB;
+
 CREATE TABLE IF NOT EXISTS system_skills (
     id              BIGINT AUTO_INCREMENT PRIMARY KEY,
     name            VARCHAR(128) NOT NULL
@@ -202,6 +234,10 @@ CREATE TABLE IF NOT EXISTS system_skills (
 -- MySQL 5.7 不兼容 IF NOT EXISTS for ALTER TABLE ADD COLUMN，
 -- 若列已存在会报错，忽略即可。
 -- ============================================================
+
+-- 邀请码支持字符串：为已有 invite_codes 表增加 code 列
+-- ALTER TABLE invite_codes ADD COLUMN code VARCHAR(32) NOT NULL DEFAULT '' AFTER id, ADD UNIQUE INDEX uk_code (code);
+-- UPDATE invite_codes SET code = CAST(id AS CHAR) WHERE code = '';
 
 -- ALTER TABLE task_manager ADD COLUMN account_id BIGINT NOT NULL DEFAULT 0 COMMENT '归属账户 ID，0=无主/系统', ADD INDEX idx_account_id (account_id);
 -- ALTER TABLE agent_events ADD COLUMN account_id BIGINT NOT NULL DEFAULT 0 COMMENT '归属账户 ID，0=无主/系统', ADD INDEX idx_account_id (account_id);

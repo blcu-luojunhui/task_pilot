@@ -181,3 +181,103 @@ class UsageRepository:
             "ON DUPLICATE KEY UPDATE tokens_used = tokens_used + %s",
             (account_id, today, tokens, tokens),
         )
+
+
+class InviteCodeRepository:
+    def __init__(self, db: AsyncMySQLPool):
+        self._db = db
+
+    async def create_batch(self, created_by: int, codes: list[str]) -> list[str]:
+        """批量插入邀请码，返回 codes 列表。"""
+        for code in codes:
+            await self._db.async_save(
+                "INSERT INTO invite_codes (code, created_by) VALUES (%s, %s)",
+                (code, created_by),
+            )
+        return codes
+
+    async def find_by_code(self, code: str) -> Optional[dict]:
+        return await self._db.async_fetch_one(
+            "SELECT id, code, created_by, used_by, status, created_at, used_at "
+            "FROM invite_codes WHERE code = %s",
+            params=(code,),
+        )
+
+    async def reserve(self, code: str) -> bool:
+        """原子预占邀请码（used_by=0 占位），防止并发重复使用。"""
+        affected = await self._db.async_save(
+            "UPDATE invite_codes SET status = 1, used_by = 0, used_at = NOW() "
+            "WHERE code = %s AND status = 0",
+            (code,),
+        )
+        return affected > 0
+
+    async def assign(self, code: str, account_id: int) -> None:
+        """将预占的邀请码绑定到真实账户。"""
+        await self._db.async_save(
+            "UPDATE invite_codes SET used_by = %s WHERE code = %s",
+            (account_id, code),
+        )
+
+    async def release(self, code: str) -> None:
+        """释放预占的邀请码（注册失败回滚）。"""
+        await self._db.async_save(
+            "UPDATE invite_codes SET status = 0, used_by = NULL, used_at = NULL WHERE code = %s",
+            (code,),
+        )
+
+    async def list_all(self, page: int = 1, page_size: int = 20) -> tuple[list[dict], int]:
+        total_row = await self._db.async_fetch_one(
+            "SELECT COUNT(*) AS c FROM invite_codes"
+        )
+        total = total_row["c"] if total_row else 0
+        rows = await self._db.async_fetch(
+            "SELECT ic.id, ic.code, ic.created_by, ic.used_by, ic.status, "
+            "ic.created_at, ic.used_at, a.username AS created_by_name "
+            "FROM invite_codes ic "
+            "LEFT JOIN accounts a ON a.id = ic.created_by "
+            "ORDER BY ic.id DESC LIMIT %s OFFSET %s",
+            params=(page_size, (page - 1) * page_size),
+        )
+        return rows, total
+
+
+class LoginFailureRepository:
+    def __init__(self, db: AsyncMySQLPool):
+        self._db = db
+
+    async def record_failure(self, account_id: int, ip: str) -> None:
+        await self._db.async_save(
+            "INSERT INTO account_login_failures (account_id, ip_address, fail_count, first_fail_at, last_fail_at) "
+            "VALUES (%s, %s, 1, NOW(), NOW()) "
+            "ON DUPLICATE KEY UPDATE fail_count = fail_count + 1, ip_address = %s, last_fail_at = NOW()",
+            (account_id, ip, ip),
+        )
+
+    async def lock_account(self, account_id: int, lock_minutes: int) -> None:
+        await self._db.async_save(
+            "UPDATE account_login_failures SET locked_until = DATE_ADD(NOW(), INTERVAL %s MINUTE) "
+            "WHERE account_id = %s",
+            (lock_minutes, account_id),
+        )
+
+    async def check_locked(self, account_id: int) -> tuple[bool, int]:
+        """返回 (is_locked, remaining_seconds)。"""
+        row = await self._db.async_fetch_one(
+            "SELECT fail_count, locked_until, "
+            "TIMESTAMPDIFF(SECOND, NOW(), locked_until) AS remaining_sec "
+            "FROM account_login_failures WHERE account_id = %s",
+            params=(account_id,),
+        )
+        if not row or not row["locked_until"]:
+            return False, 0
+        remaining = row["remaining_sec"] or 0
+        if remaining > 0:
+            return True, remaining
+        return False, 0
+
+    async def reset_failures(self, account_id: int) -> None:
+        await self._db.async_save(
+            "DELETE FROM account_login_failures WHERE account_id = %s",
+            (account_id,),
+        )

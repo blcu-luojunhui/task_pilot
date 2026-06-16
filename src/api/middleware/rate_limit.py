@@ -7,10 +7,11 @@ from src.infra.shared import ErrorCode
 
 class RateLimitMiddleware:
     """
-    基于 IP 的滑动窗口速率限制中间件
+    基于 IP 的滑动窗口速率限制中间件。
 
-    默认限制：每个 IP 每分钟最多 60 次请求
-    可通过 rate_limit_paths 指定只对特定路径生效
+    rate_limit_paths: 受默认限制的路径集合
+    path_limits:     路径 → (max_requests, window_seconds) 差异化限制
+                     不在 path_limits 中的路径使用默认值
     """
 
     def __init__(
@@ -19,11 +20,13 @@ class RateLimitMiddleware:
         max_requests: int = 60,
         window_seconds: int = 60,
         rate_limit_paths: set = None,
+        path_limits: dict = None,
     ):
         self.app = app
         self.max_requests = max_requests
         self.window_seconds = window_seconds
-        self.rate_limit_paths = rate_limit_paths
+        self.rate_limit_paths = rate_limit_paths or set()
+        self.path_limits = path_limits or {}
         self._requests = defaultdict(list)
 
         app.before_request(self.before_request)
@@ -35,28 +38,37 @@ class RateLimitMiddleware:
             return forwarded.split(",")[0].strip()
         return request.remote_addr or "unknown"
 
-    def _cleanup(self, key: str, now: float):
-        cutoff = now - self.window_seconds
+    def _cleanup(self, key: str, now: float, window: int):
+        cutoff = now - window
         timestamps = self._requests[key]
-        # 移除过期的时间戳
         while timestamps and timestamps[0] < cutoff:
             timestamps.pop(0)
         if not timestamps:
             del self._requests[key]
 
+    def _get_limit_for_path(self, path: str) -> tuple[int, int] | None:
+        """返回 (max_requests, window_seconds)，若非限流路径返回 None。"""
+        if path in self.path_limits:
+            return self.path_limits[path]
+        if path in self.rate_limit_paths:
+            return self.max_requests, self.window_seconds
+        return None
+
     async def before_request(self):
-        # 如果指定了路径，只对这些路径限流
-        if self.rate_limit_paths and request.path not in self.rate_limit_paths:
+        limit = self._get_limit_for_path(request.path)
+        if limit is None:
             return None
 
+        max_req, window = limit
         client_ip = self._get_client_ip()
+        key = f"{client_ip}:{request.path}"
         now = time.time()
 
-        self._cleanup(client_ip, now)
+        self._cleanup(key, now, window)
 
-        timestamps = self._requests[client_ip]
-        if len(timestamps) >= self.max_requests:
-            retry_after = int(self.window_seconds - (now - timestamps[0]))
+        timestamps = self._requests[key]
+        if len(timestamps) >= max_req:
+            retry_after = int(window - (now - timestamps[0]))
             response = jsonify(
                 {
                     "code": ErrorCode.RATE_LIMITED,
