@@ -235,9 +235,10 @@ CREATE TABLE IF NOT EXISTS system_skills (
 -- 若列已存在会报错，忽略即可。
 -- ============================================================
 
--- 邀请码支持字符串：为已有 invite_codes 表增加 code 列
--- ALTER TABLE invite_codes ADD COLUMN code VARCHAR(32) NOT NULL DEFAULT '' AFTER id, ADD UNIQUE INDEX uk_code (code);
+-- 邀请码支持字符串：为已有 invite_codes 表增加 code 列（分步执行，避免唯一索引冲突）
+-- ALTER TABLE invite_codes ADD COLUMN code VARCHAR(32) NOT NULL DEFAULT '' AFTER id;
 -- UPDATE invite_codes SET code = CAST(id AS CHAR) WHERE code = '';
+-- ALTER TABLE invite_codes ADD UNIQUE INDEX uk_code (code);
 
 -- ALTER TABLE task_manager ADD COLUMN account_id BIGINT NOT NULL DEFAULT 0 COMMENT '归属账户 ID，0=无主/系统', ADD INDEX idx_account_id (account_id);
 -- ALTER TABLE agent_events ADD COLUMN account_id BIGINT NOT NULL DEFAULT 0 COMMENT '归属账户 ID，0=无主/系统', ADD INDEX idx_account_id (account_id);
