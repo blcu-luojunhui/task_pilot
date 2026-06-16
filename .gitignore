@@ -43,3 +43,5 @@ node_modudles/
 docs/design
 frontend/
 nginx/certs/
+/docs/deploy.md
+/src/infra/streaming/DESIGN.md
