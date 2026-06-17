@@ -9,7 +9,8 @@ ENV FRONTEND_DIST=/app/dist
 ENV FRONTEND_DIST_ENABLED=true
 
 COPY requirements.txt .
-RUN apt-get update && \
+RUN sed -i 's/deb.debian.org/mirrors.aliyun.com/g' /etc/apt/sources.list.d/debian.sources && \
+    apt-get update && \
     apt-get install -y --no-install-recommends tzdata && \
     ln -sf /usr/share/zoneinfo/Asia/Shanghai /etc/localtime && \
     echo "Asia/Shanghai" > /etc/timezone && \
