@@ -189,7 +189,8 @@ def create_tasks_bp(deps: ApiDependencies) -> Blueprint:
         account_id = get_current_account_id() or 0
         rows = await deps.mysql.async_fetch(
             "SELECT sequence, event_type, source, step, payload, created_at "
-            "FROM agent_events WHERE trace_id = %s AND account_id = %s ORDER BY sequence",
+            "FROM agent_events FORCE INDEX (uk_trace_seq) "
+            "WHERE trace_id = %s AND account_id = %s ORDER BY sequence",
             params=(trace_id, account_id),
         )
         closed = not deps.events.has_trace(trace_id) or deps.events.is_closed(trace_id)
