@@ -30,6 +30,7 @@ from src.infra.streaming import TraceEventBus
 _MAX_ITERATIONS = 10
 _TOKEN_FLUSH_INTERVAL = 0.016
 _TOKEN_FLUSH_CHARS = 48
+_MAX_EVENT_PAYLOAD_CHARS = 4096
 
 _ESCALATE_TOOL_NAME = "escalate_to_agent"
 
@@ -53,6 +54,8 @@ class ChatTurnRunner:
         cancel_checker: Callable[[], Awaitable[bool]],
         tool_dependencies: Optional[Dict[str, Any]] = None,
         on_escalate: Optional[Callable[[], Awaitable[None]]] = None,
+        initial_mode: str = "chat",
+        skip_risk_check: bool = False,
     ):
         self._provider = llm_provider
         self._tools = tools
@@ -62,8 +65,12 @@ class ChatTurnRunner:
         self._tool_deps = tool_dependencies or {}
         self._executor = SkillExecutor(validate_params=False)
         self._serializer = ToolSpecSerializer(OpenAIAdapter())
-        self._mode = "chat"  # "chat" | "agentic"
+        self._mode = initial_mode  # "chat" | "agentic"
         self._on_escalate = on_escalate
+        self._skip_risk_check = skip_risk_check
+        self._step = 0
+        self._source = "agent" if initial_mode == "agentic" else "runner"
+        self._goal_label = ""
 
     def _active_tools(self) -> List[Skill]:
         """根据当前 mode 过滤暴露给 LLM 的工具。"""
@@ -101,16 +108,43 @@ class ChatTurnRunner:
             ]
 
         total_usage: Dict[str, int] = {}
+        tool_calls_count = 0
+        run_start_ts = _time.monotonic()
+
+        # 发布 harness 兼容的 run_start 事件
+        goal = self._goal_label or ""
+        if not goal and messages:
+            goal = messages[0].get("content", "") or ""
+        await self._publish_harness("run_start", {
+            "metadata": {"goal": goal, "trace_id": self._trace_id},
+            "goal": goal,
+        })
 
         for _ in range(_MAX_ITERATIONS):
+            self._step += 1
             if await self._cancel_checker():
                 return ChatTurnResult(status="cancelled", content="")
+
+            # 发布 step_start（DAGView 依赖此事件识别步骤边界）
+            await self._publish_harness("step_start", {"deps": []})
+
+            # 发布 think_start
+            await self._publish_harness("think_start", {})
 
             full_content, tool_calls, usage = await self._call_llm(messages, system_prompt)
 
             if usage:
                 for k, v in usage.items():
                     total_usage[k] = total_usage.get(k, 0) + v
+
+            # 发布 harness 兼容的 think_end
+            await self._publish_harness("think_end", {
+                "assistant_message": {
+                    "content": full_content,
+                    "tool_calls": tool_calls or [],
+                },
+                "_usage": usage or {},
+            })
 
             if not tool_calls:
                 if self._mode == "agentic":
@@ -122,6 +156,17 @@ class ChatTurnRunner:
                 await self._publish(ChatEventType.TURN_END, {
                     "content": full_content,
                     "token_usage": total_usage,
+                })
+                await self._publish_harness("step_end", {})
+                await self._publish_harness("run_end", {
+                    "result": {
+                        "stop_reason": "completed",
+                        "total_steps": self._step,
+                        "tool_calls_count": tool_calls_count,
+                        "token_usage": total_usage,
+                        "duration_seconds": round(_time.monotonic() - run_start_ts, 2),
+                        "final_answer": full_content,
+                    },
                 })
                 return ChatTurnResult(
                     status="completed",
@@ -154,6 +199,7 @@ class ChatTurnRunner:
                     "reason": escalate_reason,
                 })
                 # 执行 escalate（结果只是占位），写 tool 消息让 LLM 知道已升级
+                tool_calls_count += len(tool_calls)
                 tool_results = await self._execute_tools(tool_calls)
                 messages = messages + [
                     {
@@ -172,21 +218,33 @@ class ChatTurnRunner:
                 continue
 
             # 风险分级（仅 agentic 模式下才可能出现 high-risk 工具）
-            high_risk = [tc for tc in tool_calls if is_high_risk(tc["function"]["name"])]
+            if not self._skip_risk_check:
+                high_risk = [tc for tc in tool_calls if is_high_risk(tc["function"]["name"])]
 
-            if high_risk:
-                await self._publish(ChatEventType.TOOL_CALL_PROPOSED, {
-                    "tool_calls": tool_calls,
-                })
-                await self._publish(ChatEventType.TURN_PAUSED, {})
-                return ChatTurnResult(
-                    status="pending_confirmation",
-                    content=full_content,
-                    proposed_tool_calls=tool_calls,
-                    token_usage=total_usage,
-                )
+                if high_risk:
+                    await self._publish(ChatEventType.TOOL_CALL_PROPOSED, {
+                        "tool_calls": tool_calls,
+                    })
+                    await self._publish(ChatEventType.TURN_PAUSED, {})
+                    await self._publish_harness("step_end", {})
+                    await self._publish_harness("run_end", {
+                        "result": {
+                            "stop_reason": "pending_confirmation",
+                            "total_steps": self._step,
+                            "tool_calls_count": tool_calls_count,
+                            "token_usage": total_usage,
+                            "duration_seconds": round(_time.monotonic() - run_start_ts, 2),
+                        },
+                    })
+                    return ChatTurnResult(
+                        status="pending_confirmation",
+                        content=full_content,
+                        proposed_tool_calls=tool_calls,
+                        token_usage=total_usage,
+                    )
 
             # 全 low-risk → 直接执行
+            tool_calls_count += len(tool_calls)
             tool_results = await self._execute_tools(tool_calls)
             messages = messages + [
                 {
@@ -196,7 +254,17 @@ class ChatTurnRunner:
                 },
                 *tool_results,
             ]
+            await self._publish_harness("step_end", {})
 
+        await self._publish_harness("run_end", {
+            "result": {
+                "stop_reason": "max_iterations",
+                "total_steps": self._step,
+                "tool_calls_count": tool_calls_count,
+                "token_usage": total_usage,
+                "duration_seconds": round(_time.monotonic() - run_start_ts, 2),
+            },
+        })
         return ChatTurnResult(status="completed", content="达到最大迭代次数", token_usage=total_usage)
 
     # ── 内部方法 ────────────────────────────────────────────
@@ -319,6 +387,17 @@ class ChatTurnRunner:
 
         return full_content, tool_calls, usage_dict
 
+    @staticmethod
+    def _truncate_for_event(payload: Any) -> Any:
+        """截断大型字符串，避免 agent_events 表存完整 HTML 等巨型内容。"""
+        if isinstance(payload, str) and len(payload) > _MAX_EVENT_PAYLOAD_CHARS:
+            return payload[:_MAX_EVENT_PAYLOAD_CHARS] + "...[truncated]"
+        if isinstance(payload, dict):
+            return {k: ChatTurnRunner._truncate_for_event(v) for k, v in payload.items()}
+        if isinstance(payload, list):
+            return [ChatTurnRunner._truncate_for_event(v) for v in payload]
+        return payload
+
     async def _execute_tools(self, tool_calls: List[Dict]) -> List[Dict]:
         results = []
         for tc in tool_calls:
@@ -337,6 +416,11 @@ class ChatTurnRunner:
                 "call_id": call_id,
             })
 
+            # harness 兼容: act_start
+            await self._publish_harness("act_start", {
+                "tool_calls": [{"name": tool_name, "arguments": arguments}],
+            })
+
             skill = self._find_skill(tool_name)
             if skill is None:
                 error_msg = {"ok": False, "error": f"未知工具: {tool_name}"}
@@ -345,6 +429,9 @@ class ChatTurnRunner:
                     "call_id": call_id,
                     "result": error_msg,
                     "ok": False,
+                })
+                await self._publish_harness("act_end", {
+                    "tool_results": [{"tool_call_id": call_id, "content": f"Error: {error_msg['error']}"}],
                 })
                 results.append({
                     "role": "tool",
@@ -367,8 +454,14 @@ class ChatTurnRunner:
             await self._publish(ChatEventType.TOOL_CALL_END, {
                 "tool_name": tool_name,
                 "call_id": call_id,
-                "result": result_payload,
+                "result": self._truncate_for_event(result_payload),
                 "ok": ok,
+            })
+
+            # harness 兼容: act_end（截断后的 result_content）
+            truncated_for_event = self._truncate_for_event(result_content)
+            await self._publish_harness("act_end", {
+                "tool_results": [{"tool_call_id": call_id, "content": truncated_for_event}],
             })
 
             results.append({
@@ -396,8 +489,25 @@ class ChatTurnRunner:
                 trace_id=self._trace_id,
                 event_type=event_type,
                 data=data,
-                source="chat",
+                source=self._source,
+                step=self._step,
                 persist=persist,
+            )
+        except Exception:
+            pass
+
+    async def _publish_harness(
+        self, event_type: str, data: Dict[str, Any]
+    ) -> None:
+        """发布 harness 兼容事件，source 统一用 self._source。"""
+        try:
+            self._event_bus.publish(
+                trace_id=self._trace_id,
+                event_type=event_type,
+                data=data,
+                source=self._source,
+                step=self._step,
+                persist=True,
             )
         except Exception:
             pass

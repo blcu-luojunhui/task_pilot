@@ -260,12 +260,12 @@ class AuthService:
 
         where = "WHERE " + " AND ".join(conditions)
         total_row = await self._db.async_fetch_one(
-            f"SELECT COUNT(*) AS c FROM task_manager {where}", tuple(params)
+            f"SELECT COUNT(*) AS c FROM task_manager {where}", params=tuple(params)
         )
         total = total_row["c"] if total_row else 0
         rows = await self._db.async_fetch(
             f"SELECT * FROM task_manager {where} ORDER BY start_timestamp DESC LIMIT %s OFFSET %s",
-            (*params, page_size, (page - 1) * page_size),
+            params=(*params, page_size, (page - 1) * page_size),
         )
         return {"total": total, "page": page, "page_size": page_size, "items": rows}
 

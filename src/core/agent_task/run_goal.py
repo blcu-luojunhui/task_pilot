@@ -20,7 +20,7 @@ from src.core.agents.capabilities.llm.providers import (
 )
 from src.core.agents.capabilities.skills import get_global_registry
 from src.core.agents.capabilities.tools.loader import load_agentic_tools
-from src.core.chat.runner import ChatTurnRunner, ChatTurnResult
+from src.core.chat.runner import ChatTurnRunner
 from src.core.agent_task.prompts import RUN_GOAL_SYSTEM_PROMPT
 from src.jobs.task_config import TaskStatus
 from src.jobs.task_handler import register
@@ -185,7 +185,11 @@ async def run_agent_goal(scheduler: "TaskScheduler") -> int:
         event_bus=events_bus,
         cancel_checker=cancel_checker,
         tool_dependencies=tool_dependencies,
+        initial_mode="agentic",
+        skip_risk_check=True,
     )
+    # 优先用用户原始输入作为 Goal，而非完整 PRD
+    runner._goal_label = (data.get("original_goal") or goal).strip()
 
     try:
         result = await runner.run(

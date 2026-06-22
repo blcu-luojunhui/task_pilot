@@ -4,12 +4,20 @@
 """
 from __future__ import annotations
 
-from typing import Any, Dict
+import logging
+from typing import Any, Dict, Optional
 
 from quart import Blueprint, jsonify, request
 
 from src.api.middleware.trace import get_current_trace_id
 from src.api.v1.utils import ApiDependencies
+from src.core.agent_task.prompts import PRD_COMPILER_SYSTEM_PROMPT
+from src.core.agents.capabilities.llm.base import LLMProvider, LLMConfig, LLMMessage
+from src.core.agents.capabilities.llm.providers import (
+    OpenAIProvider,
+    ClaudeProvider,
+    DeepSeekProvider,
+)
 from src.core.auth import get_current_account_id
 from src.infra.shared import ErrorCode
 from src.jobs import TaskScheduler
@@ -19,6 +27,48 @@ from src.core.agent_task import run_agent_goal as _run_agent_goal  # noqa: F401
 
 _AGENT_TASK_NAME = "agent.run_goal"
 _AVAILABLE_TOOL_AREAS = ["database", "http", "task", "utils", "chat_ops"]
+
+_PROVIDER_MAP = {
+    "openai": OpenAIProvider,
+    "claude": ClaudeProvider,
+    "deepseek": DeepSeekProvider,
+}
+
+_PROVIDER_DEFAULTS = {
+    "openai": {"model": "gpt-4o", "base_url": "https://api.openai.com/v1"},
+    "claude": {
+        "model": "claude-sonnet-4-6",
+        "base_url": "https://api.anthropic.com/v1",
+    },
+    "deepseek": {"model": "deepseek-chat", "base_url": "https://api.deepseek.com"},
+}
+
+logger = logging.getLogger(__name__)
+
+
+def _infer_provider_key(base_url: Optional[str]) -> str:
+    if not base_url:
+        return "deepseek"
+    bl = base_url.lower()
+    if "anthropic" in bl or "claude" in bl:
+        return "claude"
+    if "deepseek" in bl:
+        return "deepseek"
+    return "openai"
+
+
+def _build_llm_provider(cfg) -> LLMProvider:
+    key = _infer_provider_key(cfg.base_url)
+    defaults = _PROVIDER_DEFAULTS.get(key, _PROVIDER_DEFAULTS["deepseek"])
+    provider_cls = _PROVIDER_MAP.get(key, DeepSeekProvider)
+    llm_config = LLMConfig(
+        api_key=cfg.api_key,
+        model=cfg.model or defaults["model"],
+        base_url=cfg.base_url or defaults["base_url"],
+        temperature=cfg.temperature,
+    )
+    logger.info("agent endpoint 使用 provider=%s model=%s", key, llm_config.model)
+    return provider_cls(llm_config)
 
 
 def _bad_request(message: str) -> tuple:
@@ -39,6 +89,37 @@ def create_agent_bp(deps: ApiDependencies) -> Blueprint:
                 },
             }
         )
+
+    @bp.route("/agent/generate_prd", methods=["POST"])
+    async def generate_prd():
+        body: Dict[str, Any] = await request.get_json(silent=True) or {}
+        goal = (body.get("goal") or "").strip()
+
+        if not goal:
+            return _bad_request("goal is required and must be a non-empty string")
+
+        llm_cfg = deps.config.llm
+        provider = _build_llm_provider(llm_cfg)
+
+        try:
+            messages = [
+                LLMMessage(role="system", content=PRD_COMPILER_SYSTEM_PROMPT),
+                LLMMessage(role="user", content=goal),
+            ]
+            response = await provider.chat(
+                messages=messages,
+                temperature=0.3,
+            )
+            prd = response.content.strip()
+            return jsonify({"code": 0, "data": {"prd": prd}})
+        except Exception:
+            logger.exception("PRD 生成失败")
+            return jsonify({"code": ErrorCode.INTERNAL_ERROR, "message": "PRD 生成失败，请稍后重试"}), 500
+        finally:
+            try:
+                await provider.close()
+            except Exception:
+                pass
 
     @bp.route("/agent/run", methods=["POST"])
     async def run_agent():
@@ -72,6 +153,7 @@ def create_agent_bp(deps: ApiDependencies) -> Blueprint:
             "task_name": _AGENT_TASK_NAME,
             "goal": goal,
             "tool_areas": safe_areas,
+            "original_goal": (body.get("original_goal") or "").strip() or goal,
         }
         scheduler = TaskScheduler(scheduler_data, trace_id, deps, account_id=account_id)
         result = await scheduler.deal()

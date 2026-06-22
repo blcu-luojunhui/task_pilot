@@ -17,7 +17,7 @@ async def build_agent_metadata(
 ) -> Optional[Dict[str, Any]]:
     """从 agent_events 表重建 agent_metadata"""
     events = await mysql.async_fetch(
-        "SELECT event_type, payload FROM agent_events "
+        "SELECT event_type, payload FROM agent_events FORCE INDEX (uk_trace_seq) "
         "WHERE trace_id = %s AND event_type IN ('run_start', 'run_end') AND account_id = %s "
         "ORDER BY sequence",
         params=(trace_id, account_id),
