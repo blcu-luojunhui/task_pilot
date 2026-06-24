@@ -1,0 +1,2 @@
+import{n as e,t}from"./client-CmXu8x4U.js";async function n(n){return e(t.get(`/system/stats`,{signal:n?.signal}))}async function r(){return e(t.get(`/health`))}export{n,r as t};
+//# sourceMappingURL=system-Cxw9NtX_.js.map

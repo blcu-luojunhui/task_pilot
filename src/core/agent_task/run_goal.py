@@ -185,8 +185,6 @@ async def run_agent_goal(scheduler: "TaskScheduler") -> int:
         event_bus=events_bus,
         cancel_checker=cancel_checker,
         tool_dependencies=tool_dependencies,
-        initial_mode="agentic",
-        skip_risk_check=True,
     )
     # 优先用用户原始输入作为 Goal，而非完整 PRD
     runner._goal_label = (data.get("original_goal") or goal).strip()

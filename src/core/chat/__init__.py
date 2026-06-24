@@ -9,7 +9,7 @@ from .repository import (
     MSG_STATUS_REJECTED,
     MSG_STATUS_CANCELLED,
 )
-from .risk import ToolRisk, TOOL_RISK_REGISTRY, DEFAULT_RISK, CHAT_MODE_TOOLS, get_tool_risk, is_high_risk, is_chat_mode_tool
+from .risk import ToolRisk, TOOL_RISK_REGISTRY, DEFAULT_RISK, get_tool_risk, is_high_risk
 from .events import ChatEventType
 from .runner import ChatTurnRunner, ChatTurnResult
 from .service import ChatService
@@ -25,10 +25,8 @@ __all__ = [
     "ToolRisk",
     "TOOL_RISK_REGISTRY",
     "DEFAULT_RISK",
-    "CHAT_MODE_TOOLS",
     "get_tool_risk",
     "is_high_risk",
-    "is_chat_mode_tool",
     "ChatEventType",
     "ChatTurnRunner",
     "ChatTurnResult",
