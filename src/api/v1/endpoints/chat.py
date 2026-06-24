@@ -1,11 +1,12 @@
-"""Chat HTTP API：会话 CRUD + 发送消息（驱动 chat turn）。
+"""Chat HTTP API：会话 CRUD + 发送消息（驱动 chat turn）+ PRD 提炼。
 
 流式响应不在这里实现——前端拿到 ``trace_id`` 后直接复用 ``/api/task_events/<trace_id>``
-SSE 即可消费 think/act/run_end 等事件。
+SSE 即可消费 token_delta/turn_end 等事件。
 """
 from __future__ import annotations
 
 import asyncio
+import logging
 from typing import Any, Dict
 
 from quart import Blueprint, jsonify, request
@@ -16,10 +17,10 @@ from src.core.auth import get_current_account_id
 from src.core.chat import ChatRepository, ConversationStatus
 from src.core.chat.agent_task import run_chat_turn
 from src.core.chat.cancel import ChatCancelRegistry
-from src.core.chat.service import ChatService
 
 from src.infra.shared import ErrorCode
 
+logger = logging.getLogger(__name__)
 
 _CHAT_TASK_NAME = "chat.agent_turn"
 _DEFAULT_LIST_LIMIT = 20
@@ -161,18 +162,13 @@ def create_chat_bp(deps: ApiDependencies) -> Blueprint:
         if int(conv.get("status", 0)) == ConversationStatus.DELETED.value:
             return _bad_request("conversation has been deleted")
 
-        # 用 middleware 注入的 trace_id 作为本轮 chat 的 trace_id；
-        # 前端可立即拿它订阅 SSE
         trace_id = get_current_trace_id()
         account_id = get_current_account_id() or 0
-        # 在 chat turn 真正起步前就把 trace 占位到 event bus，
-        # 避免前端 SSE 抢跑命中 404 后无限 backoff 重连
         try:
             deps.events.ensure_trace(trace_id, metadata={"task_name": _CHAT_TASK_NAME, "account_id": account_id})
         except Exception:
             pass
 
-        # 普通 chat 不创建 task_manager 记录，直接启动轻量 chat turn
         asyncio.create_task(
             run_chat_turn(
                 db=deps.mysql,
@@ -201,17 +197,15 @@ def create_chat_bp(deps: ApiDependencies) -> Blueprint:
 
     @bp.route("/chat/conversations/<conversation_id>/cancel", methods=["POST"])
     async def cancel_turn(conversation_id: str):
-        """取消指定 trace_id 的当前轮次。trace_id 由前端 SSE 订阅时拿到。"""
+        """取消指定 trace_id 的当前轮次。"""
         body: Dict[str, Any] = await request.get_json(silent=True) or {}
         trace_id = body.get("trace_id")
         if not trace_id:
             return _bad_request("trace_id is required")
 
         account_id = get_current_account_id() or 0
-        # 优先走轻量取消（普通 chat），fallback 到 task_manager 取消（已升级的 task）
         success = ChatCancelRegistry.cancel(trace_id)
         if not success:
-            # 可能已升级或从未注册，尝试 task_manager
             from src.jobs import TaskScheduler
             scheduler_data = {"task_name": _CHAT_TASK_NAME, "trace_id": trace_id}
             scheduler = TaskScheduler(scheduler_data, trace_id, deps, account_id=account_id)
@@ -227,51 +221,100 @@ def create_chat_bp(deps: ApiDependencies) -> Blueprint:
             }
         )
 
-    @bp.route(
-        "/chat/conversations/<conversation_id>/confirm", methods=["POST"]
-    )
-    async def confirm_plan(conversation_id: str):
+    @bp.route("/chat/conversations/<conversation_id>/prd_from_messages", methods=["POST"])
+    async def prd_from_messages(conversation_id: str):
+        """从选中的聊天消息提炼 PRD。"""
         body: Dict[str, Any] = await request.get_json(silent=True) or {}
-        message_id = body.get("message_id")
-        action = body.get("action")
+        message_ids = body.get("message_ids")
+        if not message_ids or not isinstance(message_ids, list):
+            return _bad_request("message_ids is required and must be a list of integers")
+        if not all(isinstance(mid, int) for mid in message_ids):
+            return _bad_request("message_ids must be a list of integers")
 
-        if not message_id or not isinstance(message_id, int):
-            return _bad_request("message_id is required and must be an integer")
-        if action not in ("confirm", "reject"):
-            return _bad_request("action must be 'confirm' or 'reject'")
+        repo = _repo()
+        conv = await repo.get_conversation(conversation_id)
+        if not conv:
+            return _not_found("conversation not found")
 
-        trace_id = get_current_trace_id()
-        account_id = get_current_account_id() or 0
-        chat_service = ChatService(
-            db=deps.mysql,
-            log=deps.log,
-            config=deps.config,
-            event_bus=deps.events,
-            account_id=account_id,
+        # 拉取全部消息，筛选选中的
+        messages = await repo.list_messages(conversation_id, limit=_MAX_MESSAGE_LIMIT)
+        selected = [m for m in messages if int(m.get("id", 0)) in message_ids]
+        if not selected:
+            return _bad_request("no matching messages found for the given message_ids")
+
+        # 构建对话 transcript
+        transcript_parts: list[str] = []
+        for m in selected:
+            role = m.get("role", "unknown")
+            content = (m.get("content") or "").strip()
+            if content:
+                transcript_parts.append(f"[{role}]: {content}")
+        context = "\n\n".join(transcript_parts)
+
+        if not context.strip():
+            return _bad_request("selected messages contain no text content")
+
+        # 调用 LLM 提炼 PRD
+        from src.core.agent_task.prompts import PRD_COMPILER_SYSTEM_PROMPT
+        from src.core.agents.capabilities.llm.base import LLMMessage, LLMConfig
+        from src.core.agents.capabilities.llm.providers import (
+            OpenAIProvider,
+            ClaudeProvider,
+            DeepSeekProvider,
         )
 
-        new_trace_id = await chat_service.confirm_plan(
-            conversation_id=conversation_id,
-            message_id=message_id,
-            action=action,
-            trace_id=trace_id,
-            deps=deps,
+        llm_cfg = deps.config.llm
+
+        def _infer_key(base_url):
+            if not base_url:
+                return "deepseek"
+            bl = base_url.lower()
+            if "anthropic" in bl or "claude" in bl:
+                return "claude"
+            if "deepseek" in bl:
+                return "deepseek"
+            return "openai"
+
+        key = _infer_key(llm_cfg.base_url)
+        defaults = {
+            "openai": {"model": "gpt-4o", "base_url": "https://api.openai.com/v1"},
+            "claude": {"model": "claude-sonnet-4-6", "base_url": "https://api.anthropic.com/v1"},
+            "deepseek": {"model": "deepseek-chat", "base_url": "https://api.deepseek.com"},
+        }
+        provider_map = {
+            "openai": OpenAIProvider,
+            "claude": ClaudeProvider,
+            "deepseek": DeepSeekProvider,
+        }
+        provider_dflt = defaults.get(key, defaults["deepseek"])
+        provider_cls = provider_map.get(key, DeepSeekProvider)
+        llm_config = LLMConfig(
+            api_key=llm_cfg.api_key,
+            model=llm_cfg.model or provider_dflt["model"],
+            base_url=llm_cfg.base_url or provider_dflt["base_url"],
+            temperature=0.3,
         )
+        provider = provider_cls(llm_config)
 
-        if new_trace_id == "__not_found__":
-            return jsonify({
-                "code": 404,
-                "message": "no pending plan found for this message",
-            }), 404
-        if new_trace_id is None:
-            # reject 成功
-            return jsonify({"code": 0, "message": "plan rejected"})
-
-        return jsonify({
-            "code": 0,
-            "trace_id": new_trace_id,
-            "message": "confirmed, execution started",
-        })
+        try:
+            llm_messages = [
+                LLMMessage(role="system", content=PRD_COMPILER_SYSTEM_PROMPT),
+                LLMMessage(
+                    role="user",
+                    content=f"Based on the following conversation context, create a detailed PRD:\n\n{context}",
+                ),
+            ]
+            response = await provider.chat(messages=llm_messages, temperature=0.3)
+            prd = (response.content or "").strip()
+            return jsonify({"code": 0, "data": {"prd": prd}})
+        except Exception:
+            logger.exception("PRD from messages failed for conversation=%s", conversation_id)
+            return jsonify({"code": ErrorCode.INTERNAL_ERROR, "message": "PRD generation failed"}), 500
+        finally:
+            try:
+                await provider.close()
+            except Exception:
+                pass
 
     return bp
 

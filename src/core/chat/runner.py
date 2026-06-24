@@ -1,12 +1,7 @@
-"""ChatTurnRunner：极简 while 循环，替代 Agent harness。
+"""ChatTurnRunner：极简 while 循环，不再区分 chat/agentic 模式。
 
-每轮 = LLM 流式调用 → 解析 tool_calls → 风险分级 → 执行或暂停。
+工具列表由调用方决定：chat 路径传空列表 → 纯文本对话；agent 路径传完整工具集。
 不引入 budget / feedback_loop / improvement / context_window。
-
-模式切换：
-- chat 模式（默认）：只暴露 escalate_to_agent + 只读查询工具
-- agentic 模式：暴露完整工具集（plan_tasks / run_task 等），走 propose-confirm
-LLM 调用 escalate_to_agent 后自动切换到 agentic 模式，同一轮内保持。
 """
 from __future__ import annotations
 
@@ -24,7 +19,6 @@ from src.core.agents.capabilities.skills import (
 )
 from src.core.agents.capabilities.skills.serializer import OpenAIAdapter, ToolSpecSerializer
 from src.core.chat.events import ChatEventType
-from src.core.chat.risk import is_chat_mode_tool, is_high_risk
 from src.infra.streaming import TraceEventBus
 
 _MAX_ITERATIONS = 10
@@ -32,14 +26,11 @@ _TOKEN_FLUSH_INTERVAL = 0.016
 _TOKEN_FLUSH_CHARS = 48
 _MAX_EVENT_PAYLOAD_CHARS = 4096
 
-_ESCALATE_TOOL_NAME = "escalate_to_agent"
-
 
 @dataclass
 class ChatTurnResult:
-    status: str  # "completed" | "pending_confirmation" | "cancelled"
+    status: str  # "completed" | "cancelled"
     content: str
-    proposed_tool_calls: Optional[List[Dict]] = None
     tool_call_results: Optional[List[Dict]] = None
     token_usage: Optional[Dict] = None
 
@@ -53,9 +44,6 @@ class ChatTurnRunner:
         event_bus: TraceEventBus,
         cancel_checker: Callable[[], Awaitable[bool]],
         tool_dependencies: Optional[Dict[str, Any]] = None,
-        on_escalate: Optional[Callable[[], Awaitable[None]]] = None,
-        initial_mode: str = "chat",
-        skip_risk_check: bool = False,
     ):
         self._provider = llm_provider
         self._tools = tools
@@ -65,53 +53,19 @@ class ChatTurnRunner:
         self._tool_deps = tool_dependencies or {}
         self._executor = SkillExecutor(validate_params=False)
         self._serializer = ToolSpecSerializer(OpenAIAdapter())
-        self._mode = initial_mode  # "chat" | "agentic"
-        self._on_escalate = on_escalate
-        self._skip_risk_check = skip_risk_check
         self._step = 0
-        self._source = "agent" if initial_mode == "agentic" else "runner"
+        self._source = "agent" if tools else "runner"
         self._goal_label = ""
-
-    def _active_tools(self) -> List[Skill]:
-        """根据当前 mode 过滤暴露给 LLM 的工具。"""
-        if self._mode == "agentic":
-            return [t for t in self._tools if t.is_executable]
-        return [t for t in self._tools if t.is_executable and is_chat_mode_tool(t.name)]
 
     async def run(
         self,
         messages: List[Dict],
         system_prompt: str,
-        *,
-        confirmed_tool_calls: Optional[List[Dict]] = None,
     ) -> ChatTurnResult:
-        # confirm 续跑意味着之前已经升级到 agentic 模式
-        if confirmed_tool_calls:
-            self._mode = "agentic"
-            if self._on_escalate:
-                try:
-                    await self._on_escalate()
-                except Exception:
-                    pass
-            await self._publish(ChatEventType.MODE_CHANGED, {
-                "mode": "agentic",
-                "reason": "confirm 续跑",
-            })
-            tool_results = await self._execute_tools(confirmed_tool_calls)
-            messages = messages + [
-                {
-                    "role": "assistant",
-                    "content": None,
-                    "tool_calls": confirmed_tool_calls,
-                },
-                *tool_results,
-            ]
-
         total_usage: Dict[str, int] = {}
         tool_calls_count = 0
         run_start_ts = _time.monotonic()
 
-        # 发布 harness 兼容的 run_start 事件
         goal = self._goal_label or ""
         if not goal and messages:
             goal = messages[0].get("content", "") or ""
@@ -125,10 +79,7 @@ class ChatTurnRunner:
             if await self._cancel_checker():
                 return ChatTurnResult(status="cancelled", content="")
 
-            # 发布 step_start（DAGView 依赖此事件识别步骤边界）
             await self._publish_harness("step_start", {"deps": []})
-
-            # 发布 think_start
             await self._publish_harness("think_start", {})
 
             full_content, tool_calls, usage = await self._call_llm(messages, system_prompt)
@@ -137,7 +88,6 @@ class ChatTurnRunner:
                 for k, v in usage.items():
                     total_usage[k] = total_usage.get(k, 0) + v
 
-            # 发布 harness 兼容的 think_end
             await self._publish_harness("think_end", {
                 "assistant_message": {
                     "content": full_content,
@@ -147,12 +97,6 @@ class ChatTurnRunner:
             })
 
             if not tool_calls:
-                if self._mode == "agentic":
-                    self._mode = "chat"
-                    await self._publish(ChatEventType.MODE_CHANGED, {
-                        "mode": "chat",
-                        "reason": "turn 正常结束",
-                    })
                 await self._publish(ChatEventType.TURN_END, {
                     "content": full_content,
                     "token_usage": total_usage,
@@ -174,76 +118,7 @@ class ChatTurnRunner:
                     token_usage=total_usage,
                 )
 
-            # 检查是否有 escalate_to_agent 调用 → 切模式
-            escalate_calls = [
-                tc for tc in tool_calls
-                if tc["function"]["name"] == _ESCALATE_TOOL_NAME
-            ]
-            if escalate_calls:
-                self._mode = "agentic"
-                escalate_reason = ""
-                try:
-                    escalate_reason = _json.loads(
-                        escalate_calls[0]["function"].get("arguments", "{}")
-                    ).get("reason", "")
-                except Exception:
-                    pass
-                # 通知外层按需创建 task_manager 记录
-                if self._on_escalate:
-                    try:
-                        await self._on_escalate()
-                    except Exception:
-                        pass
-                await self._publish(ChatEventType.MODE_CHANGED, {
-                    "mode": "agentic",
-                    "reason": escalate_reason,
-                })
-                # 执行 escalate（结果只是占位），写 tool 消息让 LLM 知道已升级
-                tool_calls_count += len(tool_calls)
-                tool_results = await self._execute_tools(tool_calls)
-                messages = messages + [
-                    {
-                        "role": "assistant",
-                        "content": full_content,
-                        "tool_calls": tool_calls,
-                    },
-                    *tool_results,
-                ]
-                await self._publish(ChatEventType.TOOL_CALL_END, {
-                    "tool_name": _ESCALATE_TOOL_NAME,
-                    "call_id": escalate_calls[0].get("id", ""),
-                    "result": {"mode": "agentic"},
-                    "ok": True,
-                })
-                continue
-
-            # 风险分级（仅 agentic 模式下才可能出现 high-risk 工具）
-            if not self._skip_risk_check:
-                high_risk = [tc for tc in tool_calls if is_high_risk(tc["function"]["name"])]
-
-                if high_risk:
-                    await self._publish(ChatEventType.TOOL_CALL_PROPOSED, {
-                        "tool_calls": tool_calls,
-                    })
-                    await self._publish(ChatEventType.TURN_PAUSED, {})
-                    await self._publish_harness("step_end", {})
-                    await self._publish_harness("run_end", {
-                        "result": {
-                            "stop_reason": "pending_confirmation",
-                            "total_steps": self._step,
-                            "tool_calls_count": tool_calls_count,
-                            "token_usage": total_usage,
-                            "duration_seconds": round(_time.monotonic() - run_start_ts, 2),
-                        },
-                    })
-                    return ChatTurnResult(
-                        status="pending_confirmation",
-                        content=full_content,
-                        proposed_tool_calls=tool_calls,
-                        token_usage=total_usage,
-                    )
-
-            # 全 low-risk → 直接执行
+            # 执行全部 tool_calls（无风险分级，由调用方通过 tools 列表控制可用工具）
             tool_calls_count += len(tool_calls)
             tool_results = await self._execute_tools(tool_calls)
             messages = messages + [
@@ -256,6 +131,10 @@ class ChatTurnRunner:
             ]
             await self._publish_harness("step_end", {})
 
+        await self._publish(ChatEventType.TURN_END, {
+            "content": "达到最大迭代次数",
+            "token_usage": total_usage,
+        })
         await self._publish_harness("run_end", {
             "result": {
                 "stop_reason": "max_iterations",
@@ -282,7 +161,7 @@ class ChatTurnRunner:
                 tool_call_id=m.get("tool_call_id"),
             ))
 
-        active_tools = self._active_tools()
+        active_tools = [t for t in self._tools if t.is_executable]
         tool_specs = self._serializer.serialize_many(active_tools)
         openai_tools = [{"type": "function", "function": s} for s in tool_specs]
 
@@ -389,7 +268,6 @@ class ChatTurnRunner:
 
     @staticmethod
     def _truncate_for_event(payload: Any) -> Any:
-        """截断大型字符串，避免 agent_events 表存完整 HTML 等巨型内容。"""
         if isinstance(payload, str) and len(payload) > _MAX_EVENT_PAYLOAD_CHARS:
             return payload[:_MAX_EVENT_PAYLOAD_CHARS] + "...[truncated]"
         if isinstance(payload, dict):
@@ -416,7 +294,6 @@ class ChatTurnRunner:
                 "call_id": call_id,
             })
 
-            # harness 兼容: act_start
             await self._publish_harness("act_start", {
                 "tool_calls": [{"name": tool_name, "arguments": arguments}],
             })
@@ -458,7 +335,6 @@ class ChatTurnRunner:
                 "ok": ok,
             })
 
-            # harness 兼容: act_end（截断后的 result_content）
             truncated_for_event = self._truncate_for_event(result_content)
             await self._publish_harness("act_end", {
                 "tool_results": [{"tool_call_id": call_id, "content": truncated_for_event}],
@@ -499,7 +375,6 @@ class ChatTurnRunner:
     async def _publish_harness(
         self, event_type: str, data: Dict[str, Any]
     ) -> None:
-        """发布 harness 兼容事件，source 统一用 self._source。"""
         try:
             self._event_bus.publish(
                 trace_id=self._trace_id,

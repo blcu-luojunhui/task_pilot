@@ -1,0 +1,2 @@
+import{et as e}from"./antd-vendor-6x-3Rg2K.js";import{i as t}from"./colors-BF_-YRnY.js";function n(){let{token:n}=e.useToken();return t(n)}export{n as t};
+//# sourceMappingURL=useSemanticColors-tG3SL_Ap.js.map
