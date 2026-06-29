@@ -111,6 +111,123 @@ async def util_current_time(ctx: SkillContext) -> str:
 
 
 @skill(
+    name="read_file",
+    description="读取指定路径的文件内容，返回带行号的文本。支持 offset/limit 分页读取大文件。",
+    dependencies=[],
+    risk_level="read",
+    parameters={
+        "file_path": {
+            "type": "string",
+            "description": "文件路径（相对或绝对路径）",
+            "required": True,
+        },
+        "offset": {
+            "type": "integer",
+            "description": "从第几行开始读取（1-based，默认 1）",
+            "default": 1,
+        },
+        "limit": {
+            "type": "integer",
+            "description": "最多读取行数（默认 2000，最大 5000）",
+            "default": 2000,
+        },
+    },
+)
+async def read_file(
+    ctx: SkillContext, file_path: str, offset: int = 1, limit: int = 2000
+) -> str:
+    path = Path(file_path).resolve()
+    limit = min(limit, 5000)
+
+    # 安全校验：使用 realpath 后再判断
+    real = Path(os.path.realpath(path))
+    real_str = str(real)
+
+    # 项目根目录白名单（仅允许读取项目目录下的文件）
+    allowed_roots = [
+        os.path.realpath(os.getcwd()),
+    ]
+    is_allowed = any(
+        os.path.commonpath([real_str, root]) == root for root in allowed_roots
+    )
+    if not is_allowed:
+        raise PermissionError(
+            f"read_file denied: {real_str} is outside allowed directories"
+        )
+
+    # 禁止读取系统关键路径
+    blocked_prefixes = (
+        "/etc/", "/private/etc/",
+        "/sys/", "/proc/", "/dev/",
+        "/boot/", "/usr/", "/bin/", "/sbin/",
+        "/var/", "/private/var/",
+        "C:\\Windows\\",
+    )
+    for prefix in blocked_prefixes:
+        if real_str.startswith(prefix):
+            raise PermissionError(
+                f"read_file denied: {real_str} is in a protected location"
+            )
+
+    # 检查读取敏感用户路径
+    home = str(Path.home())
+    sensitive_home_paths = (
+        f"{home}/.ssh", f"{home}/.aws", f"{home}/.config",
+        f"{home}/.gnupg", f"{home}/.kube", f"{home}/.docker",
+        f"{home}/.npmrc", f"{home}/.bash_history", f"{home}/.zsh_history",
+    )
+    for sp in sensitive_home_paths:
+        if real_str.startswith(sp):
+            raise PermissionError(f"read_file denied: {sp} is protected")
+
+    if not path.exists():
+        raise FileNotFoundError(f"文件不存在: {path}")
+
+    if not path.is_file():
+        raise ValueError(f"路径不是文件: {path}")
+
+    # 文件大小限制：最大 10 MB
+    file_size = path.stat().st_size
+    if file_size > 10 * 1024 * 1024:
+        raise ValueError(
+            f"read_file denied: file size ({file_size} bytes) exceeds 10 MB limit"
+        )
+
+    try:
+        text = path.read_text(encoding="utf-8")
+    except UnicodeDecodeError:
+        # 尝试以二进制读取，返回十六进制摘要
+        raw = path.read_bytes()
+        preview = raw[:200]
+        return (
+            f"[二进制文件] {path}\n"
+            f"大小: {len(raw)} bytes\n"
+            f"前 200 字节 (hex): {preview.hex()}"
+        )
+
+    lines = text.split("\n")
+    total_lines = len(lines)
+
+    # offset 1-based 转 0-based index
+    start_idx = max(0, offset - 1)
+    end_idx = min(start_idx + limit, total_lines)
+
+    if start_idx >= total_lines:
+        return f"[空范围] offset={offset} 超出文件总行数 {total_lines}"
+
+    selected = lines[start_idx:end_idx]
+    formatted_lines = []
+    for i, line in enumerate(selected, start=start_idx + 1):
+        formatted_lines.append(f"{i}\t{line}")
+
+    header = (
+        f"# {path}  (行 {start_idx + 1}-{end_idx}, 共 {total_lines} 行, "
+        f"{file_size} bytes)\n"
+    )
+    return header + "\n".join(formatted_lines)
+
+
+@skill(
     name="write_file",
     description="将内容写入指定路径的文件。如果文件已存在会覆盖，目录不存在会自动创建。",
     dependencies=[],
