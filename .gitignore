@@ -46,3 +46,5 @@ nginx/
 /docs/deploy.md
 /src/infra/streaming/DESIGN.md
 .mcp.json
+/docs/develop
+
