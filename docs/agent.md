@@ -81,7 +81,18 @@ MemoryManager.retrieve()
 
 `MemoryManager` 由短期记忆、长期记忆和可插拔检索器组成。默认关键词检索零依赖；需要语义检索时，可以切换到 embedding 后端。
 
-`ContextWindowManager` 负责在 token 预算内压缩上下文。Agent 任务越长，越不能依赖模型“自然记住一切”；必须把上下文窗口当作有限资源来管理。
+`ContextWindowManager` 负责在 token 预算内压缩上下文。Agent 任务越长，越不能依赖模型”自然记住一切”；必须把上下文窗口当作有限资源来管理。
+
+当启用 LLM 摘要压缩时（`enable_summary_compaction=True`），`ContextWindowManager` 会经由 `compactor.py` 调用 Provider 将早期历史压缩为摘要文本，再由 `compact_if_needed` 用摘要替换被压缩区间，失败时自动回退到中段截断。**生产路径 `ChatTurnRunner` 已默认接入，富路径 `AgentLoopRunner` 通过开关控制。**
+
+### 双层 ToolResult
+
+长工具返回（如几百行 JSON）每轮原样塞进历史是 token 浪费的主要来源。`tool_result_memory.py` 实现双层策略：
+
+- `annotate_tool_message`：超长结果（>1500 字符）同时保存完整版和摘要版。
+- `collapse_old_tool_results`：送 LLM 前把旧轮次的长结果替换为摘要，最近 2 条保留完整。
+
+关键区分：真实历史 `messages` 不丢（持久化用），送给 LLM 的是折叠副本 `llm_messages_for_call`。两条执行循环均已接入。
 
 ## Skill / Tool 体系
 
@@ -91,7 +102,10 @@ TaskPilot 把所有可执行能力统一进 SkillRegistry：
 
 执行前会经过 `PermissionGuard`。每个 Skill 带有风险级别：`READ`、`WRITE`、`DESTRUCTIVE`。MCP 工具默认按更保守的 `WRITE` 处理，避免未知外部能力被低估风险。
 
-## Runtime Harness
+**工具分组白名单**：每个 Skill 通过 `domain` 字段标记所属组（`database` / `http` / `task` / `utils` / `chat_ops` / `plan` / `artifact` / `handoff` / `mcp`）。`group_filter.py` 提供 `filter_tools_by_groups`，调用方通过 `allowed_tool_groups` 和 `exclude_tools` 在运行时按场景做最小权限过滤。不传参数则放行全部，默认行为不变。
+
+
+<｜｜DSML｜｜parameter name="replace_all" string="false">false## Runtime Harness
 
 `runtime/harness/` 是 Agent 自主性的边界层：
 
@@ -123,6 +137,21 @@ Agent 生命周期独立于任务状态机：
 - `run_from_snapshot()`：从快照恢复执行。
 
 这条设计的核心约束是：不能在任意协程切换点强杀 Agent。工具调用、数据库连接和事件写入都需要清理机会，所以取消要协作式传播。
+
+## 跨 Run 记忆与反思
+
+Agent 的默认行为是每次 run 独立执行，不携带过往经验。`memory_store.py` 打通了一条"写回 + 注入"闭环：
+
+```text
+run 成功/失败
+  → generate_reflection()    # LLM 复盘，生成 2-4 条经验要点
+  → save_reflection()        # 写入 agent_memory 表 (account_id + scope_key)
+  → 下次同 goal 启动时
+  → fetch_reflections()      # 按 scope_key 检索最近 3 条
+  → format_memory_injection() # 拼入 system prompt
+```
+
+整个链路受 `enable_memory` 开关控制，默认 `False`（保持旧行为）。
 
 ## 多智能体协作
 
@@ -160,8 +189,16 @@ Agent 的行为不能只靠日志排查。`Evaluator` 和 `Replay` 提供两条�
 
 ## 演进方向
 
-当前架构已经具备 Agent Loop、策略可插拔、Skill/Tool、Memory、Runtime Harness、Replay/Evaluator 和 Multi-Agent 基础。下一阶段最可能变化的位置是：
+当前架构已完成 Agent Loop、策略可插拔、Skill/Tool、Memory、Runtime Harness、Replay/Evaluator 和 Multi-Agent 基础。**最近完成的演进（2026-07）：**
 
+- ✅ 真实上下文压缩（`compactor.py`）：LLM 摘要 + 截断回退，两条执行循环均已接入。
+- ✅ 双层 ToolResult（`tool_result_memory.py`）：长工具结果历史自动折叠，从源头省 token。
+- ✅ 工具分组白名单（`group_filter.py`）：按 `domain` 做运行时权限最小化。
+- ✅ 跨 run 记忆（`memory_store.py` + `agent_memory` 表）：反思生成 → 持久化 → 下次注入，打通闭环。
+
+下一阶段最可能变化的位​​置：
+
+- 消息树（Phase 5）：将对话从线性列表升级为树结构，支撑非破坏式压缩和回溯。
 - Tool calling 兼容性：不同 provider 的结构化输出、并行工具调用、错误修复提示。
 - Runtime 治理：成本预算、token 预算、危险工具确认、用户中断恢复。
 - Multi-Agent 协议：任务分解、结果聚合、共享状态和上下文隔离的平衡。

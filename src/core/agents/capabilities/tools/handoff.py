@@ -10,6 +10,7 @@ _MAX_HANDOFF_DEPTH = 3  # 防成环
 
 @skill(
     name="handoff_to",
+    domain="handoff",
     description=(
         "Transfer control to another specialized agent. "
         "Use this when another agent is better suited for the current task. "

@@ -39,6 +39,9 @@ Agent 的主链路由 `Agent.create()` 装配：Provider、SkillRegistry、Think
 
 - **确定性边界**：任务状态机、抢占、取消、超时、优雅关闭集中在 `jobs`，Agent 不确定性不扩散到调度层。
 - **Agent 治理层**：`AgentBudget`、`ConstraintSet`、`WorkflowController` 控制最大步数、工具调用、执行时长和终止条件。
+- **上下文经济**：LLM 摘要压缩（`compactor.py`）+ 双层 ToolResult（`tool_result_memory.py`）防 token 溢出；长工具结果历史自动折叠为摘要，送 LLM 前按轮次降级，失败回退截断。
+- **工具最小权限**：Skill 按 `domain` 分组（`database`/`http`/`task`/`utils`/`chat_ops`/`plan`/`artifact`/`handoff`/`mcp`），运行时通过 `allowed_tool_groups` + `exclude_tools` 做白名单过滤。
+- **跨 run 记忆**：每次 Agent 运行后 LLM 复盘生成反思，写入 `agent_memory` 表；下次同类任务自动注入 system prompt，让 Agent 不再"失忆"。
 - **状态外置**：任务状态进入 MySQL，Agent 可通过 `StateSnapshot` 保存与恢复，进程内只持有运行态缓存。
 - **失败显式**：工具失败会写回 transcript，让模型在下一轮看见错误并修正，而不是静默吞掉。
 - **可观测优先**：`trace_id` 从 HTTP、任务、Agent step、工具调用到日志和事件流贯穿。
@@ -51,7 +54,7 @@ src/
 ├── api/                 # Quart 接入层与中间件
 ├── jobs/                # 调度器、任务状态机、生命周期、取消
 ├── core/
-│   ├── agents/          # Agent Loop / Skills / Tools / Memory / Multi-Agent
+│   ├── agents/          # Agent Loop / Skills / Tools / Memory / Compaction / Multi-Agent
 │   ├── chat/            # 流式对话、风险分级、会话仓库
 │   ├── auth/            # JWT、API Token、账户管理
 │   ├── config/          # pydantic-settings

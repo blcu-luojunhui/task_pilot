@@ -106,6 +106,7 @@ async def run_agent_goal(scheduler: "TaskScheduler") -> int:
     data = scheduler.data or {}
     goal = data.get("goal")
     tool_areas = data.get("tool_areas") or _DEFAULT_TOOL_AREAS
+    enable_memory = bool(data.get("enable_memory", False))
 
     if not goal or not isinstance(goal, str):
         await scheduler._log_task_event(
@@ -142,6 +143,11 @@ async def run_agent_goal(scheduler: "TaskScheduler") -> int:
     load_agentic_tools(tool_areas)
     registry = get_global_registry()
     tools = list(registry.filter(lambda s: s.is_executable))
+    allowed_groups = data.get("allowed_tool_groups")  # 缺省 None = 不限制
+    exclude_tools = data.get("exclude_tools")
+    if allowed_groups is not None or exclude_tools is not None:
+        from src.core.agents.capabilities.tools.group_filter import filter_tools_by_groups
+        tools = filter_tools_by_groups(tools, allowed_groups, exclude_tools)
 
     if not tools:
         await scheduler._log_task_event(
@@ -189,11 +195,45 @@ async def run_agent_goal(scheduler: "TaskScheduler") -> int:
     # 优先用用户原始输入作为 Goal，而非完整 PRD
     runner._goal_label = (data.get("original_goal") or goal).strip()
 
+    system_prompt = RUN_GOAL_SYSTEM_PROMPT
+    scope_key = ""
+    if enable_memory:
+        from src.core.agents.capabilities.memory_store import (
+            normalize_scope_key, fetch_reflections, format_memory_injection,
+        )
+        scope_key = normalize_scope_key(data.get("original_goal") or goal)
+        try:
+            reflections = await fetch_reflections(
+                scheduler.db_client, scheduler.account_id, scope_key,
+            )
+            injection = format_memory_injection(reflections)
+            if injection:
+                system_prompt = f"{RUN_GOAL_SYSTEM_PROMPT}\n\n{injection}"
+        except Exception:
+            logger.warning("fetch reflections failed", exc_info=True)
+
     try:
         result = await runner.run(
             messages=[{"role": "user", "content": goal}],
-            system_prompt=RUN_GOAL_SYSTEM_PROMPT,
+            system_prompt=system_prompt,
         )
+
+        # 跨 run 记忆写回（必须在 provider.close() 之前）
+        if enable_memory and scope_key:
+            try:
+                from src.core.agents.capabilities.memory_store import (
+                    generate_reflection, save_reflection,
+                )
+                is_success = result.status == "completed"
+                reflection = await generate_reflection(
+                    provider, goal, result.content, is_success,
+                )
+                await save_reflection(
+                    scheduler.db_client, scheduler.account_id, scope_key,
+                    trace_id, reflection, is_success,
+                )
+            except Exception:
+                logger.warning("save reflection failed", exc_info=True)
     except Exception:
         logger.exception("RunGoal ChatTurnRunner failed")
         if events_bus:

@@ -19,6 +19,7 @@ from src.jobs.task_utils import TaskUtils
 
 @skill(
     name="plan_tasks",
+    domain="chat_ops",
     description=(
         "在执行实际任务前，把整体计划结构化输出。每个步骤可关联一个 task_name "
         "和参数，用户在 UI 上看到 plan 卡片后会决定是否继续。本身不真正执行任务，"
@@ -106,6 +107,7 @@ async def plan_tasks(
 
 @skill(
     name="run_task",
+    domain="chat_ops",
     description=(
         "启动一个 TaskPilot 业务任务。任务在后台异步执行，立即返回 trace_id。"
         "用户可以通过 trace_id 查看进度或取消。注意：先用 task_query_status 验证 "
@@ -156,6 +158,7 @@ async def run_task(
 
 @skill(
     name="list_recent_tasks",
+    domain="chat_ops",
     description=(
         "列出最近的任务（任意状态），按开始时间倒序。用于回答用户"
         "类似'最近跑了什么任务'、'有没有失败的任务'这类问题。"
@@ -230,6 +233,7 @@ async def list_recent_tasks(
 
 @skill(
     name="escalate_to_agent",
+    domain="chat_ops",
     description=(
         "把当前对话从纯聊天模式升级为 agentic 模式（同一轮内立即解锁 plan_tasks / "
         "run_task 等改状态的工具）。仅当用户的诉求需要制定计划、启动任务、取消任务、"

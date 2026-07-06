@@ -72,6 +72,8 @@ class AgentLoopRunner:
     memory_backend: str = "keyword"
     long_term_memory_path: Optional[str] = None
     embedding_provider: Optional[str] = None
+    llm_provider: Optional[Any] = None  # 用于构造 compactor；None 时压缩回退到截断
+    enable_summary_compaction: bool = False  # 开关：True 才启用 LLM 摘要压缩
 
     def __post_init__(self) -> None:
         if self.budget is None:
@@ -101,9 +103,14 @@ class AgentLoopRunner:
             self.memory_manager.long_term = LongTermMemory(Path(self.long_term_memory_path))
 
         if self.thinker is None:
+            compactor = None
+            if self.enable_summary_compaction and self.llm_provider is not None:
+                from src.core.agents.state.context.compactor import build_llm_compactor
+                compactor = build_llm_compactor(self.llm_provider)
             context_manager = ContextWindowManager(
                 max_tokens=self.max_context_tokens,
                 model=self.llm_model,
+                compactor=compactor,
             )
             knowledge_selector = KnowledgeSelector(self.registry)
             prompt_assembler = PromptAssembler(

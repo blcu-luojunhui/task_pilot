@@ -13,6 +13,7 @@ from src.jobs.task_utils import TaskUtils
 
 @skill(
     name="task_query_status",
+    domain="task",
     description="查询任务状态",
     dependencies=["db", "log", "account_id"],
     risk_level="read",
@@ -50,6 +51,7 @@ async def task_query_status(ctx: SkillContext, trace_id: str) -> Optional[Dict[s
 
 @skill(
     name="task_list_processing",
+    domain="task",
     description="列出指定任务名下所有正在执行的任务",
     dependencies=["db", "log", "account_id"],
     risk_level="read",
@@ -85,6 +87,7 @@ async def task_list_processing(ctx: SkillContext, task_name: str) -> List[Dict[s
 
 @skill(
     name="task_cancel",
+    domain="task",
     description="请求取消任务（设置取消信号，任务会在下次轮询时取消）",
     dependencies=["db", "log", "account_id"],
     risk_level="write",
@@ -134,6 +137,7 @@ async def task_cancel(ctx: SkillContext, trace_id: str) -> bool:
 
 @skill(
     name="task_create",
+    domain="task",
     description="创建新任务记录",
     dependencies=["db", "log", "account_id"],
     risk_level="write",
@@ -205,6 +209,7 @@ _VALID_TRANSITIONS = {
 
 @skill(
     name="task_update_status",
+    domain="task",
     description="更新任务状态（带状态机校验，只允许合法的状态转换）",
     dependencies=["db", "log", "account_id"],
     risk_level="write",

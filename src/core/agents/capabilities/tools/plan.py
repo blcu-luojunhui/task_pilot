@@ -7,6 +7,7 @@ from src.core.agents.capabilities.skills import skill, SkillContext
 
 @skill(
     name="update_plan",
+    domain="plan",
     description=(
         "Update the agent's structured plan (todo list). "
         "Use this to mark steps as done/failed/skipped or add new steps. "

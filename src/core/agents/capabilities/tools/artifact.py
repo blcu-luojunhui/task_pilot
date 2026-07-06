@@ -5,6 +5,7 @@ from src.core.agents.capabilities.skills import skill, SkillContext
 
 @skill(
     name="read_artifact",
+    domain="artifact",
     description=(
         "Read a previously offloaded large tool result from the artifact store. "
         "Use this when you need the full content of a result that was truncated."

@@ -8,7 +8,6 @@ Agent Loop - 整合 Think-Act-Observe 循环
 """
 
 import asyncio
-import inspect
 import json
 import logging
 import time
@@ -19,6 +18,10 @@ from ..state import AgentLoopState, StopReason, ToolCallRecord
 from ..state.protocol import ToolCall, get_tool_calls, tool_result_message
 from ..state.context import ContextWindowManager
 from ..capabilities.skills import SkillContext, SkillExecutor, SkillRegistry, MappingResolver
+from ..capabilities.skills.tool_result_memory import (
+    annotate_tool_message,
+    collapse_old_tool_results,
+)
 from ..exceptions import ToolNotFoundError, ToolExecutionError
 from .prompting import PromptAssembler
 
@@ -102,6 +105,8 @@ class Think:
                     before_count,
                     len(messages),
                 )
+        # 折叠旧的超长 tool 结果，节省上下文 token
+        messages = collapse_old_tool_results(messages)
 
         # 发布 prompt_assembled 事件（供前端 Prompt Inspector 使用）
         if self.publish_event:
@@ -178,7 +183,6 @@ class Think:
 
             # tool_calls
             if tool_calls:
-                import json
 
                 for tc in tool_calls:
                     func = tc.get("function", tc)
@@ -215,9 +219,9 @@ class Act:
         if not tool_calls:
             return []
         if len(tool_calls) == 1:
-            return [await self._execute_one(state, tool_calls[0])]
+            return [annotate_tool_message(await self._execute_one(state, tool_calls[0]))]
         tasks = [self._execute_one(state, call) for call in tool_calls]
-        return list(await asyncio.gather(*tasks))
+        return [annotate_tool_message(r) for r in list(await asyncio.gather(*tasks))]
 
     async def _execute_one(self, state: AgentLoopState, call: ToolCall) -> Dict[str, Any]:
         if hasattr(self, "_semaphore"):
