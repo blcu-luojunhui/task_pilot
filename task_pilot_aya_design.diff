@@ -1,0 +1,151 @@
+diff --git a/frontend/src/components/common/AppLayout.css b/frontend/src/components/common/AppLayout.css
+index 9818b67..8a53ee8 100644
+--- a/frontend/src/components/common/AppLayout.css
++++ b/frontend/src/components/common/AppLayout.css
+@@ -5,7 +5,7 @@
+   overflow: hidden;
+ }
+ 
+-/* ── 侧栏：纯白底，无装饰 ── */
++/* ── 侧栏：白底 + 极淡右分割线 ── */
+ .app-layout__sider {
+   position: fixed;
+   left: 0; top: 0; bottom: 0;
+@@ -14,20 +14,20 @@
+   overflow-y: auto;
+   z-index: 100;
+   background: #FFFFFF !important;
+-  border-right: none !important;
++  border-right: 1px solid #F1F1EF !important;
+   border-left: none !important;
+   box-shadow: none !important;
+ }
+ 
+ .app-layout__sider .sider-logo {
+-  border-bottom: 1px solid var(--border-light);
++  border-bottom: 1px solid #F1F1EF;
+ }
+ 
+ .app-layout__sider .ant-menu {
+   background: transparent !important;
+ }
+ 
+-/* ── 导航项：纯文字，无背景色 ── */
++/* ── 导航项：纯文字 ── */
+ .app-layout__sider .ant-menu-item {
+   transition: none;
+   margin: 0 !important;
+@@ -42,21 +42,16 @@
+   color: var(--n0) !important;
+ }
+ 
+-/* ── 选中态：左侧 2px 竖线 + 字重 600 ── */
++/* ── 选中态：暖灰底 + 字重 500 ── */
+ .app-layout__sider .ant-menu-item-selected {
+-  background: transparent !important;
+-  font-weight: 600 !important;
++  background: #F7F6F3 !important;
++  font-weight: 500 !important;
+   color: var(--n0) !important;
+   position: relative;
+ }
+ 
+ .app-layout__sider .ant-menu-item-selected::before {
+-  content: '';
+-  position: absolute;
+-  left: 0; top: 8px; bottom: 8px;
+-  width: 2px;
+-  background: var(--n0);
+-  border-radius: 0 1px 1px 0;
++  display: none;
+ }
+ 
+ .app-layout__sider .ant-menu-item-selected::after {
+@@ -72,12 +67,12 @@
+   min-width: 0;
+ }
+ 
+-/* ── 顶栏：纯白底，极简 ── */
++/* ── 顶栏：纯白底 ── */
+ .app-layout__header {
+   flex-shrink: 0;
+   z-index: 99;
+   background: #FFFFFF !important;
+-  border-bottom: 1px solid var(--border-light) !important;
++  border-bottom: 1px solid #F1F1EF !important;
+   box-shadow: none !important;
+ }
+ 
+diff --git a/frontend/src/components/common/PageLayout.css b/frontend/src/components/common/PageLayout.css
+index 36c4531..707d7ca 100644
+--- a/frontend/src/components/common/PageLayout.css
++++ b/frontend/src/components/common/PageLayout.css
+@@ -113,10 +113,11 @@
+ }
+ 
+ .page-table-card .ant-table-thead > tr > th {
+-  font-size: 12px;
++  font-size: 11px;
+   font-weight: 600;
+-  letter-spacing: 0.03em;
++  letter-spacing: 0.05em;
+   text-transform: uppercase;
++  color: var(--n4) !important;
+   background: transparent !important;
+   border-bottom: 1px solid var(--border-default) !important;
+ }
+diff --git a/frontend/src/pages/ChatPage.tsx b/frontend/src/pages/ChatPage.tsx
+index c8ab156..5f307b3 100644
+--- a/frontend/src/pages/ChatPage.tsx
++++ b/frontend/src/pages/ChatPage.tsx
+@@ -41,7 +41,7 @@ export function ChatPage() {
+     // Relative luminance (sRGB)
+     const lum = 0.2126 * (r / 255) + 0.7152 * (g / 255) + 0.0722 * (b / 255);
+     if (lum > 0.55) {
+-      return { isLight: true, text: '#171717', border: 'rgba(0,0,0,0.1)' };
++      return { isLight: true, text: '#37352F', border: 'rgba(0,0,0,0.1)' };
+     }
+     return { isLight: false, text: '#FFFFFF', border: 'rgba(255,255,255,0.15)' };
+   }, [bubbleColor]);
+diff --git a/frontend/src/theme/tokens.css b/frontend/src/theme/tokens.css
+index 708456d..ab7469c 100644
+--- a/frontend/src/theme/tokens.css
++++ b/frontend/src/theme/tokens.css
+@@ -5,14 +5,14 @@
+ 
+    中性色阶 (Neutral Scale)     → 结构：页面/卡片/边框/文字
+    语义调色板 (Semantic Palette) → 交互：按钮/选中/状态/强调
+-   色谱:  #171717 ──→ #525252 ──→ #D4D4D4 ──→ #FAFAF9
++   色谱:  #37352F ──→ #525252 ──→ #D4D4D4 ──→ #FAFAF9
+           最深              中暗             亮灰            近白
+    ═══════════════════════════════════════════════════════════ */
+ 
+ :root {
+   /* ── 中性色阶 ──────────────────────────────────────────── */
+ 
+-  --n0: #171717;  /* 最深     — 暗色模式底色 */
++  --n0: #37352F;  /* 最深     — 暗色模式底色 */
+   --n1: #262626;  /* 暗色抬高 — 暗色卡片 */
+   --n2: #404040;  /* 次深     — 深色边框 / 强调辅 */
+   --n3: #525252;  /* 中暗     — 次要文字 */
+diff --git a/frontend/src/theme/tokens.ts b/frontend/src/theme/tokens.ts
+index 6634c51..2d25b76 100644
+--- a/frontend/src/theme/tokens.ts
++++ b/frontend/src/theme/tokens.ts
+@@ -6,7 +6,7 @@ import { theme as antdTheme } from 'antd';
+ 
+ export const PALETTE = {
+   neutral: {
+-    n0: '#171717',
++    n0: '#37352F',
+     n1: '#262626',
+     n2: '#404040',
+     n3: '#525252',
+@@ -84,6 +84,7 @@ export function createAntdThemeConfig(dark: boolean): ThemeConfig {
+ 
+     components: {
+       Layout: {
++        colorBgLayout: "#FFFFFF",
+         headerBg: 'transparent',
+         siderBg: 'transparent',
+         bodyBg: '#FFFFFF',
