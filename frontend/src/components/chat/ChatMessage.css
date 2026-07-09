@@ -4,7 +4,7 @@
 }
 
 .chat-composer-bar {
-  background: #F5F3EF !important;
+  background: var(--n8) !important;
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
   border-top: 1px solid var(--border-light) !important;
@@ -12,16 +12,16 @@
 
 /* ── 消息列表 ── */
 .chat-thread {
-  --chat-user-bubble: var(--chat-bubble-custom, #5c838c);
-  --chat-user-border: var(--chat-user-border-custom, rgba(255, 255, 255, 0.15));
-  --chat-user-text: var(--chat-user-text, #FFFFFF);
+  --chat-user-bubble: transparent;
+  --chat-user-border: var(--n6);
+  --chat-user-text: var(--n0);
   --chat-user-shadow: var(--shadow-card);
-  --chat-assistant-bubble: #E6EFED;
-  --chat-assistant-border: rgba(0, 0, 0, 0.06);
-  --chat-assistant-text: #1C2636;
-  --chat-assistant-shadow: 0 1px 4px rgba(0, 0, 0, 0.04);
-  --chat-avatar-user: linear-gradient(135deg, var(--color-accent) 0%, var(--n2) 100%);
-  --chat-avatar-agent: linear-gradient(135deg, var(--color-highlight) 0%, var(--n2) 100%);
+  --chat-assistant-bubble: var(--n8);
+  --chat-assistant-border: var(--border-light);
+  --chat-assistant-text: var(--n0);
+  --chat-assistant-shadow: var(--shadow-card);
+  --chat-avatar-user: var(--n0);
+  --chat-avatar-agent: var(--n6);
   --chat-avatar-agent-icon: var(--n2);
   background: transparent;
 }
@@ -51,7 +51,7 @@
   margin: 10px 0;
   border-radius: var(--radius-lg);
   overflow: hidden;
-  background: #E3E6EC;
+  background: var(--n7);
   border: 1px solid var(--border-default);
 }
 .code-block-header {
@@ -59,7 +59,7 @@
   align-items: center;
   justify-content: space-between;
   padding: 6px 12px;
-  background: #D6DAE2;
+  background: var(--n6);
   border-bottom: 1px solid var(--border-light);
 }
 .code-block-lang {
@@ -78,7 +78,7 @@
   border-radius: 4px;
   transition: color 0.15s, background 0.15s;
 }
-.code-block-copy:hover { color: var(--n2); background: rgba(58,80,107,0.08); }
+.code-block-copy:hover { color: var(--n0); background: var(--color-primary-soft); }
 .code-block-copy.copied { color: var(--color-accent); }
 .code-block-wrapper pre {
   margin: 0 !important;
@@ -106,7 +106,7 @@
   color: var(--color-accent);
   font-weight: 500;
   text-decoration: none;
-  border-bottom: 1px solid rgba(91, 192, 190, 0.35);
+  border-bottom: 1px solid rgba(23, 23, 23, 0.2);
 }
 
 /* ── 表格 / 引用 / 分割线 ── */
@@ -189,7 +189,7 @@
   align-items: center;
   justify-content: center;
   font-size: 15px;
-  box-shadow: 0 1px 4px rgba(58, 80, 107, 0.1);
+  box-shadow: 0 1px 4px rgba(23, 23, 23, 0.1);
 }
 .msg-row.user .msg-avatar {
   background: var(--chat-avatar-user);
@@ -241,7 +241,7 @@
   transition: background 0.15s;
 }
 .msg-meta__trace:hover {
-  background: rgba(91, 192, 190, 0.18);
+  background: rgba(23, 23, 23, 0.08);
 }
 
 /* ── 气泡 ── */
@@ -282,10 +282,10 @@
 /* ── 滚到底部按钮 ── */
 .chat-scroll-bottom {
   border-radius: 20px !important;
-  box-shadow: 0 2px 12px rgba(91, 192, 190, 0.2) !important;
+  box-shadow: 0 2px 8px rgba(23, 23, 23, 0.12) !important;
   background: var(--surface-elevated) !important;
   color: var(--color-accent) !important;
-  border: 1px solid rgba(91, 192, 190, 0.25) !important;
+  border: 1px solid rgba(23, 23, 23, 0.12) !important;
   font-weight: 500;
   letter-spacing: -0.01em;
   backdrop-filter: blur(12px);

@@ -68,7 +68,7 @@ export function SystemPage() {
         title={
           <PageCardTitle
             icon={
-              <PageCardIcon color="#5BC0BE" bg="rgba(91,192,190,0.12)">
+              <PageCardIcon color="var(--n2)" bg="rgba(23,23,23,0.06)">
                 <LineChartOutlined />
               </PageCardIcon>
             }

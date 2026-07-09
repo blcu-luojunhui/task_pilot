@@ -2,26 +2,27 @@ import type { ThemeConfig } from 'antd';
 import { theme as antdTheme } from 'antd';
 
 // ── JS 侧色值引用（与 tokens.css 同名变量保持一致）─────────
+// Muji / Notion 极简留白：暖灰中性色阶 + 克制语义色
 
 export const PALETTE = {
   neutral: {
-    n0: '#1C2636',
-    n1: '#253548',
-    n2: '#3A506B',
-    n3: '#526881',
-    n4: '#71869C',
-    n5: '#93A4B5',
-    n6: '#B3C0CD',
-    n7: '#D6DCE4',
-    n8: '#E8ECF1',
-    n9: '#F3F5F8',
-    n10: '#FBFCFD',
+    n0: '#171717',
+    n1: '#262626',
+    n2: '#404040',
+    n3: '#525252',
+    n4: '#737373',
+    n5: '#A3A3A3',
+    n6: '#D4D4D4',
+    n7: '#E5E5E5',
+    n8: '#F0F0EE',
+    n9: '#F5F5F4',
+    n10: '#FAFAF9',
   },
-  accent: '#5BC0BE',
-  warning: '#C9A68B',
-  info: '#A8B59F',
-  highlight: '#CDEDF6',
-  error: '#C96B6B',
+  accent: '#1A1A1A',
+  warning: '#B45309',
+  info: '#525252',
+  highlight: '#FEF3C7',
+  error: '#B91C1C',
 } as const;
 
 export function rgba(hex: string, alpha: number): string {
@@ -31,18 +32,18 @@ export function rgba(hex: string, alpha: number): string {
   return `rgba(${r},${g},${b},${alpha})`;
 }
 
-// ── 按钮/强调渐变（仅用于显式强调场景，不用于结构面）───────
+// ── 纯色引用（渐变已废弃，Muji/Notion 极简风格）───────────
 
-export const GRADIENTS = {
-  /** 主按钮：深灰蓝 → 柔青绿 */
-  primaryBtn: `linear-gradient(135deg, ${PALETTE.neutral.n2} 0%, ${PALETTE.accent} 100%)`,
+export const SOLIDS = {
+  /** 主按钮 */
+  primaryBtn: PALETTE.neutral.n0,
   /** 品牌文字 */
-  brandText: `linear-gradient(135deg, ${PALETTE.neutral.n2} 0%, ${PALETTE.accent} 50%, ${PALETTE.info} 100%)`,
-  /** PageCardIcon 渐变 */
+  brandText: PALETTE.neutral.n0,
+  /** PageCardIcon 纯色 */
   pageIcon: {
-    blue: `linear-gradient(135deg, ${PALETTE.neutral.n2} 0%, ${PALETTE.accent} 100%)`,
-    green: `linear-gradient(135deg, ${PALETTE.info} 0%, ${PALETTE.accent} 100%)`,
-    warm: `linear-gradient(135deg, ${PALETTE.warning} 0%, ${PALETTE.neutral.n2} 100%)`,
+    blue: PALETTE.neutral.n2,
+    green: PALETTE.neutral.n4,
+    warm: PALETTE.warning,
   },
 } as const;
 
@@ -56,8 +57,8 @@ export function createAntdThemeConfig(dark: boolean): ThemeConfig {
     algorithm: dark ? antdTheme.darkAlgorithm : antdTheme.defaultAlgorithm,
 
     token: {
-      // 语义映射：柔青绿 → success / 陶土 → warning / 鼠尾草 → info
-      colorPrimary: n.n2,
+      // 语义映射
+      colorPrimary: n.n0,        // 纯黑 primary — 极简克制
       colorSuccess: PALETTE.accent,
       colorWarning: PALETTE.warning,
       colorInfo: PALETTE.info,
@@ -73,21 +74,20 @@ export function createAntdThemeConfig(dark: boolean): ThemeConfig {
       paddingContentHorizontal: 20,
       paddingContentVertical: 16,
 
-      // 边框
+      // 边框 — 暖灰，极淡
       colorBorder: dark ? 'rgba(255,255,255,0.08)' : n.n6,
-      colorBorderSecondary: dark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)',
+      colorBorderSecondary: dark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.04)',
 
-      // 文字 — 必须用显式 hex，CSS var 会导致 Ant Design 无法计算派生色
-      colorText: dark ? '#E4E8EE' : n.n0,
-      colorTextSecondary: dark ? '#93A4B5' : n.n3,
-      colorTextTertiary: dark ? '#71869C' : n.n4,
-      colorTextQuaternary: dark ? '#526881' : n.n5,
+      // 文字 — 暖灰阶，不用蓝黑
+      colorText: dark ? '#E5E5E5' : n.n0,
+      colorTextSecondary: dark ? '#A3A3A3' : n.n3,
+      colorTextTertiary: dark ? '#737373' : n.n4,
+      colorTextQuaternary: dark ? '#525252' : n.n5,
     },
 
     components: {
       Layout: {
         headerBg: dark ? n.n0 : n.n10,
-        // 侧栏更深 → 退后；内容区更亮 → 聚焦
         siderBg: dark ? n.n0 : n.n7,
         bodyBg: dark ? n.n0 : n.n9,
       },
@@ -96,10 +96,9 @@ export function createAntdThemeConfig(dark: boolean): ThemeConfig {
         itemMarginInline: 8,
         itemHeight: 38,
         iconSize: 17,
-        // 选中颜色用柔青绿——晶脉透光
         itemSelectedColor: PALETTE.accent,
         itemColor: dark ? 'rgba(255,255,255,0.55)' : n.n3,
-        itemHoverColor: dark ? 'rgba(255,255,255,0.85)' : n.n2,
+        itemHoverColor: dark ? 'rgba(255,255,255,0.85)' : n.n0,
       },
       Card: {
         borderRadiusLG: 10,
@@ -115,13 +114,13 @@ export function createAntdThemeConfig(dark: boolean): ThemeConfig {
         borderRadius: 8,
         controlHeight: 36,
         activeBorderColor: PALETTE.accent,
-        activeShadow: `0 0 0 2px ${rgba(PALETTE.accent, 0.15)}`,
+        activeShadow: `0 0 0 2px ${rgba(PALETTE.accent, 0.1)}`,
       },
       Table: {
         borderRadiusLG: 10,
         headerBg: dark ? n.n1 : n.n10,
         headerBorderRadius: 10,
-        rowHoverBg: dark ? 'rgba(255,255,255,0.04)' : rgba(PALETTE.accent, 0.08),
+        rowHoverBg: dark ? 'rgba(255,255,255,0.04)' : rgba(PALETTE.accent, 0.04),
       },
       Segmented: { borderRadius: 8 },
       Select: { borderRadius: 8 },

@@ -66,9 +66,9 @@ export function ConversationList({
                 style={{
                   padding: '10px 12px',
                   cursor: 'pointer',
-                  background: active ? token.colorSuccessBg : 'transparent',
+                  background: active ? 'var(--color-primary-soft)' : 'transparent',
                   borderLeft: active
-                    ? `3px solid ${token.colorSuccess}`
+                    ? `3px solid var(--n0)`
                     : '3px solid transparent',
                   display: 'flex',
                   flexDirection: 'column',
@@ -77,7 +77,7 @@ export function ConversationList({
               >
                 <Space size={6} style={{ width: '100%', justifyContent: 'space-between' }}>
                   <Space size={6} style={{ minWidth: 0, flex: 1 }}>
-                    <MessageOutlined style={{ color: token.colorSuccess }} />
+                    <MessageOutlined style={{ color: active ? 'var(--n0)' : 'var(--n4)' }} />
                     <Typography.Text
                       strong={active}
                       ellipsis

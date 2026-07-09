@@ -62,10 +62,10 @@ export function DashboardPage() {
   }, []);
 
   const statCards = [
-    { key: 'running', title: t('running'), value: stats?.counts.running ?? 0, icon: ThunderboltFilled, color: palette.chartAccent },
-    { key: 'success', title: t('success24h'), value: stats?.counts.success_24h ?? 0, icon: CheckCircleFilled, color: palette.chartSuccess },
-    { key: 'failed', title: t('failed24h'), value: stats?.counts.failed_24h ?? 0, icon: CloseCircleFilled, color: palette.chartError },
-    { key: 'cancelled', title: t('cancelled24h'), value: stats?.counts.cancelled_24h ?? 0, icon: ExclamationCircleFilled, color: palette.chartWarning },
+    { key: 'running', title: t('running'), value: stats?.counts.running ?? 0, icon: ThunderboltFilled, color: token.colorText },
+    { key: 'success', title: t('success24h'), value: stats?.counts.success_24h ?? 0, icon: CheckCircleFilled, color: token.colorText },
+    { key: 'failed', title: t('failed24h'), value: stats?.counts.failed_24h ?? 0, icon: CloseCircleFilled, color: token.colorText },
+    { key: 'cancelled', title: t('cancelled24h'), value: stats?.counts.cancelled_24h ?? 0, icon: ExclamationCircleFilled, color: token.colorText },
   ] as const;
 
   return (

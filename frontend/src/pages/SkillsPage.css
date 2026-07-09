@@ -33,8 +33,8 @@
 
 .skill-explorer-categoryButton.is-selected,
 .skill-explorer-fileButton.is-selected {
-  background: rgba(91, 192, 190, 0.12);
-  color: var(--color-accent);
+  background: var(--color-primary-soft);
+  color: var(--n0);
 }
 
 .skill-explorer-categories {

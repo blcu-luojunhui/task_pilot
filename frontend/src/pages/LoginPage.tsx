@@ -43,7 +43,7 @@ export function LoginPage() {
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        background: `linear-gradient(135deg, ${themeToken.colorPrimaryBg} 0%, ${themeToken.colorBgLayout} 100%)`,
+        background: themeToken.colorBgLayout,
       }}
     >
       <Card
@@ -52,7 +52,7 @@ export function LoginPage() {
       >
         <div style={{ textAlign: 'center', marginBottom: 36 }}>
           <Typography.Title level={3} style={{ marginBottom: 4 }}>
-            <span className="gradient-text">TaskPilot</span>
+            <span style={{ color: "var(--n0)" }}>TaskPilot</span>
           </Typography.Title>
           <Typography.Text type="secondary">{t('login.subtitle')}</Typography.Text>
         </div>
@@ -74,7 +74,7 @@ export function LoginPage() {
 
           <Form.Item style={{ marginBottom: 16 }}>
             <Button type="primary" htmlType="submit" loading={loading} block size="large"
-              style={{ background: 'linear-gradient(135deg, var(--n2) 0%, var(--color-accent) 100%)', border: 'none' }}
+              style={{ background: 'var(--n0)', border: 'none' }}
             >
               {t('login.submitButton')}
             </Button>

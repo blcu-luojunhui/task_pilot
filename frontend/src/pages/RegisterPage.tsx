@@ -50,13 +50,13 @@ export function RegisterPage() {
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        background: `linear-gradient(135deg, ${themeToken.colorPrimaryBg} 0%, ${themeToken.colorBgLayout} 100%)`,
+        background: themeToken.colorBgLayout,
       }}
     >
       <Card style={{ width: 420, borderRadius: 14, boxShadow: '0 4px 24px rgba(0,0,0,0.08)' }} bordered={false}>
         <div style={{ textAlign: 'center', marginBottom: 36 }}>
           <Typography.Title level={3} style={{ marginBottom: 4 }}>
-            <span className="gradient-text">TaskPilot</span>
+            <span style={{ color: "var(--n0)" }}>TaskPilot</span>
           </Typography.Title>
           <Typography.Text type="secondary">{t('register.subtitle')}</Typography.Text>
         </div>
@@ -138,7 +138,7 @@ export function RegisterPage() {
 
           <Form.Item style={{ marginBottom: 16 }}>
             <Button type="primary" htmlType="submit" loading={loading} block size="large"
-              style={{ background: 'linear-gradient(135deg, var(--n2) 0%, var(--color-accent) 100%)', border: 'none' }}
+              style={{ background: 'var(--n0)', border: 'none' }}
             >
               {t('register.submitButton')}
             </Button>

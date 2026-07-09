@@ -53,9 +53,9 @@ export function Composer({ disabled, onSend }: Props) {
         style={{
           height: 'auto',
           borderRadius: '0 12px 12px 0',
-          background: 'linear-gradient(135deg, var(--n2) 0%, var(--color-accent) 100%)',
+          background: 'var(--n0)',
           border: 'none',
-          boxShadow: '0 2px 8px rgba(91, 192, 190, 0.2)',
+          boxShadow: '0 1px 3px rgba(0,0,0,0.08)',
           minWidth: 60,
         }}
       >

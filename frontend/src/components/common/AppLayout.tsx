@@ -118,12 +118,12 @@ export function AppLayout() {
           }}
         >
           <span
-            className="gradient-text"
             style={{
               marginLeft: 10,
               fontSize: 21,
               fontWeight: 700,
               letterSpacing: '-0.3px',
+              color: 'var(--n0)',
             }}
           >
             TaskPilot
@@ -149,7 +149,7 @@ export function AppLayout() {
             target="_blank"
             rel="noopener noreferrer"
             style={{
-              color: 'var(--n2)',
+              color: 'var(--n0)',
               fontSize: 17,
               display: 'flex',
               alignItems: 'center',

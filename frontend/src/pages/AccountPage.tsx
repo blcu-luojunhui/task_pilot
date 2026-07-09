@@ -354,7 +354,7 @@ export function AccountPage() {
             title={
               <PageCardTitle
                 icon={
-                  <PageCardIcon color="#C9A68B" bg="rgba(201,166,139,0.15)">
+                  <PageCardIcon color="#B45309" bg="rgba(180,83,9,0.06)">
                     <ThunderboltOutlined />
                   </PageCardIcon>
                 }
@@ -406,7 +406,7 @@ export function AccountPage() {
             title={
               <PageCardTitle
                 icon={
-                  <PageCardIcon color="#3A506B" bg="rgba(58,80,107,0.12)">
+                  <PageCardIcon color="#404040" bg="rgba(0,0,0,0.04)">
                     <KeyOutlined />
                   </PageCardIcon>
                 }
@@ -418,7 +418,7 @@ export function AccountPage() {
               <Button
                 type="primary"
                 icon={<PlusOutlined />}
-                style={{ borderRadius: 10, background: 'var(--color-accent)', boxShadow: '0 4px 12px rgba(91,192,190,0.25)' }}
+                style={{ borderRadius: 10, background: 'var(--color-accent)', boxShadow: '0 4px 12px rgba(13,148,136,0.25)' }}
                 onClick={() => {
                   setNewToken(null);
                   setTokenName('');
@@ -448,7 +448,7 @@ export function AccountPage() {
               title={
                 <PageCardTitle
                   icon={
-                    <PageCardIcon color="#5BC0BE" bg="rgba(91,192,190,0.12)">
+                    <PageCardIcon color="var(--n2)" bg="rgba(23,23,23,0.06)">
                       <BarChartOutlined />
                     </PageCardIcon>
                   }
@@ -576,7 +576,7 @@ export function AccountPage() {
               title={
                 <PageCardTitle
                   icon={
-                    <PageCardIcon color="#C9A68B" bg="rgba(201,166,139,0.12)">
+                    <PageCardIcon color="#B45309" bg="rgba(180,83,9,0.06)">
                       <SendOutlined />
                     </PageCardIcon>
                   }
@@ -588,7 +588,7 @@ export function AccountPage() {
                 <Button
                   type="primary"
                   icon={<PlusOutlined />}
-                  style={{ borderRadius: 10, background: 'var(--color-warning)', boxShadow: '0 4px 12px rgba(201,166,139,0.25)' }}
+                  style={{ borderRadius: 10, background: 'var(--color-warning)', boxShadow: '0 4px 12px rgba(180,83,9,0.25)' }}
                   onClick={() => {
                     setNewInviteCodes(null);
                     setInviteCount(1);

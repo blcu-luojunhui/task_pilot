@@ -173,7 +173,7 @@ export function RunsPage() {
         title={
           <PageCardTitle
             icon={
-              <PageCardIcon color="#C9A68B" bg="rgba(201,166,139,0.12)">
+              <PageCardIcon color="#B45309" bg="rgba(180,83,9,0.06)">
                 <FilterOutlined />
               </PageCardIcon>
             }

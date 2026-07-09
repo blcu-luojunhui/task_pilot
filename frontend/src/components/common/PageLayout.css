@@ -27,7 +27,7 @@
   letter-spacing: -0.02em;
   color: #fff;
   flex-shrink: 0;
-  box-shadow: 0 8px 24px rgba(58, 80, 107, 0.2);
+  box-shadow: 0 8px 24px rgba(23, 23, 23, 0.1);
 }
 
 .page-hero__title {

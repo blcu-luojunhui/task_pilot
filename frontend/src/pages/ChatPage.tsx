@@ -28,7 +28,7 @@ export function ChatPage() {
   const navigate = useNavigate();
   const [createAgentLoading, setCreateAgentLoading] = useState(false);
   const [bubbleColor, setBubbleColor] = useState<string>(() => {
-    try { return localStorage.getItem('chat-bubble-color') || '#5c838c'; } catch { return '#5c838c'; }
+    try { return localStorage.getItem('chat-bubble-color') || '#404040'; } catch { return '#404040'; }
   });
 
   /** 根据 hex 计算亮度 → 浅色底配深字，深色底配白字 */
@@ -41,7 +41,7 @@ export function ChatPage() {
     // Relative luminance (sRGB)
     const lum = 0.2126 * (r / 255) + 0.7152 * (g / 255) + 0.0722 * (b / 255);
     if (lum > 0.55) {
-      return { isLight: true, text: '#1C2636', border: 'rgba(0,0,0,0.1)' };
+      return { isLight: true, text: '#171717', border: 'rgba(0,0,0,0.1)' };
     }
     return { isLight: false, text: '#FFFFFF', border: 'rgba(255,255,255,0.15)' };
   }, [bubbleColor]);
@@ -255,7 +255,7 @@ export function ChatPage() {
                 type="text"
                 value={bubbleColor}
                 onChange={(e) => handleBubbleColorChange(e.target.value)}
-                placeholder="#5c838c"
+                placeholder="#404040"
                 style={{
                   width: 80,
                   height: 26,

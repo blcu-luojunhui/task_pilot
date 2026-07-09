@@ -115,7 +115,7 @@ export function TasksPage() {
         title={
           <PageCardTitle
             icon={
-              <PageCardIcon color="#3A506B" bg="rgba(58,80,107,0.12)">
+              <PageCardIcon color="#404040" bg="rgba(0,0,0,0.04)">
                 <FilterOutlined />
               </PageCardIcon>
             }
