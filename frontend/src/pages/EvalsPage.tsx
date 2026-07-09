@@ -139,7 +139,7 @@ export function EvalsPage() {
           title={
             <PageCardTitle
               icon={
-                <PageCardIcon color={token.colorPrimary} bg={token.colorPrimaryBg}>
+                <PageCardIcon tone="accent">
                   <BarChartOutlined />
                 </PageCardIcon>
               }
@@ -177,7 +177,7 @@ export function EvalsPage() {
         title={
           <PageCardTitle
             icon={
-              <PageCardIcon color="#404040" bg="rgba(0,0,0,0.04)">
+              <PageCardIcon tone="neutral">
                 <UnorderedListOutlined />
               </PageCardIcon>
             }

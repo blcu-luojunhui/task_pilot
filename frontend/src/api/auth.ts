@@ -6,11 +6,15 @@ export interface AccountInfo {
   username: string;
   email: string;
   role: string;
+  avatar_url: string | null;
+  agent_avatar_url: string | null;
   daily_token_limit: number;
   today_tokens_used: number;
   created_at: string;
   updated_at: string;
 }
+
+export type AvatarRole = 'user' | 'agent';
 
 export interface AdminUserInfo {
   id: number;
@@ -89,6 +93,20 @@ export async function logout() {
 
 export async function getMe() {
   return unwrap<AccountInfo>(apiClient.get('/auth/me'));
+}
+
+export async function uploadAvatar(role: AvatarRole, file: File) {
+  const form = new FormData();
+  form.append('file', file, file.name);
+  return unwrap<AccountInfo>(
+    apiClient.post(`/auth/avatar?role=${encodeURIComponent(role)}`, form),
+  );
+}
+
+export async function deleteAvatar(role: AvatarRole) {
+  return unwrap<AccountInfo>(
+    apiClient.delete(`/auth/avatar?role=${encodeURIComponent(role)}`),
+  );
 }
 
 export async function createToken(name?: string) {

@@ -208,7 +208,7 @@ export function TaskDetailPage() {
             title={
               <PageCardTitle
                 icon={
-                  <PageCardIcon color="var(--n2)" bg="rgba(23,23,23,0.06)">
+                  <PageCardIcon tone="neutral">
                     <SwapOutlined />
                   </PageCardIcon>
                 }

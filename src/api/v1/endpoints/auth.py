@@ -199,6 +199,97 @@ def create_auth_bp(deps: ApiDependencies) -> Blueprint:
 
         return _ok(None, "邮箱已修改")
 
+    @bp.route("/auth/avatar", methods=["POST"])
+    async def upload_avatar():
+        account_id = get_current_account_id()
+        if not account_id:
+            return _error(ErrorCode.UNAUTHORIZED, "未登录", 401)
+
+        role = request.args.get("role", "user")
+        try:
+            from src.core.auth.avatar_storage import parse_avatar_role
+
+            parse_avatar_role(role)
+        except ValueError as e:
+            return _error(ErrorCode.VALIDATION_ERROR, str(e), 400)
+
+        files = await request.files
+        upload = files.get("file")
+        if not upload or not upload.filename:
+            return _error(ErrorCode.VALIDATION_ERROR, "请上传图片文件", 400)
+
+        data = upload.read()
+        if not data:
+            return _error(ErrorCode.VALIDATION_ERROR, "空文件", 400)
+
+        try:
+            account = await deps.auth.upload_avatar(
+                account_id,
+                role,
+                data,
+                upload.content_type,
+                filename=upload.filename,
+            )
+        except ValueError as e:
+            return _error(ErrorCode.VALIDATION_ERROR, str(e), 400)
+        except Exception as e:
+            logger.exception("上传头像失败: %s", e)
+            return _error(ErrorCode.INTERNAL_ERROR, "上传头像失败", 500)
+
+        account.pop("password_hash", None)
+        account.pop("password_salt", None)
+        return _ok(account, "头像已更新")
+
+    @bp.route("/auth/avatar", methods=["DELETE"])
+    async def delete_avatar():
+        account_id = get_current_account_id()
+        if not account_id:
+            return _error(ErrorCode.UNAUTHORIZED, "未登录", 401)
+
+        role = request.args.get("role", "user")
+        try:
+            account = await deps.auth.remove_avatar(account_id, role)
+        except ValueError as e:
+            return _error(ErrorCode.VALIDATION_ERROR, str(e), 400)
+        except Exception as e:
+            logger.exception("删除头像失败: %s", e)
+            return _error(ErrorCode.INTERNAL_ERROR, "删除头像失败", 500)
+
+        account.pop("password_hash", None)
+        account.pop("password_salt", None)
+        return _ok(account, "头像已删除")
+
+    @bp.route("/auth/avatar/image", methods=["GET"])
+    async def get_avatar_image():
+        account_id = get_current_account_id()
+        if not account_id:
+            return _error(ErrorCode.UNAUTHORIZED, "未登录", 401)
+
+        role = request.args.get("role", "user")
+        try:
+            path, mime, version_key = await deps.auth.get_avatar_file(account_id, role)
+        except ValueError as e:
+            return _error(ErrorCode.VALIDATION_ERROR, str(e), 400)
+
+        if not path or not mime:
+            return _error(ErrorCode.BAD_REQUEST, "头像不存在", 404)
+
+        from quart import send_file
+
+        cache_version = request.args.get("v") or version_key
+        response = await send_file(
+            path,
+            mimetype=mime,
+            cache_timeout=86_400,
+            conditional=True,
+            add_etags=False,
+        )
+        if cache_version:
+            response.set_etag(cache_version)
+        response.cache_control.public = False
+        response.cache_control.private = True
+        return response
+
     @bp.route("/auth/account", methods=["DELETE"])
     async def delete_account():
         account_id = get_current_account_id()

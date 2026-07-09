@@ -3,6 +3,7 @@ import ReactDOM from 'react-dom/client';
 import { QueryClientProvider } from '@tanstack/react-query';
 import { App } from './App';
 import { queryClient } from './lib/queryClient';
+import { syncThemePaletteFromStore } from '@/stores/themePaletteStore';
 import './index.css';
 
 /**
@@ -12,6 +13,8 @@ import './index.css';
  * - 生产构建不引入 msw（动态 import 在 vite 下会被识别为 lazy chunk）
  */
 async function bootstrap() {
+  syncThemePaletteFromStore();
+
   if (import.meta.env.VITE_USE_MOCKS !== 'false') {
     const { worker } = await import('./mocks/browser');
     await worker.start({

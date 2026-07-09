@@ -22,7 +22,7 @@ function streamingSafeMarkdown(content: string, streaming: boolean): string {
 }
 
 /** 流式安全 markdown + 代码高亮（FE-5） */
-export function MarkdownContent({ content, isUser = false, streaming = false }: Props) {
+export function MarkdownContent({ content, streaming = false }: Props) {
   const { token } = theme.useToken();
   const safeContent = streamingSafeMarkdown(content, streaming);
 
@@ -37,8 +37,7 @@ export function MarkdownContent({ content, isUser = false, streaming = false }: 
             return (
               <code
                 style={{
-                  background: isUser ? 'rgba(255,255,255,0.18)' : token.colorFillTertiary,
-                  color: isUser ? token.colorTextLightSolid : undefined,
+                  background: token.colorFillTertiary,
                   padding: '1px 5px',
                   borderRadius: 4,
                   fontSize: '0.88em',
@@ -57,7 +56,7 @@ export function MarkdownContent({ content, isUser = false, streaming = false }: 
               href={href}
               target="_blank"
               rel="noopener noreferrer"
-              style={{ color: isUser ? token.colorTextLightSolid : token.colorSuccess }}
+              style={{ color: token.colorSuccess }}
               {...props}
             >
               {children}
@@ -68,9 +67,9 @@ export function MarkdownContent({ content, isUser = false, streaming = false }: 
           return (
             <th
               style={{
-                border: `1px solid ${isUser ? 'rgba(255,255,255,0.25)' : token.colorBorderSecondary}`,
+                border: `1px solid ${token.colorBorderSecondary}`,
                 padding: '7px 12px',
-                background: isUser ? 'rgba(255,255,255,0.1)' : token.colorFillTertiary,
+                background: token.colorFillTertiary,
                 fontWeight: 600,
                 textAlign: 'left',
               }}
@@ -84,7 +83,7 @@ export function MarkdownContent({ content, isUser = false, streaming = false }: 
           return (
             <td
               style={{
-                border: `1px solid ${isUser ? 'rgba(255,255,255,0.25)' : token.colorBorderSecondary}`,
+                border: `1px solid ${token.colorBorderSecondary}`,
                 padding: '7px 12px',
               }}
               {...props}
@@ -98,7 +97,7 @@ export function MarkdownContent({ content, isUser = false, streaming = false }: 
             <hr
               style={{
                 border: 'none',
-                borderTop: `1px solid ${isUser ? 'rgba(255,255,255,0.25)' : token.colorBorderSecondary}`,
+                borderTop: `1px solid ${token.colorBorderSecondary}`,
               }}
             />
           );
@@ -107,8 +106,8 @@ export function MarkdownContent({ content, isUser = false, streaming = false }: 
           return (
             <blockquote
               style={{
-                borderLeft: `3px solid ${isUser ? 'rgba(255,255,255,0.4)' : token.colorPrimaryBorder}`,
-                color: isUser ? 'rgba(255,255,255,0.85)' : token.colorTextSecondary,
+                borderLeft: `3px solid ${token.colorPrimaryBorder}`,
+                color: token.colorTextSecondary,
               }}
               {...props}
             >

@@ -59,10 +59,10 @@
    * 内容页底色(n9)最亮，侧栏(n7)退后
    * 书页是白的，页边距是灰的
    */
-  --surface-page:     var(--n9);  /* 内容区底色 — 亮，聚焦 */
-  --surface-card:     var(--n7);  /* 侧栏 / 卡片 — 暗，退后 */
-  --surface-elevated: var(--n10); /* 浮层面板 — 最亮 */
-  --surface-header:   var(--n10); /* Header — 最亮 */
+  --surface-page:     var(--n9);  /* 内容区渐变 — JS 覆盖 */
+  --surface-card:     var(--n7);  /* 侧栏渐变 — JS 覆盖 */
+  --surface-elevated: var(--n10); /* 卡片渐变 — JS 覆盖 */
+  --surface-header:   var(--n10); /* 顶栏渐变 — JS 覆盖 */
 
   /* ── 边框 ──────────────────────────────────────────────── */
 

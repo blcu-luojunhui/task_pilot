@@ -42,11 +42,25 @@ def _collect_migrations() -> list[Path]:
     return files
 
 
+def _strip_sql_comments(stmt: str) -> str:
+    lines = [
+        line
+        for line in stmt.splitlines()
+        if line.strip() and not line.strip().startswith("--")
+    ]
+    return "\n".join(lines).strip()
+
+
+async def _execute_sql(db, sql: str) -> None:
+    for stmt in sql.split(";"):
+        stmt = _strip_sql_comments(stmt.strip())
+        if not stmt:
+            continue
+        await db.async_save(stmt, ())
+
+
 async def _ensure_schema_table(db) -> None:
-    for stmt in _SCHEMA_TABLE_DDL.split(";"):
-        stmt = stmt.strip()
-        if stmt:
-            await db.async_save(stmt)
+    await _execute_sql(db, _SCHEMA_TABLE_DDL)
 
 
 async def _applied_versions(db) -> set[str]:
@@ -82,18 +96,14 @@ async def run_migrations(scheduler: "TaskScheduler") -> int:
         logger.info("db.migrate: applying %s", version)
 
         try:
-            for stmt in sql.split(";"):
-                stmt = stmt.strip()
-                if not stmt or stmt.startswith("--"):
-                    continue
-                await db.async_save(stmt)
+            await _execute_sql(db, sql)
         except Exception:
             logger.exception("db.migrate: FAILED at %s", version)
             return TaskStatus.FAILED
 
         await db.async_save(
             "INSERT INTO schema_migrations (version) VALUES (%s)",
-            params=(version,),
+            (version,),
         )
         logger.info("db.migrate: applied %s ✓", version)
 
@@ -118,17 +128,13 @@ async def auto_migrate(db) -> bool:
         sql = f.read_text(encoding="utf-8")
         logger.info("auto_migrate: applying %s", f.stem)
         try:
-            for stmt in sql.split(";"):
-                stmt = stmt.strip()
-                if not stmt or stmt.startswith("--"):
-                    continue
-                await db.async_save(stmt)
+            await _execute_sql(db, sql)
         except Exception:
             logger.exception("auto_migrate: FAILED at %s", f.stem)
             return False
         await db.async_save(
             "INSERT INTO schema_migrations (version) VALUES (%s)",
-            params=(f.stem,),
+            (f.stem,),
         )
     return True
 

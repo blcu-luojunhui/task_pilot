@@ -33,6 +33,10 @@ export const apiClient: AxiosInstance = axios.create({
 
 // 请求拦截器：自动携带 Bearer Token
 apiClient.interceptors.request.use((config) => {
+  // FormData 需由浏览器自动设置 multipart boundary
+  if (config.data instanceof FormData) {
+    delete config.headers['Content-Type'];
+  }
   // 延迟导入避免循环依赖
   try {
     const stored = localStorage.getItem('auth-storage');

@@ -29,6 +29,8 @@ export function Composer({ disabled, onSend }: Props) {
     }
   };
 
+  const canSend = !disabled && !!value.trim();
+
   return (
     <Space.Compact style={{ width: '100%' }}>
       <Input.TextArea
@@ -46,17 +48,25 @@ export function Composer({ disabled, onSend }: Props) {
         }}
       />
       <Button
-        type="primary"
         icon={<SendOutlined />}
-        disabled={disabled || !value.trim()}
+        disabled={!canSend}
         onClick={submit}
         style={{
           height: 'auto',
           borderRadius: '0 12px 12px 0',
-          background: 'var(--n0)',
-          border: 'none',
           boxShadow: 'none',
           minWidth: 60,
+          ...(canSend
+            ? {
+                background: 'var(--color-accent)',
+                borderColor: 'var(--color-accent)',
+                color: '#fff',
+              }
+            : {
+                background: token.colorFillQuaternary,
+                borderColor: token.colorBorderSecondary,
+                color: token.colorTextQuaternary,
+              }),
         }}
       >
         {t('send')}

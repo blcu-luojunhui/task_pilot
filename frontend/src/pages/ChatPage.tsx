@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import { Button, Drawer, Grid, Layout, message, Popconfirm, Space, Tag, Typography, theme } from 'antd';
@@ -27,29 +27,6 @@ export function ChatPage() {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const navigate = useNavigate();
   const [createAgentLoading, setCreateAgentLoading] = useState(false);
-  const [bubbleColor, setBubbleColor] = useState<string>(() => {
-    try { return localStorage.getItem('chat-bubble-color') || '#404040'; } catch { return '#404040'; }
-  });
-
-  /** 根据 hex 计算亮度 → 浅色底配深字，深色底配白字 */
-  const bubbleLuminance = useMemo(() => {
-    const hex = bubbleColor.replace('#', '');
-    if (hex.length !== 6) return { isLight: false, text: '#FFFFFF', border: 'rgba(255,255,255,0.15)' };
-    const r = parseInt(hex.slice(0, 2), 16);
-    const g = parseInt(hex.slice(2, 4), 16);
-    const b = parseInt(hex.slice(4, 6), 16);
-    // Relative luminance (sRGB)
-    const lum = 0.2126 * (r / 255) + 0.7152 * (g / 255) + 0.0722 * (b / 255);
-    if (lum > 0.55) {
-      return { isLight: true, text: '#37352F', border: 'rgba(0,0,0,0.1)' };
-    }
-    return { isLight: false, text: '#FFFFFF', border: 'rgba(255,255,255,0.15)' };
-  }, [bubbleColor]);
-
-  const handleBubbleColorChange = (color: string) => {
-    setBubbleColor(color);
-    try { localStorage.setItem('chat-bubble-color', color); } catch { /* noop */ }
-  };
 
   const activeConversationId = useChatStore((s) => s.activeConversationId);
   const inFlight = useChatStore((s) => s.inFlight);
@@ -180,11 +157,6 @@ export function ChatPage() {
       <Layout
         className="chat-pane"
         data-theme="light"
-        style={{
-          '--chat-bubble-custom': bubbleColor,
-          '--chat-user-text': bubbleLuminance.text,
-          '--chat-user-border-custom': bubbleLuminance.border,
-        } as React.CSSProperties}
       >
         <div
           style={{
@@ -234,41 +206,6 @@ export function ChatPage() {
           </Space>
 
           <Space>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-              <input
-                type="color"
-                value={bubbleColor}
-                onChange={(e) => handleBubbleColorChange(e.target.value)}
-                title={t('bubbleColor') || '气泡配色'}
-                style={{
-                  width: 26,
-                  height: 26,
-                  padding: 0,
-                  border: `1px solid ${token.colorBorderSecondary}`,
-                  borderRadius: 6,
-                  cursor: 'pointer',
-                  background: 'none',
-                }}
-              />
-              <input
-                type="text"
-                value={bubbleColor}
-                onChange={(e) => handleBubbleColorChange(e.target.value)}
-                placeholder="#404040"
-                style={{
-                  width: 80,
-                  height: 26,
-                  padding: '2px 6px',
-                  border: `1px solid ${token.colorBorderSecondary}`,
-                  borderRadius: 6,
-                  fontSize: 12,
-                  fontFamily: 'monospace',
-                  textAlign: 'center',
-                  background: token.colorBgContainer,
-                  color: token.colorText,
-                }}
-              />
-            </div>
             {selectedMessageIds.size > 0 && (
               <Button
                 type="primary"

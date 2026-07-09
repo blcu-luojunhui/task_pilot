@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 import { Card, type CardProps } from 'antd';
+import { useIconTones, type IconTone } from '@/hooks/useIconTone';
 
 interface Props extends CardProps {
   table?: boolean;
@@ -14,14 +15,18 @@ export function PageCard({ table, className, variant = 'borderless', ...props }:
 export function PageCardIcon({
   color,
   bg,
+  tone,
   children,
 }: {
-  color: string;
-  bg: string;
+  color?: string;
+  bg?: string;
+  tone?: IconTone;
   children: ReactNode;
 }) {
+  const tones = useIconTones();
+  const resolved = color && bg ? { color, bg } : tones[tone ?? 'accent'];
   return (
-    <span className="page-card__icon" style={{ color, background: bg }}>
+    <span className="page-card__icon" style={{ color: resolved.color, background: resolved.bg }}>
       {children}
     </span>
   );

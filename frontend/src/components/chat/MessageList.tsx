@@ -1,9 +1,10 @@
 import { useCallback, useRef, useState } from 'react';
-import { Button, Empty, Typography, theme } from 'antd';
+import { Button, Empty, Typography } from 'antd';
 import { VerticalAlignBottomOutlined } from '@ant-design/icons';
 import { useTranslation } from 'react-i18next';
 import { Virtuoso, type VirtuosoHandle } from 'react-virtuoso';
 import type { ChatMessage } from '@/api/types';
+import { useChatStore } from '@/stores/chatStore';
 import { MessageBubble } from './MessageBubble';
 import { StreamingBubble } from './StreamingBubble';
 import './ChatMessage.css';
@@ -16,32 +17,28 @@ interface Props {
 }
 
 function LiveFooter({ inFlight }: { inFlight: boolean }) {
-  const { token } = theme.useToken();
   const { t } = useTranslation('chat');
+  const streamingText = useChatStore((s) => s.liveStreamingText);
 
   if (!inFlight) return null;
 
   return (
     <div style={{ paddingBottom: 8 }}>
       <StreamingBubble />
-      <div style={{ display: 'flex', alignItems: 'center', padding: '4px 16px' }}>
-        <div
-          className="thinking-indicator"
-          style={{
-            background: token.colorSuccessBg,
-            border: `1px solid ${token.colorSuccessBorder}`,
-          }}
-        >
-          <div className="thinking-dots">
-            <span />
-            <span />
-            <span />
+      {!streamingText && (
+        <div style={{ display: 'flex', alignItems: 'center', padding: '4px 16px' }}>
+          <div className="thinking-indicator">
+            <div className="thinking-dots">
+              <span />
+              <span />
+              <span />
+            </div>
+            <Typography.Text type="secondary" style={{ fontSize: 13 }}>
+              {t('agentThinking')}
+            </Typography.Text>
           </div>
-          <Typography.Text type="secondary" style={{ fontSize: 13 }}>
-            {t('agentThinking')}
-          </Typography.Text>
         </div>
-      </div>
+      )}
     </div>
   );
 }

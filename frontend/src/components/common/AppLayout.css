@@ -5,7 +5,7 @@
   overflow: hidden;
 }
 
-/* ── 侧栏：纯白底，无装饰 ── */
+/* ── 侧栏：跟随全局配色 cardBg ── */
 .app-layout__sider {
   position: fixed;
   left: 0; top: 0; bottom: 0;
@@ -13,8 +13,9 @@
   overflow-x: hidden;
   overflow-y: auto;
   z-index: 100;
-  background: #FFFFFF !important;
-  border-right: none !important;
+  background: var(--surface-card) !important;
+  background-attachment: fixed;
+  border-right: 1px solid var(--border-light) !important;
   border-left: none !important;
   box-shadow: none !important;
 }
@@ -72,11 +73,11 @@
   min-width: 0;
 }
 
-/* ── 顶栏：纯白底，极简 ── */
+/* ── 顶栏：跟随全局 header 渐变 ── */
 .app-layout__header {
   flex-shrink: 0;
   z-index: 99;
-  background: #FFFFFF !important;
+  background: var(--surface-header) !important;
   border-bottom: 1px solid var(--border-light) !important;
   box-shadow: none !important;
 }
@@ -86,5 +87,6 @@
   min-height: 0;
   overflow: auto;
   -webkit-overflow-scrolling: touch;
-  background: #FFFFFF;
+  background: var(--surface-page);
+  background-attachment: fixed;
 }
