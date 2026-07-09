@@ -115,7 +115,7 @@ async def startup():
     # 启动时自动执行未应用的数据库迁移
     try:
         from src.core.agent_task.db_migrate import auto_migrate
-        db = ctx._container.async_mysql_pool()
+        db = ctx.container.async_mysql_pool()
         ok = await auto_migrate(db)
         logging.info("DB migration: %s", "up to date" if ok else "FAILED")
     except Exception:
