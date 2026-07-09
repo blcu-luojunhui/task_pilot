@@ -1,0 +1,2 @@
+import{n as e,t}from"./client-DT-VS6ge.js";async function n(n){return e(t.get(`/system/stats`,{signal:n?.signal}))}async function r(){return e(t.get(`/health`))}export{n,r as t};
+//# sourceMappingURL=system-Dcdbpcyw.js.map
