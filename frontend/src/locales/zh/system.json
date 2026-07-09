@@ -1,0 +1,10 @@
+{
+  "title": "System — 系统监控",
+  "description": "只读快照：健康检查、Prometheus 指标。Phase 3 接入指标可视化。",
+  "healthCheck": "健康检查 (/api/health)",
+  "overview": "总体",
+  "prometheusTitle": "Prometheus Metrics",
+  "prometheusLabel": "原始指标接口：",
+  "prometheusHint": "建议接入 Grafana 后做完整可视化；前端可后续引入 recharts 渲染关键指标。",
+  "noData": "无数据"
+}

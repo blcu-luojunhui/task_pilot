@@ -1,0 +1,61 @@
+{
+  "timeline": {
+    "noEvents": "No event data",
+    "toolCallsCount": "Will make {{count}} tool calls",
+    "replayToolCall": "Replay this tool call"
+  },
+  "stats": {
+    "noData": "No statistics data",
+    "totalThink": "Total Think Time",
+    "totalAct": "Total Act Time",
+    "tokenUsage": "Token Usage",
+    "toolCalls": "Tool Calls",
+    "times": " times",
+    "perStepTiming": "Per-step Timing (ms)",
+    "tokenCurve": "Token Accumulation",
+    "toolDistribution": "Tool Call Distribution"
+  },
+  "stepTree": {
+    "noData": "No structured step data",
+    "hasError": "Has error"
+  },
+  "transcript": {
+    "noData": "No conversation records (missing run_start/think_end events)",
+    "toolCallsCount": "Call {{count}} tools",
+    "collapse": "Collapse",
+    "expand": "Expand full content ({{length}} chars)",
+    "system": "System",
+    "user": "User",
+    "assistant": "Assistant",
+    "tool": "Tool"
+  },
+  "dag": {
+    "noData": "No step data to render DAG",
+    "error": "Error"
+  },
+  "scrubber": {
+    "label": "Time travel: step {{step}} / {{max}}",
+    "play": "Play",
+    "pause": "Pause"
+  },
+  "replayModal": {
+    "title": "Replay Tool Call",
+    "close": "Close",
+    "execute": "Execute",
+    "noToolCall": "This event has no replayable failed tool call",
+    "readOnlyWarning": "Only READ-level Skills are allowed",
+    "destructiveWarning": "DESTRUCTIVE operations are permanently blocked. Requires env var TASK_PILOT_ALLOW_DIRECT_SKILL_INVOKE=true.",
+    "argsLabel": "Params (JSON)",
+    "argsRequired": "Please enter params",
+    "argsInvalid": "Invalid JSON",
+    "success": "Success",
+    "failed": "Failed",
+    "argsNotValidJson": "Params is not valid JSON",
+    "requestFailed": "Request failed"
+  },
+  "prompt": {
+    "noData": "No prompt_assembled event (requires backend emit, see P3-1)",
+    "snapshots": "Prompt Snapshots",
+    "compareStep": "Compare with previous step"
+  }
+}

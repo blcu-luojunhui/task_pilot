@@ -1,0 +1,89 @@
+/* ── 设计令牌入口 ── */
+@import '@/theme/tokens.css';
+
+/* ── Base ── */
+html {
+  scroll-behavior: smooth;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+  font-family: var(--font-sans);
+  height: 100%;
+}
+
+body,
+#root {
+  height: 100%;
+  margin: 0;
+}
+
+body,
+#root,
+.ant-app {
+  font-family: var(--font-sans);
+  letter-spacing: -0.01em;
+}
+
+button, input, textarea, select, optgroup {
+  font-family: inherit;
+}
+
+code, pre, kbd, samp, .font-mono {
+  font-family: var(--font-mono);
+}
+
+.hljs, .hljs * {
+  font-family: var(--font-mono) !important;
+}
+
+::selection {
+  background: rgba(58, 80, 107, 0.16);
+  color: inherit;
+}
+
+/* ── Scrollbar ── */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb {
+  background: rgba(128,128,128,0.3);
+  border-radius: 999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(128,128,128,0.5);
+}
+
+/* ── Page enter ── */
+@keyframes page-enter {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ── Glass ── */
+.glass {
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+}
+
+/* ── Brand gradient text ── */
+.gradient-text {
+  background: linear-gradient(135deg, var(--n2) 0%, var(--color-accent) 50%, var(--color-info) 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+.sider-logo:hover .gradient-text {
+  opacity: 0.85;
+}
+
+/* ── Stat card accent bar ── */
+.stat-card-accent {
+  position: relative;
+  overflow: hidden;
+}
+.stat-card-accent::before {
+  content: '';
+  position: absolute;
+  left: 0; top: 12px; bottom: 12px;
+  width: 3px;
+  border-radius: 0 3px 3px 0;
+}

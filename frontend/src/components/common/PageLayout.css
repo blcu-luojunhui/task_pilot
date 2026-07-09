@@ -1,0 +1,155 @@
+.page-shell {
+  width: 100%;
+  animation: page-enter 0.35s ease-out;
+}
+
+.page-hero {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  padding: 28px 32px;
+  border-radius: 16px;
+  margin-bottom: 24px;
+  border: 1px solid var(--page-border);
+  background: var(--page-hero-bg);
+  box-shadow: var(--page-shadow);
+}
+
+.page-hero__avatar {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 26px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  color: #fff;
+  flex-shrink: 0;
+  box-shadow: 0 8px 24px rgba(58, 80, 107, 0.2);
+}
+
+.page-hero__title {
+  margin: 0 !important;
+  font-size: 28px !important;
+  font-weight: 600 !important;
+  letter-spacing: -0.03em !important;
+  line-height: 1.2 !important;
+}
+
+.page-hero__subtitle {
+  display: block;
+  margin-top: 4px;
+  font-size: 15px;
+  letter-spacing: -0.01em;
+}
+
+.page-card {
+  border-radius: 14px !important;
+  border: 1px solid var(--page-border) !important;
+  box-shadow: var(--page-shadow) !important;
+  overflow: hidden;
+  height: 100%;
+}
+
+.page-card .ant-card-head {
+  border-bottom: 1px solid var(--page-border);
+  min-height: 52px;
+  padding: 0 22px;
+}
+
+.page-card .ant-card-head-title {
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+
+.page-card__title {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.page-card__icon {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 15px;
+}
+
+.page-info-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 16px 32px;
+}
+
+@media (max-width: 576px) {
+  .page-info-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.page-info-item__label {
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  opacity: 0.55;
+  margin-bottom: 4px;
+}
+
+.page-info-item__value {
+  font-size: 15px;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+}
+
+.page-table-card .ant-table {
+  background: transparent;
+}
+
+.page-table-card .ant-table-thead > tr > th {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+.page-table-card .ant-table-tbody > tr > td {
+  font-size: 14px;
+  letter-spacing: -0.01em;
+}
+
+.page-table-card .ant-table-tbody > tr:hover > td {
+  background: var(--page-row-hover) !important;
+}
+
+.page-panel {
+  border-radius: 14px;
+  border: 1px solid var(--page-border);
+  box-shadow: var(--page-shadow);
+  overflow: hidden;
+  background: var(--ant-color-bg-container, #fff);
+}
+
+/* 填满主内容区（Chat / Run Task 等），避免再用 100vh 计算 */
+.page-shell--fill {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+}
+
+.page-shell--fill > .page-hero {
+  flex-shrink: 0;
+}
+
+.page-shell--fill > .page-panel,
+.page-shell--fill > .page-panel.ant-layout {
+  flex: 1;
+  min-height: 0;
+}

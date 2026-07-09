@@ -1,0 +1,64 @@
+{
+  "name": "task-pilot-frontend",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -b && vite build",
+    "preview": "vite preview",
+    "lint": "eslint . --ext .ts,.tsx --report-unused-disable-directives --max-warnings 0",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "mock:init": "msw init public/ --save"
+  },
+  "dependencies": {
+    "@ant-design/icons": "^5.5.1",
+    "@dagrejs/dagre": "^3.0.0",
+    "@tanstack/react-query": "^5.101.0",
+    "@xyflow/react": "^12.11.0",
+    "antd": "^5.21.0",
+    "axios": "^1.7.7",
+    "dayjs": "^1.11.13",
+    "i18next": "^26.3.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "react-i18next": "^17.0.8",
+    "react-markdown": "^10.1.0",
+    "react-resizable": "^4.0.1",
+    "react-router-dom": "^6.27.0",
+    "react-virtuoso": "^4.18.7",
+    "recharts": "^3.8.1",
+    "rehype-highlight": "^7.0.2",
+    "rehype-raw": "^7.0.0",
+    "remark-gfm": "^4.0.1",
+    "zustand": "^5.0.0"
+  },
+  "devDependencies": {
+    "@rolldown/plugin-babel": "^0.2.3",
+    "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/react": "^16.3.2",
+    "@testing-library/user-event": "^14.6.1",
+    "@types/dagre": "^0.7.54",
+    "@types/react": "^18.3.12",
+    "@types/react-dom": "^18.3.1",
+    "@types/react-resizable": "^3.0.8",
+    "@typescript-eslint/eslint-plugin": "^8.10.0",
+    "@typescript-eslint/parser": "^8.10.0",
+    "@vitejs/plugin-react": "^6.0.2",
+    "eslint": "^8.57.1",
+    "eslint-plugin-react-hooks": "^5.0.0",
+    "eslint-plugin-react-refresh": "^0.4.13",
+    "jsdom": "^27.0.1",
+    "msw": "^2.4.11",
+    "typescript": "^5.6.3",
+    "vite": "^8.0.16",
+    "vitest": "^3.2.6"
+  },
+  "msw": {
+    "workerDirectory": [
+      "public"
+    ]
+  }
+}

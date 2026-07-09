@@ -1,0 +1,99 @@
+/* ═══════════════════════════════════════════════════════════
+   TaskPilot 设计令牌 — CSS 定制属性层
+   〰〰〰〰〰〰〰〰〰〰〰〰〰〰〰〰〰〰〰〰〰〰〰〰〰〰〰〰〰〰〰〰〰〰〰
+   中性色阶 (Neutral Scale)     → 结构：页面/卡片/边框/文字
+   语义调色板 (Semantic Palette) → 交互：按钮/选中/状态/强调
+   色谱:  #1C2636 ──→ #3A506B ──→ #B3C0CD ──→ #FBFCFD
+          最深              锚点             边框            近白
+   ═══════════════════════════════════════════════════════════ */
+
+:root {
+  /* ── 中性色阶 ──────────────────────────────────────────── */
+
+  --n0: #1C2636;  /* 最深     — 暗色模式底色 */
+  --n1: #253548;  /* 暗色抬高 — 暗色卡片 */
+  --n2: #3A506B;  /* 锚点     — 品牌主色 / 深色边框 */
+  --n3: #526881;  /* 中暗     — 次要文字 / 暗色文字 */
+  --n4: #71869C;  /* 中       — 辅助文字 */
+  --n5: #93A4B5;  /* 中亮     — 禁用态 / 占位 */
+  --n6: #B3C0CD;  /* 亮灰     — 边框 / 分割线 */
+  --n7: #D6DCE4;  /* 侧栏灰   — 亮色模式侧栏（退后，但不过暗） */
+  --n8: #E8ECF1;  /* 卡片色   — 旧卡片基准 */
+  --n9: #F3F5F8;  /* 近白偏灰 — 页面底色（突出） */
+  --n10: #FBFCFD; /* 近白     — Header / 最亮面 */
+
+  /* ── 语义调色板 ────────────────────────────────────────── */
+
+  --color-primary:      var(--n2);
+  --color-primary-hover: #2D3F56;
+  --color-primary-soft: rgba(58, 80, 107, 0.08);
+
+  --color-accent:       #5BC0BE;  /* 柔青绿 — 选中 / 焦点 / 完成 */
+  --color-accent-hover: #4AA9A7;
+  --color-accent-soft:  rgba(91, 192, 190, 0.15); /* 侧栏选中背景，明显但不过跳 */
+
+  --color-warning:      #C9A68B;
+  --color-warning-soft: rgba(201, 166, 139, 0.1);
+
+  --color-info:         #A8B59F;
+  --color-info-soft:    rgba(168, 181, 159, 0.1);
+
+  --color-highlight:    #CDEDF6;
+  --color-highlight-soft: rgba(205, 237, 246, 0.25);
+
+  --color-error:        #C96B6B;
+  --color-error-soft:   rgba(201, 107, 107, 0.08);
+
+  /* ── 文字色 ────────────────────────────────────────────── */
+
+  --text-primary:   var(--n0);
+  --text-secondary: var(--n3);
+  --text-tertiary:  var(--n4);
+  --text-disabled:  var(--n5);
+  --text-inverse:   #FFFFFF;
+
+  /* ── 表面色 ────────────────────────────────────────────── */
+  /*
+   * 阅读区 > 导航区：内容页底色(n9)最亮，侧栏(n7)退后
+   * 符合人眼聚焦——书页是白的，页边距是灰的
+   */
+  --surface-page:     var(--n9);  /* 内容区底色 — 亮，聚焦 */
+  --surface-card:     var(--n7);  /* 侧栏 / 卡片 — 暗，退后 */
+  --surface-elevated: var(--n10); /* 浮层面板 — 最亮 */
+  --surface-header:   var(--n10); /* Header — 最亮 */
+
+  /* ── 边框 ──────────────────────────────────────────────── */
+
+  --border-default: rgba(0, 0, 0, 0.07);
+  --border-light:   rgba(0, 0, 0, 0.04);
+  --border-subtle:  rgba(0, 0, 0, 0.025);
+
+  /* ── 阴影 ──────────────────────────────────────────────── */
+
+  --shadow-card:     0 1px 3px rgba(0,0,0,0.04), 0 1px 2px rgba(0,0,0,0.06);
+  --shadow-elevated: 0 4px 16px rgba(0,0,0,0.06);
+  --shadow-button:   0 2px 8px rgba(58,80,107,0.15);
+
+  /* ── 字体 ──────────────────────────────────────────────── */
+
+  --font-sans: -apple-system, BlinkMacSystemFont, 'SF Pro Display',
+    'SF Pro Text', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei',
+    'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  --font-mono: 'SF Mono', 'SFMono-Regular', ui-monospace, Menlo, Monaco,
+    Consolas, 'Liberation Mono', monospace;
+
+  /* ── 圆角 ──────────────────────────────────────────────── */
+
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 10px;
+  --radius-xl: 14px;
+
+  /* ── 间距 ──────────────────────────────────────────────── */
+
+  --space-xs: 4px;
+  --space-sm: 8px;
+  --space-md: 16px;
+  --space-lg: 24px;
+  --space-xl: 32px;
+}
