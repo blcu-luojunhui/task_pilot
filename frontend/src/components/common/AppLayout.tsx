@@ -205,10 +205,7 @@ export function AppLayout() {
           </div>
         </Header>
 
-        <Content
-          className="app-layout__content"
-          style={{ padding: 24, background: token.colorBgLayout }}
-        >
+        <Content className="app-layout__content" style={{ padding: 24 }}>
           <Outlet />
         </Content>
       </Layout>

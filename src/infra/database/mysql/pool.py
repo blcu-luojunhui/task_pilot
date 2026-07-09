@@ -99,7 +99,14 @@ class AsyncMySQLPool:
             )
             raise
 
-    async def async_save(self, query, params, db_name="default", batch: bool = False, return_lastrowid: bool = False):
+    async def async_save(
+        self,
+        query,
+        params=None,
+        db_name="default",
+        batch: bool = False,
+        return_lastrowid: bool = False,
+    ):
         pool = self.pools.get(db_name)
         if not pool:
             await self.init_pools()
@@ -112,9 +119,9 @@ class AsyncMySQLPool:
             async with connection.cursor() as cursor:
                 try:
                     if batch:
-                        await cursor.executemany(query, params)
+                        await cursor.executemany(query, params or ())
                     else:
-                        await cursor.execute(query, params)
+                        await cursor.execute(query, params or ())
                     affected_rows = cursor.rowcount
                     lastrowid = cursor.lastrowid
                     await connection.commit()

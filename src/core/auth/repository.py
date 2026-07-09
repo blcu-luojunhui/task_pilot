@@ -24,7 +24,8 @@ class AccountRepository:
 
     async def find_by_id(self, account_id: int) -> Optional[dict]:
         return await self._db.async_fetch_one(
-            "SELECT id, username, email, role, password_hash, password_salt, "
+            "SELECT id, username, email, role, avatar_url, agent_avatar_url, "
+            "password_hash, password_salt, "
             "daily_token_limit, created_at, updated_at "
             "FROM accounts WHERE id = %s",
             params=(account_id,),
@@ -74,6 +75,16 @@ class AccountRepository:
         affected = await self._db.async_save(
             "UPDATE accounts SET daily_token_limit = %s WHERE id = %s",
             (limit, account_id),
+        )
+        return affected > 0
+
+    async def update_avatar_url(
+        self, account_id: int, role: str, version_key: str | None
+    ) -> bool:
+        column = "avatar_url" if role == "user" else "agent_avatar_url"
+        affected = await self._db.async_save(
+            f"UPDATE accounts SET {column} = %s WHERE id = %s",
+            (version_key, account_id),
         )
         return affected > 0
 

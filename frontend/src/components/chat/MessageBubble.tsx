@@ -1,10 +1,10 @@
-import { RobotOutlined, ToolOutlined, UserOutlined } from '@ant-design/icons';
 import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 import type { ChatMessage } from '@/api/types';
 import { useSemanticColors } from '@/hooks/useSemanticColors';
 import { buildMessageParts } from '@/utils/messageParts';
+import { ChatAvatar } from './ChatAvatar';
 import { MessageRenderer } from './MessageRenderer';
 import './ChatMessage.css';
 
@@ -67,18 +67,10 @@ export function MessageBubble({ message, streaming = false, selectable = false, 
     border: `1px solid ${palette.toolAvatarBorder}`,
   };
 
-  const toolBubbleStyle: React.CSSProperties = {
-    background: palette.toolAvatarBg,
-    border: `1px solid ${palette.toolAvatarBorder}`,
-    boxShadow: 'none',
-  };
-
   return (
     <div className={rowClass} onClick={handleClick} style={{ cursor: selectable ? 'pointer' : undefined }}>
       {!isUser && (
-        <div className="msg-avatar" style={isTool ? toolAvatarStyle : undefined}>
-          {isAssistant ? <RobotOutlined /> : <ToolOutlined />}
-        </div>
+        <ChatAvatar role={isAssistant ? 'assistant' : 'tool'} toolStyle={isTool ? toolAvatarStyle : undefined} />
       )}
 
       <div className="msg-body">
@@ -92,7 +84,7 @@ export function MessageBubble({ message, streaming = false, selectable = false, 
         </div>
 
         {hasBubbleContent && (
-          <div className={bubbleClass} style={isTool ? toolBubbleStyle : undefined}>
+          <div className={bubbleClass}>
             <MessageRenderer
               parts={textParts.length > 0 ? textParts : [{ kind: 'text', text: '' }]}
               isUser={isUser}
@@ -121,11 +113,7 @@ export function MessageBubble({ message, streaming = false, selectable = false, 
         )}
       </div>
 
-      {isUser && (
-        <div className="msg-avatar">
-          <UserOutlined />
-        </div>
-      )}
+      {isUser && <ChatAvatar role="user" />}
 
       {selectable && (
         <div

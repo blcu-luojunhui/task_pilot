@@ -58,7 +58,7 @@ export function MessageRenderer({ parts, isUser = false, streaming = false }: Pr
             return (
               <div
                 key={`text-${i}`}
-                className={isUser ? undefined : 'markdown-body'}
+                className="markdown-body"
                 aria-live={streaming ? 'polite' : undefined}
               >
                 <MarkdownContent content={part.text} isUser={isUser} streaming={streaming} />

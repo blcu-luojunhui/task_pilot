@@ -69,5 +69,12 @@
   "compaction.title": "上下文已压缩",
   "createAgentTask": "创建 Agent 任务 ({{count}} 条选中)",
   "selectMode": "选择消息以创建 Agent 任务",
-  "deselectAll": "取消全选"
+  "deselectAll": "取消全选",
+  "avatarSettings": "头像",
+  "avatarSettingsHint": "自定义对话中的用户与 Agent 头像，设置会保存在本地。",
+  "avatarUser": "我的头像",
+  "avatarAgent": "Agent 头像",
+  "avatarBg": "背景色",
+  "avatarLabelPlaceholder": "emoji 或 1–2 字",
+  "avatarReset": "恢复默认"
 }

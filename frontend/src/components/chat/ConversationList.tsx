@@ -3,6 +3,7 @@ import { DeleteOutlined, MessageOutlined, PlusOutlined } from '@ant-design/icons
 import dayjs from 'dayjs';
 import { useTranslation } from 'react-i18next';
 import type { ChatConversation } from '@/api/types';
+import './ConversationList.css';
 
 interface Props {
   conversations: ChatConversation[];
@@ -29,17 +30,23 @@ export function ConversationList({
 
   return (
     <div
+      className="conversation-list"
       style={{
         width: embedded ? '100%' : 240,
         borderRight: embedded ? undefined : `1px solid ${token.colorBorderSecondary}`,
         display: 'flex',
         flexDirection: 'column',
         height: '100%',
-        background: token.colorBgContainer,
+        background: 'var(--surface-card)',
       }}
     >
       <div style={{ padding: 12, borderBottom: `1px solid ${token.colorBorderSecondary}` }}>
-        <Button block type="primary" icon={<PlusOutlined />} onClick={onCreate}>
+        <Button
+          block
+          className="conversation-list-new-btn"
+          icon={<PlusOutlined />}
+          onClick={onCreate}
+        >
           {t('newConversation')}
         </Button>
       </div>
@@ -62,14 +69,11 @@ export function ConversationList({
             return (
               <div
                 key={c.conversation_id}
+                className={`conversation-list-item${active ? ' conversation-list-item--active' : ''}`}
                 onClick={() => onSelect(c.conversation_id)}
                 style={{
-                  padding: '10px 12px',
+                  padding: '7px 12px',
                   cursor: 'pointer',
-                  background: active ? 'var(--color-primary-soft)' : 'transparent',
-                  borderLeft: active
-                    ? `3px solid var(--n0)`
-                    : '3px solid transparent',
                   display: 'flex',
                   flexDirection: 'column',
                   gap: 2,
@@ -77,7 +81,9 @@ export function ConversationList({
               >
                 <Space size={6} style={{ width: '100%', justifyContent: 'space-between' }}>
                   <Space size={6} style={{ minWidth: 0, flex: 1 }}>
-                    <MessageOutlined style={{ color: active ? 'var(--n0)' : 'var(--n4)' }} />
+                    <MessageOutlined
+                      style={{ color: active ? 'var(--color-accent)' : 'var(--n4)' }}
+                    />
                     <Typography.Text
                       strong={active}
                       ellipsis

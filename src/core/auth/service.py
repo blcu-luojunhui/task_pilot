@@ -313,7 +313,61 @@ class AuthService:
         await self.accounts.update_email(account_id, new_email)
 
     async def delete_account(self, account_id: int) -> None:
+        from src.core.auth.avatar_storage import delete_avatar
+
+        delete_avatar(account_id, "user")
+        delete_avatar(account_id, "agent")
         await self.accounts.delete(account_id)
+
+    async def upload_avatar(
+        self, account_id: int, role: str, data: bytes, content_type: str | None, *, filename: str | None = None
+    ) -> dict:
+        from src.core.auth.avatar_storage import parse_avatar_role, save_avatar
+
+        parsed_role = parse_avatar_role(role)
+        version_key = save_avatar(
+            account_id, parsed_role, data, content_type, filename=filename
+        )
+        await self.accounts.update_avatar_url(account_id, parsed_role, version_key)
+        account = await self.get_account_info(account_id)
+        if not account:
+            raise UnauthorizedError("账号不存在")
+        return account
+
+    async def remove_avatar(self, account_id: int, role: str) -> dict:
+        from src.core.auth.avatar_storage import delete_avatar, parse_avatar_role
+
+        parsed_role = parse_avatar_role(role)
+        delete_avatar(account_id, parsed_role)
+        await self.accounts.update_avatar_url(account_id, parsed_role, None)
+        account = await self.get_account_info(account_id)
+        if not account:
+            raise UnauthorizedError("账号不存在")
+        return account
+
+    async def get_avatar_file(self, account_id: int, role: str):
+        from src.core.auth.avatar_storage import (
+            avatar_version_key,
+            find_avatar_file,
+            mime_for_path,
+            parse_avatar_role,
+        )
+
+        parsed_role = parse_avatar_role(role)
+        account = await self.accounts.find_by_id(account_id)
+        if not account:
+            return None, None, None
+
+        version_key = avatar_version_key(parsed_role, account)
+        if not version_key:
+            return None, None, None
+
+        path = find_avatar_file(account_id, parsed_role)
+        if not path:
+            await self.accounts.update_avatar_url(account_id, parsed_role, None)
+            return None, None, None
+
+        return path, mime_for_path(path), version_key
 
     # ── Token 用量 ─────────────────────────────────────────────
 

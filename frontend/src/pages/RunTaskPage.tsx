@@ -315,10 +315,14 @@ export function RunTaskPage() {
                       padding: '8px 10px',
                       borderRadius: 6,
                       cursor: inFlight ? 'not-allowed' : 'pointer',
-                      border: `1px solid ${token.colorBorderSecondary}`,
-                      background: token.colorBgContainer,
+                      border: selected
+                        ? '1px solid color-mix(in srgb, var(--color-accent) 32%, var(--border-default))'
+                        : `1px solid ${token.colorBorderSecondary}`,
+                      background: selected
+                        ? 'color-mix(in srgb, var(--color-accent) 12%, #ffffff)'
+                        : '#FFFFFF',
                       opacity: inFlight ? 0.6 : 1,
-                      transition: 'all 0.2s',
+                      transition: 'background 0.2s, border-color 0.2s',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'space-between',

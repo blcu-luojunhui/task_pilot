@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Descriptions, Spin, Tag, Typography, theme } from 'antd';
+import { Descriptions, Spin, Tag, Typography } from 'antd';
 import { MonitorOutlined, LineChartOutlined } from '@ant-design/icons';
 import { useTranslation } from 'react-i18next';
 import { getHealth, type HealthData } from '@/api/system';
@@ -9,7 +9,6 @@ import { PageCard, PageCardIcon, PageCardTitle } from '@/components/common/PageC
 
 export function SystemPage() {
   const { t } = useTranslation('system');
-  const { token } = theme.useToken();
   const [health, setHealth] = useState<HealthData | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -33,7 +32,7 @@ export function SystemPage() {
         title={
           <PageCardTitle
             icon={
-              <PageCardIcon color={token.colorPrimary} bg={token.colorPrimaryBg}>
+              <PageCardIcon tone="accent">
                 <MonitorOutlined />
               </PageCardIcon>
             }
@@ -68,7 +67,7 @@ export function SystemPage() {
         title={
           <PageCardTitle
             icon={
-              <PageCardIcon color="var(--n2)" bg="rgba(23,23,23,0.06)">
+              <PageCardIcon tone="neutral">
                 <LineChartOutlined />
               </PageCardIcon>
             }

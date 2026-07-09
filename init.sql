@@ -116,6 +116,10 @@ CREATE TABLE IF NOT EXISTS accounts (
         COMMENT '仅旧版 SHA-256 密码使用，bcrypt 内置盐',
     role                VARCHAR(16)  NOT NULL DEFAULT 'user'
         COMMENT '角色: admin / user',
+    avatar_url          VARCHAR(128) NULL
+        COMMENT '用户头像版本键，非空表示已上传',
+    agent_avatar_url    VARCHAR(128) NULL
+        COMMENT 'Agent 头像版本键，非空表示已上传',
     daily_token_limit   BIGINT       NOT NULL DEFAULT 100000
         COMMENT '每日 token 配额上限',
     created_at          TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,

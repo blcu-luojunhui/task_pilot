@@ -69,5 +69,12 @@
   "compaction.title": "Context compacted",
   "createAgentTask": "Create Agent Task ({{count}} selected)",
   "selectMode": "Select messages to create an agent task",
-  "deselectAll": "Deselect all"
+  "deselectAll": "Deselect all",
+  "avatarSettings": "Avatars",
+  "avatarSettingsHint": "Customize user and agent avatars in chat. Saved locally.",
+  "avatarUser": "My avatar",
+  "avatarAgent": "Agent avatar",
+  "avatarBg": "Background",
+  "avatarLabelPlaceholder": "emoji or 1–2 chars",
+  "avatarReset": "Reset to default"
 }

@@ -12,6 +12,7 @@ import dayjs from 'dayjs';
 import 'dayjs/locale/zh-cn';
 import '@/locales/i18n';
 import { createAntdThemeConfig } from '@/theme/tokens';
+import { syncThemePaletteFromStore, useThemePaletteStore } from '@/stores/themePaletteStore';
 
 const LoginPage = lazy(() => import('@/pages/LoginPage').then((m) => ({ default: m.LoginPage })));
 const RegisterPage = lazy(() =>
@@ -51,6 +52,11 @@ function RouteFallback() {
 
 export function App() {
   const locale = useLocaleStore((s) => s.locale);
+  const palette = useThemePaletteStore((s) => s.palette);
+
+  useEffect(() => {
+    syncThemePaletteFromStore();
+  }, []);
 
   useEffect(() => {
     dayjs.locale(DAYJS_LOCALE_MAP[locale]);
@@ -64,7 +70,7 @@ export function App() {
   return (
     <ConfigProvider
       locale={ANTD_LOCALE_MAP[locale]}
-      theme={createAntdThemeConfig(false)}
+      theme={createAntdThemeConfig(false, palette)}
     >
       <AntApp>
         <ErrorBoundary>

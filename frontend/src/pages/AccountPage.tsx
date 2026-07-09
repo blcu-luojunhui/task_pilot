@@ -28,6 +28,7 @@ import {
   TeamOutlined,
   BarChartOutlined,
   SendOutlined,
+  BgColorsOutlined,
 } from '@ant-design/icons';
 import { useAuthStore } from '@/stores/authStore';
 import {
@@ -50,14 +51,19 @@ import { useTranslation } from 'react-i18next';
 import { PageShell } from '@/components/common/PageShell';
 import { PageHero } from '@/components/common/PageHero';
 import { PageCard, PageCardIcon, PageCardTitle, PageInfoItem } from '@/components/common/PageCard';
+import { AccountAvatarEditor } from '@/components/account/AccountAvatarEditor';
+import { ThemePaletteEditor } from '@/components/account/ThemePaletteEditor';
 import { FONT_MONO } from '@/utils/fonts';
+import { buildAvatarImageUrl } from '@/utils/avatarUrl';
 import dayjs from 'dayjs';
+import './AccountPage.css';
 
 export function AccountPage() {
   const { token: themeToken } = theme.useToken();
   const palette = useSemanticColors();
   const { t } = useTranslation('account');
   const account = useAuthStore((s) => s.account);
+  const authToken = useAuthStore((s) => s.token);
   const fetchMe = useAuthStore((s) => s.fetchMe);
 
   const [tokens, setTokens] = useState<TokenInfo[]>([]);
@@ -301,12 +307,15 @@ export function AccountPage() {
     );
   }
 
+  const heroAvatarUrl = buildAvatarImageUrl('user', authToken, account.avatar_url);
+
   return (
     <PageShell>
       <PageHero
         title={t('title')}
         subtitle={t('subtitle')}
         avatarText={account.username}
+        avatarSrc={heroAvatarUrl ?? undefined}
         gradient="blue"
         extra={
           <Tag
@@ -319,85 +328,111 @@ export function AccountPage() {
       />
 
       <Row gutter={[20, 20]}>
-        <Col xs={24} xl={12}>
+        <Col xs={24} lg={14}>
           <PageCard
             title={
               <PageCardTitle
                 icon={
-                  <PageCardIcon color={themeToken.colorPrimary} bg={themeToken.colorPrimaryBg}>
-                    <SafetyCertificateOutlined />
+                  <PageCardIcon tone="accent">
+                    <BgColorsOutlined />
                   </PageCardIcon>
                 }
               >
-                {t('basicInfo')}
+                {t('personalization')}
               </PageCardTitle>
             }
             styles={{ body: { padding: '22px 24px' } }}
           >
-            <div className="page-info-grid">
-              <PageInfoItem label={t('username')} value={account.username} />
-              <PageInfoItem label={t('email')} value={account.email} />
-              <PageInfoItem
-                label={t('role')}
-                value={<Tag color={isAdmin ? 'red' : 'blue'}>{account.role}</Tag>}
-              />
-              <PageInfoItem
-                label={t('registeredAt')}
-                value={dayjs(account.created_at).format('YYYY-MM-DD HH:mm')}
-              />
+            <div className="account-page__avatar-row">
+              <AccountAvatarEditor role="user" title={t('avatarUser')} showHint={false} />
+              <AccountAvatarEditor role="agent" title={t('avatarAgent')} showHint={false} />
             </div>
+            <Typography.Text type="secondary" style={{ fontSize: 12, display: 'block', marginTop: 10 }}>
+              {t('avatarHint')}
+            </Typography.Text>
+            <div className="account-page__section-divider" />
+            <ThemePaletteEditor />
           </PageCard>
         </Col>
 
-        <Col xs={24} xl={12}>
-          <PageCard
-            title={
-              <PageCardTitle
-                icon={
-                  <PageCardIcon color="#B45309" bg="rgba(180,83,9,0.06)">
-                    <ThunderboltOutlined />
-                  </PageCardIcon>
-                }
-              >
-                {t('todayUsage')}
-              </PageCardTitle>
-            }
-            styles={{ body: { padding: '22px 24px' } }}
-          >
-            <div style={{ display: 'flex', alignItems: 'center', gap: 28, flexWrap: 'wrap' }}>
-              <Progress
-                type="circle"
-                percent={usagePercent}
-                size={120}
-                strokeWidth={8}
-                strokeColor={usageStroke}
-                format={() => (
-                  <div style={{ textAlign: 'center' }}>
-                    <div style={{ fontSize: 22, fontWeight: 600, letterSpacing: '-0.03em' }}>
-                      {usagePercent}%
+        <Col xs={24} lg={10}>
+          <div className="account-page__side-stack">
+            <PageCard
+              title={
+                <PageCardTitle
+                  icon={
+                    <PageCardIcon tone="accent">
+                      <SafetyCertificateOutlined />
+                    </PageCardIcon>
+                  }
+                >
+                  {t('basicInfo')}
+                </PageCardTitle>
+              }
+              styles={{ body: { padding: '22px 24px' } }}
+            >
+              <div className="page-info-grid">
+                <PageInfoItem label={t('username')} value={account.username} />
+                <PageInfoItem label={t('email')} value={account.email} />
+                <PageInfoItem
+                  label={t('role')}
+                  value={<Tag color={isAdmin ? 'red' : 'blue'}>{account.role}</Tag>}
+                />
+                <PageInfoItem
+                  label={t('registeredAt')}
+                  value={dayjs(account.created_at).format('YYYY-MM-DD HH:mm')}
+                />
+              </div>
+            </PageCard>
+
+            <PageCard
+              title={
+                <PageCardTitle
+                  icon={
+                    <PageCardIcon tone="warning">
+                      <ThunderboltOutlined />
+                    </PageCardIcon>
+                  }
+                >
+                  {t('todayUsage')}
+                </PageCardTitle>
+              }
+              styles={{ body: { padding: '22px 24px' } }}
+            >
+              <div className="account-page__usage-compact">
+                <Progress
+                  type="circle"
+                  percent={usagePercent}
+                  size={96}
+                  strokeWidth={8}
+                  strokeColor={usageStroke}
+                  format={() => (
+                    <div style={{ textAlign: 'center' }}>
+                      <div style={{ fontSize: 18, fontWeight: 600, letterSpacing: '-0.03em' }}>
+                        {usagePercent}%
+                      </div>
                     </div>
-                    <div style={{ fontSize: 11, opacity: 0.55, marginTop: 2 }}>used</div>
+                  )}
+                />
+                <div className="account-page__usage-stats">
+                  <div>
+                    <div className="page-info-item__label">{t('used')}</div>
+                    <div style={{ fontSize: 20, fontWeight: 600, color: usageStroke }}>
+                      {account.today_tokens_used.toLocaleString()}
+                    </div>
+                    <Typography.Text type="secondary" style={{ fontSize: 12 }}>tokens</Typography.Text>
                   </div>
-                )}
-              />
-              <div style={{ display: 'flex', gap: 32, flexWrap: 'wrap' }}>
-                <div>
-                  <div className="page-info-item__label">{t('used')}</div>
-                  <div style={{ fontSize: 22, fontWeight: 600, color: usageStroke }}>
-                    {account.today_tokens_used.toLocaleString()}
+                  <div>
+                    <div className="page-info-item__label">{t('dailyQuota')}</div>
+                    <div style={{ fontSize: 20, fontWeight: 600 }}>
+                      {account.daily_token_limit.toLocaleString()}
+                    </div>
+                    <Typography.Text type="secondary" style={{ fontSize: 12 }}>tokens</Typography.Text>
                   </div>
-                  <Typography.Text type="secondary" style={{ fontSize: 12 }}>tokens</Typography.Text>
-                </div>
-                <div>
-                  <div className="page-info-item__label">{t('dailyQuota')}</div>
-                  <div style={{ fontSize: 22, fontWeight: 600 }}>
-                    {account.daily_token_limit.toLocaleString()}
-                  </div>
-                  <Typography.Text type="secondary" style={{ fontSize: 12 }}>tokens</Typography.Text>
                 </div>
               </div>
-            </div>
-          </PageCard>
+            </PageCard>
+          </div>
         </Col>
 
         <Col span={24}>
@@ -406,7 +441,7 @@ export function AccountPage() {
             title={
               <PageCardTitle
                 icon={
-                  <PageCardIcon color="#404040" bg="rgba(0,0,0,0.04)">
+                  <PageCardIcon tone="neutral">
                     <KeyOutlined />
                   </PageCardIcon>
                 }
@@ -442,13 +477,21 @@ export function AccountPage() {
         </Col>
 
         {isAdmin && (
+          <Col span={24}>
+            <Typography.Title level={5} className="account-page__admin-heading">
+              {t('adminSection')}
+            </Typography.Title>
+          </Col>
+        )}
+
+        {isAdmin && (
           <Col xs={24} xl={12}>
             <PageCard
               table
               title={
                 <PageCardTitle
                   icon={
-                    <PageCardIcon color="var(--n2)" bg="rgba(23,23,23,0.06)">
+                    <PageCardIcon tone="neutral">
                       <BarChartOutlined />
                     </PageCardIcon>
                   }
@@ -497,7 +540,7 @@ export function AccountPage() {
               title={
                 <PageCardTitle
                   icon={
-                    <PageCardIcon color={themeToken.colorPrimary} bg={themeToken.colorPrimaryBg}>
+                    <PageCardIcon tone="accent">
                       <TeamOutlined />
                     </PageCardIcon>
                   }
@@ -576,7 +619,7 @@ export function AccountPage() {
               title={
                 <PageCardTitle
                   icon={
-                    <PageCardIcon color="#B45309" bg="rgba(180,83,9,0.06)">
+                    <PageCardIcon tone="warning">
                       <SendOutlined />
                     </PageCardIcon>
                   }
