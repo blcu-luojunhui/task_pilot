@@ -1,0 +1,2 @@
+import{Q as e}from"./antd-vendor-Bpqb5TZr.js";import{i as t}from"./colors-BF_-YRnY.js";function n(){let{token:n}=e.useToken();return t(n)}export{n as t};
+//# sourceMappingURL=useSemanticColors-DJYNh2mv.js.map

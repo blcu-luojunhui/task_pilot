@@ -19,6 +19,7 @@ from src.infra.shared.tools import (
 
 @skill(
     name="util_md5",
+    domain="utils",
     description="计算字符串的 MD5 哈希值",
     dependencies=[],
     risk_level="read",
@@ -37,6 +38,7 @@ async def util_md5(ctx: SkillContext, text: str) -> str:
 
 @skill(
     name="util_timestamp_to_str",
+    domain="utils",
     description="将 Unix 时间戳转换为格式化字符串",
     dependencies=[],
     risk_level="read",
@@ -62,6 +64,7 @@ async def util_timestamp_to_str(
 
 @skill(
     name="util_generate_trace_id",
+    domain="utils",
     description="生成唯一的任务追踪 ID",
     dependencies=[],
     risk_level="read",
@@ -74,6 +77,7 @@ async def util_generate_trace_id(ctx: SkillContext) -> str:
 
 @skill(
     name="util_batch_split",
+    domain="utils",
     description="将列表分批处理",
     dependencies=[],
     risk_level="read",
@@ -100,6 +104,7 @@ async def util_batch_split(ctx: SkillContext, data: List, batch_size: int) -> Li
 
 @skill(
     name="util_current_time",
+    domain="utils",
     description="获取当前时间（ISO 格式字符串）",
     dependencies=[],
     risk_level="read",
@@ -112,6 +117,7 @@ async def util_current_time(ctx: SkillContext) -> str:
 
 @skill(
     name="read_file",
+    domain="utils",
     description="读取指定路径的文件内容，返回带行号的文本。支持 offset/limit 分页读取大文件。",
     dependencies=[],
     risk_level="read",
@@ -229,6 +235,7 @@ async def read_file(
 
 @skill(
     name="write_file",
+    domain="utils",
     description="将内容写入指定路径的文件。如果文件已存在会覆盖，目录不存在会自动创建。",
     dependencies=[],
     risk_level="write",

@@ -12,6 +12,7 @@ from src.core.agents.capabilities.skills.sql_filter import QUERY_FILTER, EXECUTE
 
 @skill(
     name="db_query",
+    domain="database",
     description="从 MySQL 数据库查询数据，返回多行结果。仅支持 SELECT 语句。",
     dependencies=["db", "log"],
     risk_level="read",
@@ -58,6 +59,7 @@ async def db_query(
 
 @skill(
     name="db_query_one",
+    domain="database",
     description="从 MySQL 数据库查询单条数据。仅支持 SELECT 语句。",
     dependencies=["db", "log"],
     risk_level="read",
@@ -104,6 +106,7 @@ async def db_query_one(
 
 @skill(
     name="db_execute",
+    domain="database",
     description="执行 MySQL 数据库写操作（INSERT/UPDATE/DELETE），返回影响行数。禁止 DROP/TRUNCATE/ALTER 等危险操作。",
     dependencies=["db", "log"],
     risk_level="write",

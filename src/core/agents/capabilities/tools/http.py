@@ -63,6 +63,7 @@ def _validate_url(url: str) -> None:
 
 @skill(
     name="http_get",
+    domain="http",
     description="发送 HTTP GET 请求，获取数据",
     dependencies=["log"],
     risk_level="read",
@@ -107,6 +108,7 @@ async def http_get(
 
 @skill(
     name="http_post",
+    domain="http",
     description="发送 HTTP POST 请求，提交数据",
     dependencies=["log"],
     risk_level="write",

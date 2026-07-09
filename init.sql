@@ -245,3 +245,21 @@ CREATE TABLE IF NOT EXISTS system_skills (
 -- ALTER TABLE agent_run_summaries ADD COLUMN account_id BIGINT NOT NULL DEFAULT 0 COMMENT '归属账户 ID，0=无主/系统', ADD INDEX idx_account_id (account_id);
 -- ALTER TABLE chat_conversations ADD COLUMN account_id BIGINT NOT NULL DEFAULT 0 COMMENT '归属账户 ID，0=无主/系统', ADD INDEX idx_account_id (account_id);
 -- ALTER TABLE chat_messages ADD COLUMN account_id BIGINT NOT NULL DEFAULT 0 COMMENT '归属账户 ID，0=无主/系统', ADD INDEX idx_account_id (account_id);
+
+-- ============================================================
+-- Agent 跨 run 记忆（反思）
+-- ============================================================
+CREATE TABLE IF NOT EXISTS agent_memory (
+    id              BIGINT AUTO_INCREMENT PRIMARY KEY,
+    account_id      BIGINT       NOT NULL DEFAULT 0,
+    scope_key       VARCHAR(256) NOT NULL
+        COMMENT '检索键：通常是 task_name 或 goal 的归一化关键词',
+    trace_id        VARCHAR(128) NULL
+        COMMENT '产生该反思的 run',
+    reflection      TEXT         NOT NULL
+        COMMENT 'LLM 生成的经验反思正文',
+    success         TINYINT      NOT NULL DEFAULT 0,
+    created_at      TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_account_scope (account_id, scope_key),
+    INDEX idx_created (created_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

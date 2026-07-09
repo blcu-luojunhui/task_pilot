@@ -18,6 +18,10 @@ from src.core.agents.capabilities.skills import (
     get_global_registry,
 )
 from src.core.agents.capabilities.skills.serializer import OpenAIAdapter, ToolSpecSerializer
+from src.core.agents.capabilities.skills.tool_result_memory import (
+    annotate_tool_message,
+    collapse_old_tool_results,
+)
 from src.core.chat.events import ChatEventType
 from src.infra.streaming import TraceEventBus
 
@@ -57,6 +61,15 @@ class ChatTurnRunner:
         self._source = "agent" if tools else "runner"
         self._goal_label = ""
 
+        # 上下文窗口管理（默认启用截断；compactor 可选）
+        from src.core.agents.state.context.manager import ContextWindowManager
+        from src.core.agents.state.context.compactor import build_llm_compactor
+        self._ctx_manager = ContextWindowManager(
+            max_tokens=getattr(llm_provider.config, "max_tokens", None) or 60000,
+            model=llm_provider.config.model,
+            compactor=build_llm_compactor(llm_provider),
+        )
+
     async def run(
         self,
         messages: List[Dict],
@@ -82,7 +95,9 @@ class ChatTurnRunner:
             await self._publish_harness("step_start", {"deps": []})
             await self._publish_harness("think_start", {})
 
-            full_content, tool_calls, usage = await self._call_llm(messages, system_prompt)
+            messages = await self._ctx_manager.compact_if_needed(messages)
+            llm_messages_for_call = collapse_old_tool_results(messages)
+            full_content, tool_calls, usage = await self._call_llm(llm_messages_for_call, system_prompt)
 
             if usage:
                 for k, v in usage.items():
@@ -340,11 +355,11 @@ class ChatTurnRunner:
                 "tool_results": [{"tool_call_id": call_id, "content": truncated_for_event}],
             })
 
-            results.append({
+            results.append(annotate_tool_message({
                 "role": "tool",
                 "tool_call_id": call_id,
                 "content": result_content,
-            })
+            }))
 
         return results
 
