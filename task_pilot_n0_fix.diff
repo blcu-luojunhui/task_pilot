@@ -1,0 +1,47 @@
+diff --git a/frontend/src/pages/ChatPage.tsx b/frontend/src/pages/ChatPage.tsx
+index c8ab156..5f307b3 100644
+--- a/frontend/src/pages/ChatPage.tsx
++++ b/frontend/src/pages/ChatPage.tsx
+@@ -41,7 +41,7 @@ export function ChatPage() {
+     // Relative luminance (sRGB)
+     const lum = 0.2126 * (r / 255) + 0.7152 * (g / 255) + 0.0722 * (b / 255);
+     if (lum > 0.55) {
+-      return { isLight: true, text: '#171717', border: 'rgba(0,0,0,0.1)' };
++      return { isLight: true, text: '#37352F', border: 'rgba(0,0,0,0.1)' };
+     }
+     return { isLight: false, text: '#FFFFFF', border: 'rgba(255,255,255,0.15)' };
+   }, [bubbleColor]);
+diff --git a/frontend/src/theme/tokens.css b/frontend/src/theme/tokens.css
+index 708456d..ab7469c 100644
+--- a/frontend/src/theme/tokens.css
++++ b/frontend/src/theme/tokens.css
+@@ -5,14 +5,14 @@
+ 
+    中性色阶 (Neutral Scale)     → 结构：页面/卡片/边框/文字
+    语义调色板 (Semantic Palette) → 交互：按钮/选中/状态/强调
+-   色谱:  #171717 ──→ #525252 ──→ #D4D4D4 ──→ #FAFAF9
++   色谱:  #37352F ──→ #525252 ──→ #D4D4D4 ──→ #FAFAF9
+           最深              中暗             亮灰            近白
+    ═══════════════════════════════════════════════════════════ */
+ 
+ :root {
+   /* ── 中性色阶 ──────────────────────────────────────────── */
+ 
+-  --n0: #171717;  /* 最深     — 暗色模式底色 */
++  --n0: #37352F;  /* 最深     — 暗色模式底色 */
+   --n1: #262626;  /* 暗色抬高 — 暗色卡片 */
+   --n2: #404040;  /* 次深     — 深色边框 / 强调辅 */
+   --n3: #525252;  /* 中暗     — 次要文字 */
+diff --git a/frontend/src/theme/tokens.ts b/frontend/src/theme/tokens.ts
+index 6634c51..83ea59d 100644
+--- a/frontend/src/theme/tokens.ts
++++ b/frontend/src/theme/tokens.ts
+@@ -6,7 +6,7 @@ import { theme as antdTheme } from 'antd';
+ 
+ export const PALETTE = {
+   neutral: {
+-    n0: '#171717',
++    n0: '#37352F',
+     n1: '#262626',
+     n2: '#404040',
+     n3: '#525252',

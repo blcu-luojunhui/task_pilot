@@ -41,7 +41,7 @@ export function ChatPage() {
     // Relative luminance (sRGB)
     const lum = 0.2126 * (r / 255) + 0.7152 * (g / 255) + 0.0722 * (b / 255);
     if (lum > 0.55) {
-      return { isLight: true, text: '#171717', border: 'rgba(0,0,0,0.1)' };
+      return { isLight: true, text: '#37352F', border: 'rgba(0,0,0,0.1)' };
     }
     return { isLight: false, text: '#FFFFFF', border: 'rgba(255,255,255,0.15)' };
   }, [bubbleColor]);

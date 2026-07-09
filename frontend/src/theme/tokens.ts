@@ -6,7 +6,7 @@ import { theme as antdTheme } from 'antd';
 
 export const PALETTE = {
   neutral: {
-    n0: '#171717',
+    n0: '#37352F',
     n1: '#262626',
     n2: '#404040',
     n3: '#525252',
