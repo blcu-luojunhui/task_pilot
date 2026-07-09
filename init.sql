@@ -263,3 +263,21 @@ CREATE TABLE IF NOT EXISTS agent_memory (
     INDEX idx_account_scope (account_id, scope_key),
     INDEX idx_created (created_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- ============================================================
+-- Phase 5: 消息树 — chat_messages 树结构列 + trace_head
+-- (MySQL 5.7 不支持 ADD COLUMN IF NOT EXISTS，需在新环境手动执行)
+-- ALTER TABLE chat_messages ADD COLUMN seq INT NULL        COMMENT 'trace 内单增序号' AFTER trace_id;
+-- ALTER TABLE chat_messages ADD COLUMN parent_seq INT NULL COMMENT '父消息 seq，根为 NULL' AFTER seq;
+-- ALTER TABLE chat_messages ADD COLUMN branch_type VARCHAR(32) NULL COMMENT 'main/compression/reflection' AFTER parent_seq;
+-- CREATE INDEX idx_trace_seq ON chat_messages(trace_id, seq);
+-- ============================================================
+CREATE TABLE IF NOT EXISTS trace_head (
+    trace_id     VARCHAR(128) NOT NULL PRIMARY KEY,
+    head_seq     INT          NOT NULL DEFAULT 0
+        COMMENT '当前主路径最新 seq；0 = 尚无消息',
+    next_seq     INT          NOT NULL DEFAULT 1
+        COMMENT '下一条可分配 seq',
+    account_id   BIGINT       NOT NULL DEFAULT 0,
+    updated_at   TIMESTAMP    DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

@@ -10,7 +10,7 @@ TaskPilot Agent 的核心命题是：**让模型决定下一步，但让工程�
 
 <p align="center"><img src="../assets/agent-overview.png" alt="Agent 双层架构：智能层与治理层" width="85%" style="border-radius: 8px;"/></p>
 
-这不是“模型外面包一层 retry”。治理层在每个 step 前后都参与裁决：是否超预算、是否被取消、是否需要反思、是否已经完成、是否需要持久化可恢复状态。
+这不是"模型外面包一层 retry"。治理层在每个 step 前后都参与裁决：是否超预算、是否被取消、是否需要反思、是否已经完成、是否需要持久化可恢复状态。
 
 ## 六层结构
 
@@ -20,7 +20,7 @@ TaskPilot Agent 的核心命题是：**让模型决定下一步，但让工程�
 src/core/agents/
 ├── engine/          # Agent 对外 API、Loop、Runner、Lifecycle、Prompting、Planning
 ├── capabilities/    # LLM Provider、Tools、Skills、MCP、权限与序列化
-├── state/           # AgentLoopState、Result、Snapshot、Context、Memory、Protocol
+├── state/           # AgentLoopState、Result、Snapshot、Context、Memory、Protocol、MessageTree
 ├── execution/       # Dispatcher 和执行结果模型
 ├── runtime/         # Harness、Budget、Constraint、Workflow、Feedback、Replay、Evaluator
 └── multi_agents/    # MessageBus、Coordinator、SubAgent、Handoff 协议
@@ -30,22 +30,48 @@ src/core/agents/
 
 - `engine` 决定 Agent 怎样被创建、怎样进入循环。
 - `capabilities` 提供模型、工具和 Skill。
-- `state` 保存对话、步骤、计划、记忆、快照和协议对象。
+- `state` 保存对话、步骤、计划、记忆、快照、消息树和协议对象。
 - `runtime` 管理运行边界和步间治理。
 - `execution` 为更高层编排提供统一结果门面。
 - `multi_agents` 处理多个 Agent 之间的协作与隔离。
 
-## 主执行链路
+## 主执行链路（统一 ReAct）
+
+所有执行路径——agent 任务、chat 对话——都走同一条 ReAct Loop。不再有独立的简单循环。
 
 <p align="center"><img src="../assets/agent-execution-sequence.png" alt="Agent 主执行链路时序" width="85%" style="border-radius: 8px;"/></p>
 
-关键分工：
+### 入口统一
 
-- `Agent` 是用户面对的统一 API。
-- `AgentLoopRunner` 负责装配，不负责主循环治理。
-- `AgentLoopHarness` 负责运行时治理，不关心具体 provider 或 skill 实现。
+```
+POST /api/agent/run  → TaskScheduler → agent.run handler  (mode="agent")
+POST /api/chat/...   → run_chat_turn()                     (纯文本)
+```
+
+两个入口最终都委托给 `AgentLoopRunner` → `AgentLoopHarness`，差异只在于 tools 数量（agent 模式加载 tools，chat 模式传空列表）。
+
+`ChatTurnRunner`（原来的"生产路径"，for-range 极简循环）已被弃用。原来两条互不重叠的执行循环合并为一条。
+
+### 关键分工
+
+- `AgentLoopRunner` 负责装配（Think、Act、Observe、Budget、Strategy），不负责主循环治理。
+- `AgentLoopHarness` 负责运行时治理（循环控制、事件边界、Budget/Constraint/Cancel 裁决），不关心具体 provider 或 skill 实现。
 - `DecisionStrategy` 决定每一步怎样执行 Think/Act/Observe。
 - `Think`、`Act`、`Observe` 是可独立测试和替换的阶段对象。
+
+### 流式事件
+
+Harness 在关键节点通过共享 `TraceEventBus` 发布前端兼容的 `chat.*` 事件：
+
+| 节点 | 事件 | 发布者 |
+|------|------|--------|
+| LLM 产出 token | `chat.token_delta` | Think（stream_callback 包装） |
+| 开始执行 tool | `chat.tool_call_start` | Act |
+| tool 执行完毕 | `chat.tool_call_end` | Act |
+| 循环正常结束 | `chat.turn_end` | AgentLoopHarness（run_end 之后） |
+| 异常 | `chat.turn_error` | AgentLoopHarness |
+
+前端无需改动，事件协议保持不变。
 
 ## DecisionStrategy
 
@@ -76,14 +102,13 @@ MemoryManager.retrieve()
   → KnowledgeSelector.select()
   → PromptAssembler.assemble()
   → ContextWindowManager.compact()
-  → LLMProvider.complete()
+  → collapse_old_tool_results()
+  → LLMProvider.complete() / stream_chat()
 ```
 
 `MemoryManager` 由短期记忆、长期记忆和可插拔检索器组成。默认关键词检索零依赖；需要语义检索时，可以切换到 embedding 后端。
 
-`ContextWindowManager` 负责在 token 预算内压缩上下文。Agent 任务越长，越不能依赖模型”自然记住一切”；必须把上下文窗口当作有限资源来管理。
-
-当启用 LLM 摘要压缩时（`enable_summary_compaction=True`），`ContextWindowManager` 会经由 `compactor.py` 调用 Provider 将早期历史压缩为摘要文本，再由 `compact_if_needed` 用摘要替换被压缩区间，失败时自动回退到中段截断。**生产路径 `ChatTurnRunner` 已默认接入，富路径 `AgentLoopRunner` 通过开关控制。**
+`ContextWindowManager` 负责在 token 预算内压缩上下文。Agent 任务越长，越不能依赖模型"自然记住一切"；必须把上下文窗口当作有限资源来管理。当启用 LLM 摘要压缩时（`enable_summary_compaction=True`），经由 `compactor.py` 调用 Provider 将早期历史压缩为摘要文本，失败时自动回退到中段截断。
 
 ### 双层 ToolResult
 
@@ -92,7 +117,7 @@ MemoryManager.retrieve()
 - `annotate_tool_message`：超长结果（>1500 字符）同时保存完整版和摘要版。
 - `collapse_old_tool_results`：送 LLM 前把旧轮次的长结果替换为摘要，最近 2 条保留完整。
 
-关键区分：真实历史 `messages` 不丢（持久化用），送给 LLM 的是折叠副本 `llm_messages_for_call`。两条执行循环均已接入。
+关键区分：真实历史 `messages` 不丢（持久化用），送给 LLM 的是折叠副本。
 
 ## Skill / Tool 体系
 
@@ -104,8 +129,7 @@ TaskPilot 把所有可执行能力统一进 SkillRegistry：
 
 **工具分组白名单**：每个 Skill 通过 `domain` 字段标记所属组（`database` / `http` / `task` / `utils` / `chat_ops` / `plan` / `artifact` / `handoff` / `mcp`）。`group_filter.py` 提供 `filter_tools_by_groups`，调用方通过 `allowed_tool_groups` 和 `exclude_tools` 在运行时按场景做最小权限过滤。不传参数则放行全部，默认行为不变。
 
-
-<｜｜DSML｜｜parameter name="replace_all" string="false">false## Runtime Harness
+## Runtime Harness
 
 `runtime/harness/` 是 Agent 自主性的边界层：
 
@@ -153,6 +177,29 @@ run 成功/失败
 
 整个链路受 `enable_memory` 开关控制，默认 `False`（保持旧行为）。
 
+## 消息树
+
+`chat_messages` 从线性列表升级为有向无环图（`seq` → `parent_seq`），支撑非破坏式压缩和回溯：
+
+```
+线性（旧）:  [user] → [asst] → [tool] → [asst] → [tool] → ... 50+ 条
+                                              ↑ 上下文爆炸
+
+消息树（新）:
+  [user] → [asst.tc1] → [tool1] → [asst.tc2] → [tool2]
+                ↘ [asst.side]                         ↓
+                                          [system:summary] → [asst:final]
+  head_seq 始终指向主路径最新节点
+```
+
+核心操作：
+
+- **非破坏式压缩**：`compact_main_path()` 插入一条 summary 节点，head 指针越过被压区间。旧消息仍在表中可回溯、可审计。
+- **回溯**：`backtrack_head()` 把 head 指回历史 seq，从那里 fork 新分支。
+- **双写**：`ChatRepository.append_message()` 自动分配 seq/parent_seq 并推进 trace_head。不传 trace_id 时行为不变（向后兼容）。
+
+详见 `src/core/agents/state/message_tree.py`。
+
 ## 多智能体协作
 
 `multi_agents/` 提供两类协作语义：
@@ -165,7 +212,7 @@ run 成功/失败
 - `Spawn` 适合独立研究、并行分析、避免主上下文被污染。
 - `Handoff` 适合专家切换、连续执行、需要保留完整上下文的任务。
 
-TaskPilot 当前更偏向“隔离优先”。原因是 Agent 系统最容易失控的不是能力不足，而是上下文互相污染后无法解释错误来源。
+TaskPilot 当前更偏向"隔离优先"。原因是 Agent 系统最容易失控的不是能力不足，而是上下文互相污染后无法解释错误来源。
 
 ## 评测与回放
 
@@ -174,31 +221,36 @@ Agent 的行为不能只靠日志排查。`Evaluator` 和 `Replay` 提供两条�
 - `Evaluator`：批量跑测试用例，采集成功率、步数、耗时、工具调用和可选 LLM-as-judge 分数。
 - `Replay`：录制 assistant message 和 tool result，回放时不调用真实 LLM 或真实工具，用于确定性复现。
 
-这让 Prompt、策略和 Skill 的修改可以被回归测试覆盖，而不是每次靠人工观察“感觉更好了”。
+这让 Prompt、策略和 Skill 的修改可以被回归测试覆盖，而不是每次靠人工观察"感觉更好了"。
 
 ## 关键权衡
 
 | 决策 | 当前选择 | 替代方案 | 取舍 |
 |---|---|---|---|
-| 对外 API | 单一 `Agent.create()` | Builder / Factory | 用户心智简单，但配置项会变多 |
+| 执行路径 | 统一 ReAct Loop（`AgentLoopRunner`） | 双循环（ChatTurnRunner + AgentLoopHarness） | 治理一致，不重复实现，但纯文本对话也走完整 harness |
+| 对外 API | 单一 `agent.run` handler + `run_chat_turn()` | 多个 @register 入口 | 两条入口覆盖所有场景，但最终都委托给同一 Runnable |
 | 策略扩展 | `DecisionStrategy` Protocol | 继承式基类 | 接入轻量，但需要靠类型检查和测试守住协议 |
 | 反思机制 | `FeedbackLoop` 插件 | 写进 Reflexion 策略 | 可跨策略复用，但链路理解成本更高 |
 | 记忆检索 | 默认关键词，可选 embedding | 默认向量数据库 | 零依赖启动，后续可替换检索后端 |
-| 上下文卸载 | 文件 Artifact + 按需回读 | Redis / 向量库 | 更贴合“大块内容回读”，不提前引入检索语义 |
+| 上下文卸载 | 文件 Artifact + 按需回读 | Redis / 向量库 | 更贴合"大块内容回读"，不提前引入检索语义 |
+| 消息存储 | 消息树（seq/parent_seq）双写 | 纯线性 id 排序 | 支撑非破坏式压缩和回溯，当前读路径仍走线性 id |
 | 多智能体 | Coordinator + SubAgent 隔离 | 共享大上下文 | 可观测性更好，但跨 Agent 状态共享更克制 |
 
 ## 演进方向
 
 当前架构已完成 Agent Loop、策略可插拔、Skill/Tool、Memory、Runtime Harness、Replay/Evaluator 和 Multi-Agent 基础。**最近完成的演进（2026-07）：**
 
+- ✅ 统一执行路径：`ChatTurnRunner` 弃用，全部走 `AgentLoopRunner` / `AgentLoopHarness`（ReAct）。
+- ✅ 流式事件贯通：`Think`/`Act`/`Harness` 通过共享 `event_bus` 发布 `chat.token_delta`、`chat.tool_call_start/end`、`chat.turn_end/error`。
 - ✅ 真实上下文压缩（`compactor.py`）：LLM 摘要 + 截断回退，两条执行循环均已接入。
 - ✅ 双层 ToolResult（`tool_result_memory.py`）：长工具结果历史自动折叠，从源头省 token。
 - ✅ 工具分组白名单（`group_filter.py`）：按 `domain` 做运行时权限最小化。
 - ✅ 跨 run 记忆（`memory_store.py` + `agent_memory` 表）：反思生成 → 持久化 → 下次注入，打通闭环。
+- ✅ 消息树（`message_tree.py` + `trace_head` 表）：chat_messages 双写 seq/parent_seq/branch_type，支撑非破坏式压缩和回溯。
 
-下一阶段最可能变化的位​​置：
+下一阶段最可能变化的位置：
 
-- 消息树（Phase 5）：将对话从线性列表升级为树结构，支撑非破坏式压缩和回溯。
+- 树读路径切换：将 `build_llm_messages` 从线性 `ORDER BY id` 切到 `get_main_path`（seq/parent_seq 回溯），真正启用压缩和分支。
 - Tool calling 兼容性：不同 provider 的结构化输出、并行工具调用、错误修复提示。
 - Runtime 治理：成本预算、token 预算、危险工具确认、用户中断恢复。
 - Multi-Agent 协议：任务分解、结果聚合、共享状态和上下文隔离的平衡。

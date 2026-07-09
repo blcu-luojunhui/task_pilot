@@ -315,17 +315,20 @@ export function RunTaskPage() {
                       padding: '8px 10px',
                       borderRadius: 6,
                       cursor: inFlight ? 'not-allowed' : 'pointer',
-                      border: `1px solid ${selected ? token.colorSuccess : token.colorBorderSecondary}`,
-                      background: selected ? token.colorSuccessBg : token.colorBgContainer,
+                      border: `1px solid ${token.colorBorderSecondary}`,
+                      background: token.colorBgContainer,
                       opacity: inFlight ? 0.6 : 1,
                       transition: 'all 0.2s',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
                     }}
                   >
                     <Space size={6}>
                       <span>{meta.icon}</span>
                       <div>
                         <Typography.Text
-                          style={{ fontSize: 12, fontWeight: selected ? 600 : 400 }}
+                          style={{ fontSize: 12 }}
                         >
                           {meta.label}
                         </Typography.Text>
@@ -336,10 +339,10 @@ export function RunTaskPage() {
                           {areaDesc[area] || ''}
                         </Typography.Text>
                       </div>
-                      {selected && (
-                        <CheckCircleOutlined style={{ color: token.colorSuccess, marginLeft: 'auto' }} />
-                      )}
                     </Space>
+                    {selected && (
+                      <CheckCircleOutlined style={{ color: token.colorSuccess, fontSize: 16 }} />
+                    )}
                   </div>
                 );
               })}

@@ -74,6 +74,7 @@ class AgentLoopRunner:
     embedding_provider: Optional[str] = None
     llm_provider: Optional[Any] = None  # 用于构造 compactor；None 时压缩回退到截断
     enable_summary_compaction: bool = False  # 开关：True 才启用 LLM 摘要压缩
+    event_bus: Optional[Any] = None  # TraceEventBus，harness 用其发布 chat.* 事件
 
     def __post_init__(self) -> None:
         if self.budget is None:
@@ -124,6 +125,7 @@ class AgentLoopRunner:
                 memory_manager=self.memory_manager,
                 is_cancelled=self.is_cancelled,
                 stream_callback=self.stream_callback,
+                event_bus=self.event_bus,
             )
 
         if self.actor is None:
@@ -134,6 +136,7 @@ class AgentLoopRunner:
                 context_builder=self.context_builder,
                 max_tool_result_length=self.max_tool_result_length,
                 is_cancelled=self.is_cancelled,
+                event_bus=self.event_bus,
             )
 
         if self.observer is None:
@@ -172,6 +175,7 @@ class AgentLoopRunner:
                 workflow=self.workflow,
                 lifecycle=self.lifecycle,
                 strategy=strategy_instance,
+                event_bus=self.event_bus,
             )
         # OPT-3: 启用反思
         if self.enable_reflection:

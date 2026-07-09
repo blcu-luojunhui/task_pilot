@@ -47,7 +47,6 @@ from src.core.agents.state import (
 from src.core.agents.engine.loop import Think
 from src.core.agents.engine.planning.strategy import (
     DecisionStrategy,
-    StepOutput,
     StrategyContext,
 )
 from src.core.agents.engine.planning.react import ReActStrategy
@@ -79,6 +78,7 @@ class AgentRunContext:
     state: AgentLoopState
     started_at: float
     metadata: Dict[str, Any] = field(default_factory=dict)
+    event_bus: Optional[Any] = None  # 共享 TraceEventBus，用于 chat.* 事件
 
 
 @dataclass
@@ -98,6 +98,7 @@ class AgentLoopHarness:
     event_logger: HarnessEventLogger = field(default_factory=HarnessEventLogger)
     lifecycle: "Optional[LifecycleManager]" = None
     strategy: Optional[DecisionStrategy] = None
+    event_bus: Optional[Any] = None  # 共享 TraceEventBus
 
     def __post_init__(self) -> None:
         if self.workflow is None:
@@ -109,6 +110,12 @@ class AgentLoopHarness:
         self._current_state: Optional[AgentLoopState] = None
         if self.thinker.publish_event is None:
             self.thinker.publish_event = self._emit_thinker_event
+        # 注入 event_bus 到 Think/Act（若它们还没被外部设过）
+        if self.event_bus is not None:
+            if self.thinker.event_bus is None:
+                self.thinker.event_bus = self.event_bus
+            if self.actor.event_bus is None:
+                self.actor.event_bus = self.event_bus
         if self.strategy is None:
             self.strategy = ReActStrategy()
         self._strategy_ctx = StrategyContext(
@@ -234,6 +241,8 @@ class AgentLoopHarness:
             if self.lifecycle:
                 state.lifecycle_state = self.lifecycle.state
             await self._emit("run_error", state, {"error": str(e)})
+            # 发布 chat.turn_error 给前端
+            self._publish_chat_event(state, "chat.turn_error", {"error": str(e)})
 
         if self.lifecycle:
             self.lifecycle.current_loop_state = state
@@ -251,6 +260,11 @@ class AgentLoopHarness:
                 {"record": improvement_record},
             )
         await self._emit("run_end", state, {"result": result})
+        # 发布 chat.turn_end 给前端
+        self._publish_chat_event(state, "chat.turn_end", {
+            "content": result.final_answer or "",
+            "token_usage": dict(state.token_usage),
+        })
         return result
 
     async def _think(self, state: AgentLoopState) -> Optional[Dict[str, Any]]:
@@ -389,6 +403,22 @@ class AgentLoopHarness:
 
     def _elapsed_seconds(self, context: AgentRunContext) -> float:
         return time.monotonic() - context.started_at
+
+    def _publish_chat_event(self, state: AgentLoopState, event_type: str, data: Dict[str, Any]) -> None:
+        """向共享 event_bus 发布 chat.* 事件（前端消费）。"""
+        _bus = self.event_bus
+        if _bus is None:
+            return
+        try:
+            _bus.publish(
+                trace_id=state.trace_id,
+                event_type=event_type,
+                data=data,
+                source="agent",
+                step=state.step,
+            )
+        except Exception:
+            pass
 
     async def _emit_thinker_event(
         self,

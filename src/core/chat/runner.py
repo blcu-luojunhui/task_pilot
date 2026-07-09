@@ -1,8 +1,5 @@
-"""ChatTurnRunner：极简 while 循环，不再区分 chat/agentic 模式。
+"""ChatTurnRunner - DEPRECATED, use AgentLoopRunner (ReAct) instead."""
 
-工具列表由调用方决定：chat 路径传空列表 → 纯文本对话；agent 路径传完整工具集。
-不引入 budget / feedback_loop / improvement / context_window。
-"""
 from __future__ import annotations
 
 import json as _json

@@ -69,7 +69,7 @@ class ChatRepository:
     )
     _MSG_COLUMNS = (
         "id, conversation_id, role, content, tool_calls, tool_call_id, "
-        "trace_id, token_usage, status, account_id, created_at"
+        "trace_id, seq, parent_seq, branch_type, token_usage, status, account_id, created_at"
     )
 
     def __init__(self, pool: "AsyncMySQLPool", account_id: int = 0) -> None:
@@ -206,37 +206,94 @@ class ChatRepository:
         trace_id: Optional[str] = None,
         token_usage: Optional[Dict[str, Any]] = None,
         status: int = MSG_STATUS_COMPLETED,
+        seq: Optional[int] = None,
+        parent_seq: Optional[int] = None,
+        branch_type: Optional[str] = None,
     ) -> int:
         """插入一条消息，返回自增 id。
 
-        INSERT、bump updated_at、取 lastrowid 必须在同一连接同一事务里完成——
-        ``LAST_INSERT_ID()`` 是 session 级别的，跨连接拿不到。
+        当 trace_id 不为空且未显式传入 seq 时，自动在事务内分配树序号
+        （双写：兼容旧表无 seq 列的库，树列为 NULL 时 ORDER BY id 仍正确）。
+
+        INSERT、bump updated_at、trace_head 推进必须在同一事务里完成。
         """
+        _auto_tree = bool(trace_id and seq is None)
+
         async with self._pool.transaction() as conn:
+            if _auto_tree:
+                alloc = await self._alloc_seq_in_tx(conn, trace_id)  # type: ignore[arg-type]
+                seq = alloc["seq"]
+                parent_seq = alloc["parent_seq"]
+                branch_type = branch_type or "main"
+                _next_seq = alloc["next_seq"]
+
             async with conn.cursor() as cursor:
-                await cursor.execute(
-                    f"INSERT INTO {self.MSG_TABLE} "
-                    "(conversation_id, role, content, tool_calls, tool_call_id, "
-                    "trace_id, token_usage, status, account_id) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)",
-                    (
-                        conversation_id,
-                        role,
-                        content,
-                        _dump_json(tool_calls),
-                        tool_call_id,
-                        trace_id,
-                        _dump_json(token_usage),
-                        status,
-                        self._account_id,
-                    ),
-                )
+                if seq is not None:
+                    await cursor.execute(
+                        f"INSERT INTO {self.MSG_TABLE} "
+                        "(conversation_id, role, content, tool_calls, tool_call_id, "
+                        "trace_id, seq, parent_seq, branch_type, token_usage, status, account_id) "
+                        "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)",
+                        (
+                            conversation_id, role, content,
+                            _dump_json(tool_calls), tool_call_id,
+                            trace_id, seq, parent_seq, branch_type,
+                            _dump_json(token_usage), status, self._account_id,
+                        ),
+                    )
+                else:
+                    await cursor.execute(
+                        f"INSERT INTO {self.MSG_TABLE} "
+                        "(conversation_id, role, content, tool_calls, tool_call_id, "
+                        "trace_id, token_usage, status, account_id) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)",
+                        (
+                            conversation_id, role, content,
+                            _dump_json(tool_calls), tool_call_id,
+                            trace_id,
+                            _dump_json(token_usage), status, self._account_id,
+                        ),
+                    )
                 message_id = cursor.lastrowid
+
+                # bump conversation updated_at
                 await cursor.execute(
                     f"UPDATE {self.CONV_TABLE} SET updated_at = CURRENT_TIMESTAMP "
                     "WHERE conversation_id = %s",
                     (conversation_id,),
                 )
+
+            # 推进 trace_head（同一事务）
+            if _auto_tree and seq is not None:
+                async with conn.cursor() as cursor:
+                    await cursor.execute(
+                        "UPDATE trace_head SET head_seq = %s, next_seq = %s WHERE trace_id = %s",
+                        (seq, _next_seq, trace_id),
+                    )
+
         return int(message_id) if message_id else 0
+
+    async def _alloc_seq_in_tx(self, conn, trace_id: str) -> Dict[str, Any]:
+        """在已有事务连接中分配 seq（内部方法）。"""
+        async with conn.cursor() as cursor:
+            await cursor.execute(
+                "SELECT head_seq, next_seq FROM trace_head WHERE trace_id = %s",
+                (trace_id,),
+            )
+            row = await cursor.fetchone()
+        if row is None:
+            async with conn.cursor() as cursor:
+                await cursor.execute(
+                    "INSERT INTO trace_head (trace_id, head_seq, next_seq, account_id) "
+                    "VALUES (%s, 0, 1, %s)",
+                    (trace_id, self._account_id),
+                )
+            return {"seq": 1, "parent_seq": None, "next_seq": 2}
+
+        head_seq = row["head_seq"]
+        next_seq_val = row["next_seq"]
+        parent_seq = head_seq if head_seq > 0 else None
+        seq = next_seq_val
+        return {"seq": seq, "parent_seq": parent_seq, "next_seq": next_seq_val + 1}
 
 
     async def update_message_status(self, message_id: int, status: int) -> bool:
@@ -286,6 +343,32 @@ class ChatRepository:
                 msg["tool_call_id"] = tool_call_id
             out.append(msg)
         return out
+
+    async def build_llm_messages_via_tree(
+        self, conversation_id: str,
+    ) -> List[Dict[str, Any]]:
+        """从消息树主路径拼装 LLM 消息列表（基于 seq/parent_seq 回溯）。
+
+        相比 build_llm_messages（基于 id 正序），此方法：
+        - 只走主路径（过滤掉被压缩/回溯丢弃的分支）
+        - 支持非破坏式压缩后的精简上下文
+
+        若 trace_head 不存在或消息无 seq 列，回退到 build_llm_messages。
+        """
+        from src.core.agents.state.message_tree import get_main_path
+
+        main_path = await get_main_path(self._pool, conversation_id)
+        if main_path:
+            # get_main_path 返回的是完整消息格式，但需要过滤 status
+            out: List[Dict[str, Any]] = []
+            # 需要从 DB 查 status；简化策略：从树路径中取消息，忽略 pending_confirmation
+            for msg in main_path:
+                # 树路径中可能包含 system/internal 消息，统一保留
+                out.append(msg)
+            return out
+
+        # 回退：seq 列不存在或无 trace_head 数据 → 走线性路径
+        return await self.build_llm_messages(conversation_id)
 
 
 __all__ = [

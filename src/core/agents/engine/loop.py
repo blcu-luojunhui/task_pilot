@@ -19,8 +19,7 @@ from ..state.protocol import ToolCall, get_tool_calls, tool_result_message
 from ..state.context import ContextWindowManager
 from ..capabilities.skills import SkillContext, SkillExecutor, SkillRegistry, MappingResolver
 from ..capabilities.skills.tool_result_memory import (
-    annotate_tool_message,
-    collapse_old_tool_results,
+    annotate_tool_message, collapse_old_tool_results,
 )
 from ..exceptions import ToolNotFoundError, ToolExecutionError
 from .prompting import PromptAssembler
@@ -43,6 +42,7 @@ class Think:
     is_cancelled: Optional[Callable[[], bool]] = None  # 暂停/停止检查回调
     publish_event: Optional[Callable[..., Any]] = None  # 发布 prompt_assembled 事件供前端检查器使用
     stream_callback: Optional[Callable[[str], Any]] = None  # token 级别流式回调
+    event_bus: Optional[Any] = None  # TraceEventBus，用于发布 chat.token_delta
 
     async def run(self, state: AgentLoopState) -> Optional[Dict[str, Any]]:
         """执行思考阶段"""
@@ -143,9 +143,36 @@ class Think:
             state.stop_reason = StopReason.USER_CANCELLED
             return None
 
+        # 构建流式回调（同时支持原有 stream_callback + SSE token_delta 事件）
+        _original_stream = self.stream_callback
+        _ebus = self.event_bus
+        _trace_id = state.trace_id
+        _step = state.step
+
+        async def _wrapped_stream(token: str) -> None:
+            if _original_stream:
+                result = _original_stream(token)
+                if inspect.isawaitable(result):
+                    await result
+            if _ebus:
+                try:
+                    _ebus.publish(
+                        trace_id=_trace_id,
+                        event_type="chat.token_delta",
+                        data={"delta": token},
+                        source="agent",
+                        step=_step,
+                        persist=False,
+                    )
+                except Exception:
+                    pass
+
         # 调用 planner
         try:
-            result = await self.planner(messages, state.step, stream_callback=self.stream_callback)
+            result = await self.planner(
+                messages, state.step,
+                stream_callback=_wrapped_stream if (_original_stream or _ebus) else None,
+            )
             # 累积 token 使用量
             if result and "_usage" in result:
                 usage = result.pop("_usage")
@@ -209,6 +236,7 @@ class Act:
     artifact_store: Optional[Any] = None  # OPT-5: ArtifactStore
     enable_offload: bool = False  # OPT-5: 上下文卸载开关
     offload_threshold_chars: int = 4000
+    event_bus: Optional[Any] = None  # TraceEventBus，用于发布 chat.tool_call_* 事件
 
     def __post_init__(self):
         if self.max_concurrency > 0:
@@ -231,76 +259,80 @@ class Act:
 
     async def _execute_one_impl(self, state: AgentLoopState, call: ToolCall) -> Dict[str, Any]:
         """执行单个工具调用"""
-        # 工具执行前检查是否已取消
         if self.is_cancelled and self.is_cancelled():
-            return tool_result_message(call.id, "Cancelled: agent stopped by user")
+            return self._tool_end(state, call.id, call.name,
+                                 tool_result_message(call.id, "Cancelled: agent stopped by user"), False)
 
         started = time.monotonic()
         call_id = call.id
         tool_name = call.name
-
-        # 解析参数（ToolCall.arguments 已经是 dict）
         arguments = call.arguments
 
-        # 查找 skill
+        # 发布 tool_call_start
+        self._publish_tool_event(state, "chat.tool_call_start",
+                                 {"call_id": call_id, "tool_name": tool_name, "arguments": arguments})
+
         skill = self.registry.get(tool_name)
         if not skill:
             raise ToolNotFoundError(tool_name)
 
-        # 权限检查由 SkillExecutor 统一处理
-
-        # 构建上下文
         if self.context_builder:
             context = self.context_builder(state)
         else:
             resolver = MappingResolver(self.tool_dependencies)
             context = SkillContext(_resolver=resolver)
 
-        # 执行
         try:
             result = await self.executor.execute(skill, context, **arguments)
             duration = time.monotonic() - started
             result_str = str(result)
             state.tool_calls.append(
-                ToolCallRecord(
-                    tool_name=tool_name,
-                    tool_input=arguments,
-                    tool_output=result_str,
-                    duration_ms=duration * 1000,
-                )
-            )
+                ToolCallRecord(tool_name=tool_name, tool_input=arguments,
+                               tool_output=result_str, duration_ms=duration * 1000))
 
-            # OPT-5: 上下文卸载 — 超长结果落盘，对话保留引用
             if self.enable_offload and self.artifact_store and len(result_str) > self.offload_threshold_chars:
                 try:
                     ref = await self.artifact_store.put(
-                        trace_id=state.trace_id,
-                        tool_name=tool_name,
-                        step=state.step,
-                        content=result_str,
-                    )
-                    return tool_result_message(
-                        call_id,
+                        trace_id=state.trace_id, tool_name=tool_name,
+                        step=state.step, content=result_str)
+                    msg = tool_result_message(call_id,
                         f"[Large result offloaded to artifact://{ref.id}, "
                         f"{ref.total_lines} lines / {ref.total_chars} chars. "
                         f"Preview: {ref.preview}]\n"
-                        f"Call read_artifact(id=\"{ref.id}\") to read the full content.",
-                    )
+                        f"Call read_artifact(id=\"{ref.id}\") to read the full content.")
+                    return self._tool_end(state, call_id, tool_name, msg, True)
                 except Exception:
                     logger.warning("Artifact offload failed, falling back to truncation", exc_info=True)
 
-            return tool_result_message(call_id, self._smart_truncate(result, self.max_tool_result_length))
+            msg = tool_result_message(call_id, self._smart_truncate(result, self.max_tool_result_length))
+            return self._tool_end(state, call_id, tool_name, msg, True)
         except asyncio.CancelledError:
             raise
         except ToolNotFoundError as e:
             logger.warning("Tool not found: %s", e.tool_name)
-            return self._record_error(state, call_id, tool_name, str(e))
+            return self._tool_end(state, call_id, tool_name, self._record_error(state, call_id, tool_name, str(e)), False)
         except ToolExecutionError as e:
             logger.warning("Tool '%s' execution failed: %s", tool_name, e)
-            return self._record_error(state, call_id, tool_name, str(e))
+            return self._tool_end(state, call_id, tool_name, self._record_error(state, call_id, tool_name, str(e)), False)
         except Exception as e:
             logger.warning("Tool '%s' unexpected error: %s", tool_name, e)
-            return self._record_error(state, call_id, tool_name, f"{type(e).__name__}: {e}")
+            return self._tool_end(state, call_id, tool_name, self._record_error(state, call_id, tool_name, f"{type(e).__name__}: {e}"), False)
+
+    def _publish_tool_event(self, state: AgentLoopState, event_type: str, data: Dict[str, Any]) -> None:
+        _bus = self.event_bus
+        if _bus:
+            try:
+                _bus.publish(trace_id=state.trace_id, event_type=event_type,
+                             data=data, source="agent", step=state.step)
+            except Exception:
+                pass
+
+    def _tool_end(self, state: AgentLoopState, call_id: str, tool_name: str,
+                  result_msg: Dict[str, Any], ok: bool) -> Dict[str, Any]:
+        self._publish_tool_event(state, "chat.tool_call_end",
+                                 {"call_id": call_id, "tool_name": tool_name, "ok": ok,
+                                  "result": result_msg.get("content", "")[:4096]})
+        return result_msg
 
     def _record_error(self, state, call_id, tool_name, error_msg):
         """记录错误"""

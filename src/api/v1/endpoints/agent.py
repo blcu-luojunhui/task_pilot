@@ -22,10 +22,10 @@ from src.core.auth import get_current_account_id
 from src.infra.shared import ErrorCode
 from src.jobs import TaskScheduler
 
-# 触发 agent.run_goal 的 @register 装饰器（与 chat.agent_turn 相同模式）
-from src.core.agent_task import run_agent_goal as _run_agent_goal  # noqa: F401
+# 触发 run_agent 的 @register 装饰器（统一入口，支持 agent/chat 双模式）
+from src.core.agent_task import run_agent as _run_agent  # noqa: F401
 
-_AGENT_TASK_NAME = "agent.run_goal"
+_AGENT_TASK_NAME = "agent.run"
 _AVAILABLE_TOOL_AREAS = ["database", "http", "task", "utils", "chat_ops"]
 
 _PROVIDER_MAP = {

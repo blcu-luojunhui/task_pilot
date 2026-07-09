@@ -112,6 +112,14 @@ async def frontend_spa(path: str):
 async def startup():
     logging.info("Starting TaskPilot...")
     await ctx.start_up()
+    # 启动时自动执行未应用的数据库迁移
+    try:
+        from src.core.agent_task.db_migrate import auto_migrate
+        db = ctx._container.async_mysql_pool()
+        ok = await auto_migrate(db)
+        logging.info("DB migration: %s", "up to date" if ok else "FAILED")
+    except Exception:
+        logging.warning("DB auto_migrate failed, continuing", exc_info=True)
     logging.info("TaskPilot started successfully")
 
 

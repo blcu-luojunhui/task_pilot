@@ -17,12 +17,12 @@ export enum TaskStatus {
 }
 
 export const TASK_STATUS_LABEL_KEYS: Record<TaskStatus, string> = {
-  [TaskStatus.INIT]: 'tasks.status.init',
-  [TaskStatus.PROCESSING]: 'tasks.status.processing',
-  [TaskStatus.SUCCESS]: 'tasks.status.success',
-  [TaskStatus.CANCELLED]: 'tasks.status.cancelled',
-  [TaskStatus.CANCEL_REQUESTED]: 'tasks.status.cancelRequested',
-  [TaskStatus.FAILED]: 'tasks.status.failed',
+  [TaskStatus.INIT]: 'status.init',
+  [TaskStatus.PROCESSING]: 'status.processing',
+  [TaskStatus.SUCCESS]: 'status.success',
+  [TaskStatus.CANCELLED]: 'status.cancelled',
+  [TaskStatus.CANCEL_REQUESTED]: 'status.cancelRequested',
+  [TaskStatus.FAILED]: 'status.failed',
 };
 
 // ============ 通用响应包装 ============

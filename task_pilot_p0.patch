@@ -1,0 +1,1634 @@
+From 64143f271cd356f5603564695d674ffc1ae3a319 Mon Sep 17 00:00:00 2001
+From: Kai <kai@taskpilot.dev>
+Date: Thu, 9 Jul 2026 04:46:18 +0000
+Subject: [PATCH 1/3] =?UTF-8?q?refactor:=20Muji/Notion=20minimal=20redesig?=
+ =?UTF-8?q?n=20=E2=80=94=20token=20layer=20+=20CSS=20cleanup=20+=20compone?=
+ =?UTF-8?q?nt=20adjustments?=
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Phase 1: tokens.ts accent → #1A1A1A, tokens.css warm neutral sync
+Phase 2: remove .gradient-text, .stat-card-accent, old teal/blue hardcoded colors
+Phase 3: AppLayout sider white + menu muted, Dashboard stat → foreground,
+         Chat bubble transparent/muted, ConversationList muted selected
+Phase 4: all linear-gradient → solid colors, GRADIENTS → SOLIDS
+
+21 files changed, zero hardcoded hex remaining.
+---
+ frontend/src/components/chat/ChatMessage.css  | 36 ++++-----
+ frontend/src/components/chat/Composer.tsx     |  4 +-
+ .../src/components/chat/ConversationList.tsx  |  6 +-
+ frontend/src/components/common/AppLayout.css  |  8 +-
+ frontend/src/components/common/AppLayout.tsx  |  4 +-
+ frontend/src/components/common/PageLayout.css |  2 +-
+ frontend/src/hooks/usePageStyleVars.ts        | 15 ++--
+ frontend/src/index.css                        | 25 +-----
+ frontend/src/pages/AccountPage.tsx            | 12 +--
+ frontend/src/pages/ChatPage.tsx               |  6 +-
+ frontend/src/pages/DashboardPage.tsx          |  8 +-
+ frontend/src/pages/EvalsPage.tsx              |  2 +-
+ frontend/src/pages/LoginPage.tsx              |  6 +-
+ frontend/src/pages/RegisterPage.tsx           |  6 +-
+ frontend/src/pages/RunsPage.tsx               |  2 +-
+ frontend/src/pages/SkillsPage.css             |  4 +-
+ frontend/src/pages/SystemPage.tsx             |  2 +-
+ frontend/src/pages/TaskDetailPage.tsx         |  2 +-
+ frontend/src/pages/TasksPage.tsx              |  2 +-
+ frontend/src/theme/tokens.css                 | 72 ++++++++---------
+ frontend/src/theme/tokens.ts                  | 77 +++++++++----------
+ 21 files changed, 141 insertions(+), 160 deletions(-)
+
+diff --git a/frontend/src/components/chat/ChatMessage.css b/frontend/src/components/chat/ChatMessage.css
+index 8783b7e..ab287df 100644
+--- a/frontend/src/components/chat/ChatMessage.css
++++ b/frontend/src/components/chat/ChatMessage.css
+@@ -4,7 +4,7 @@
+ }
+ 
+ .chat-composer-bar {
+-  background: #F5F3EF !important;
++  background: var(--n8) !important;
+   backdrop-filter: blur(16px);
+   -webkit-backdrop-filter: blur(16px);
+   border-top: 1px solid var(--border-light) !important;
+@@ -12,16 +12,16 @@
+ 
+ /* ── 消息列表 ── */
+ .chat-thread {
+-  --chat-user-bubble: var(--chat-bubble-custom, #5c838c);
+-  --chat-user-border: var(--chat-user-border-custom, rgba(255, 255, 255, 0.15));
+-  --chat-user-text: var(--chat-user-text, #FFFFFF);
++  --chat-user-bubble: transparent;
++  --chat-user-border: var(--n6);
++  --chat-user-text: var(--n0);
+   --chat-user-shadow: var(--shadow-card);
+-  --chat-assistant-bubble: #E6EFED;
+-  --chat-assistant-border: rgba(0, 0, 0, 0.06);
+-  --chat-assistant-text: #1C2636;
+-  --chat-assistant-shadow: 0 1px 4px rgba(0, 0, 0, 0.04);
+-  --chat-avatar-user: linear-gradient(135deg, var(--color-accent) 0%, var(--n2) 100%);
+-  --chat-avatar-agent: linear-gradient(135deg, var(--color-highlight) 0%, var(--n2) 100%);
++  --chat-assistant-bubble: var(--n8);
++  --chat-assistant-border: var(--border-light);
++  --chat-assistant-text: var(--n0);
++  --chat-assistant-shadow: var(--shadow-card);
++  --chat-avatar-user: var(--n0);
++  --chat-avatar-agent: var(--n6);
+   --chat-avatar-agent-icon: var(--n2);
+   background: transparent;
+ }
+@@ -51,7 +51,7 @@
+   margin: 10px 0;
+   border-radius: var(--radius-lg);
+   overflow: hidden;
+-  background: #E3E6EC;
++  background: var(--n7);
+   border: 1px solid var(--border-default);
+ }
+ .code-block-header {
+@@ -59,7 +59,7 @@
+   align-items: center;
+   justify-content: space-between;
+   padding: 6px 12px;
+-  background: #D6DAE2;
++  background: var(--n6);
+   border-bottom: 1px solid var(--border-light);
+ }
+ .code-block-lang {
+@@ -78,7 +78,7 @@
+   border-radius: 4px;
+   transition: color 0.15s, background 0.15s;
+ }
+-.code-block-copy:hover { color: var(--n2); background: rgba(58,80,107,0.08); }
++.code-block-copy:hover { color: var(--n0); background: var(--color-primary-soft); }
+ .code-block-copy.copied { color: var(--color-accent); }
+ .code-block-wrapper pre {
+   margin: 0 !important;
+@@ -106,7 +106,7 @@
+   color: var(--color-accent);
+   font-weight: 500;
+   text-decoration: none;
+-  border-bottom: 1px solid rgba(91, 192, 190, 0.35);
++  border-bottom: 1px solid rgba(23, 23, 23, 0.2);
+ }
+ 
+ /* ── 表格 / 引用 / 分割线 ── */
+@@ -189,7 +189,7 @@
+   align-items: center;
+   justify-content: center;
+   font-size: 15px;
+-  box-shadow: 0 1px 4px rgba(58, 80, 107, 0.1);
++  box-shadow: 0 1px 4px rgba(23, 23, 23, 0.1);
+ }
+ .msg-row.user .msg-avatar {
+   background: var(--chat-avatar-user);
+@@ -241,7 +241,7 @@
+   transition: background 0.15s;
+ }
+ .msg-meta__trace:hover {
+-  background: rgba(91, 192, 190, 0.18);
++  background: rgba(23, 23, 23, 0.08);
+ }
+ 
+ /* ── 气泡 ── */
+@@ -282,10 +282,10 @@
+ /* ── 滚到底部按钮 ── */
+ .chat-scroll-bottom {
+   border-radius: 20px !important;
+-  box-shadow: 0 2px 12px rgba(91, 192, 190, 0.2) !important;
++  box-shadow: 0 2px 8px rgba(23, 23, 23, 0.12) !important;
+   background: var(--surface-elevated) !important;
+   color: var(--color-accent) !important;
+-  border: 1px solid rgba(91, 192, 190, 0.25) !important;
++  border: 1px solid rgba(23, 23, 23, 0.12) !important;
+   font-weight: 500;
+   letter-spacing: -0.01em;
+   backdrop-filter: blur(12px);
+diff --git a/frontend/src/components/chat/Composer.tsx b/frontend/src/components/chat/Composer.tsx
+index 947a4bd..5da0abd 100644
+--- a/frontend/src/components/chat/Composer.tsx
++++ b/frontend/src/components/chat/Composer.tsx
+@@ -53,9 +53,9 @@ export function Composer({ disabled, onSend }: Props) {
+         style={{
+           height: 'auto',
+           borderRadius: '0 12px 12px 0',
+-          background: 'linear-gradient(135deg, var(--n2) 0%, var(--color-accent) 100%)',
++          background: 'var(--n0)',
+           border: 'none',
+-          boxShadow: '0 2px 8px rgba(91, 192, 190, 0.2)',
++          boxShadow: '0 1px 3px rgba(0,0,0,0.08)',
+           minWidth: 60,
+         }}
+       >
+diff --git a/frontend/src/components/chat/ConversationList.tsx b/frontend/src/components/chat/ConversationList.tsx
+index cf92447..12dee17 100644
+--- a/frontend/src/components/chat/ConversationList.tsx
++++ b/frontend/src/components/chat/ConversationList.tsx
+@@ -66,9 +66,9 @@ export function ConversationList({
+                 style={{
+                   padding: '10px 12px',
+                   cursor: 'pointer',
+-                  background: active ? token.colorSuccessBg : 'transparent',
++                  background: active ? 'var(--color-primary-soft)' : 'transparent',
+                   borderLeft: active
+-                    ? `3px solid ${token.colorSuccess}`
++                    ? `3px solid var(--n0)`
+                     : '3px solid transparent',
+                   display: 'flex',
+                   flexDirection: 'column',
+@@ -77,7 +77,7 @@ export function ConversationList({
+               >
+                 <Space size={6} style={{ width: '100%', justifyContent: 'space-between' }}>
+                   <Space size={6} style={{ minWidth: 0, flex: 1 }}>
+-                    <MessageOutlined style={{ color: token.colorSuccess }} />
++                    <MessageOutlined style={{ color: active ? 'var(--n0)' : 'var(--n4)' }} />
+                     <Typography.Text
+                       strong={active}
+                       ellipsis
+diff --git a/frontend/src/components/common/AppLayout.css b/frontend/src/components/common/AppLayout.css
+index c487ea7..6413ca6 100644
+--- a/frontend/src/components/common/AppLayout.css
++++ b/frontend/src/components/common/AppLayout.css
+@@ -12,8 +12,9 @@
+   overflow-x: hidden;
+   overflow-y: auto;
+   z-index: 100;
+-  background: var(--surface-card) !important;
+-  border-right: 1px solid var(--border-subtle) !important;
++  background: var(--n10) !important;
++  border-right: none !important;
++  border-left: 1px solid var(--border-light) !important;
+   box-shadow: none !important;
+ }
+ 
+@@ -30,8 +31,9 @@
+ }
+ 
+ .app-layout__sider .ant-menu-item-selected {
+-  background: var(--color-accent-soft) !important;
++  background: var(--color-primary-soft) !important;
+   font-weight: 600;
++  color: var(--n0) !important;
+ }
+ 
+ .app-layout__sider .ant-menu-item-selected::after {
+diff --git a/frontend/src/components/common/AppLayout.tsx b/frontend/src/components/common/AppLayout.tsx
+index 45e55ad..9cc3e20 100644
+--- a/frontend/src/components/common/AppLayout.tsx
++++ b/frontend/src/components/common/AppLayout.tsx
+@@ -118,12 +118,12 @@ export function AppLayout() {
+           }}
+         >
+           <span
+-            className="gradient-text"
+             style={{
+               marginLeft: 10,
+               fontSize: 21,
+               fontWeight: 700,
+               letterSpacing: '-0.3px',
++              color: 'var(--n0)',
+             }}
+           >
+             TaskPilot
+@@ -149,7 +149,7 @@ export function AppLayout() {
+             target="_blank"
+             rel="noopener noreferrer"
+             style={{
+-              color: 'var(--n2)',
++              color: 'var(--n0)',
+               fontSize: 17,
+               display: 'flex',
+               alignItems: 'center',
+diff --git a/frontend/src/components/common/PageLayout.css b/frontend/src/components/common/PageLayout.css
+index be5bb99..c8eca68 100644
+--- a/frontend/src/components/common/PageLayout.css
++++ b/frontend/src/components/common/PageLayout.css
+@@ -27,7 +27,7 @@
+   letter-spacing: -0.02em;
+   color: #fff;
+   flex-shrink: 0;
+-  box-shadow: 0 8px 24px rgba(58, 80, 107, 0.2);
++  box-shadow: 0 8px 24px rgba(23, 23, 23, 0.1);
+ }
+ 
+ .page-hero__title {
+diff --git a/frontend/src/hooks/usePageStyleVars.ts b/frontend/src/hooks/usePageStyleVars.ts
+index 6e2fa89..54bc9ad 100644
+--- a/frontend/src/hooks/usePageStyleVars.ts
++++ b/frontend/src/hooks/usePageStyleVars.ts
+@@ -5,16 +5,17 @@ export function usePageStyleVars(): React.CSSProperties {
+   return {
+     '--page-border': 'var(--border-default)',
+     '--page-shadow': 'var(--shadow-elevated)',
+-    '--page-hero-bg': `linear-gradient(135deg, ${rgba(PALETTE.neutral.n2, 0.08)} 0%, ${rgba(PALETTE.accent, 0.04)} 100%)`,
++    '--page-hero-bg': rgba(PALETTE.neutral.n6, 0.25),
+     '--page-row-hover': rgba(PALETTE.neutral.n2, 0.04),
+   } as React.CSSProperties;
+ }
+ 
++/** PageHero avatar 背景 — 纯色，不用渐变 */
+ export const PAGE_GRADIENTS = {
+-  blue:   'linear-gradient(135deg, var(--n2) 0%, var(--color-accent) 100%)',
+-  green:  'linear-gradient(135deg, var(--color-info) 0%, var(--color-accent) 100%)',
+-  orange: 'linear-gradient(135deg, var(--color-warning) 0%, var(--n2) 100%)',
+-  purple: 'linear-gradient(135deg, var(--n2) 0%, var(--color-warning) 100%)',
+-  cyan:   'linear-gradient(135deg, var(--n2) 0%, var(--color-highlight) 100%)',
+-  indigo: 'linear-gradient(135deg, var(--n2) 0%, var(--color-info) 100%)',
++  blue:   PALETTE.neutral.n0,
++  green:  PALETTE.neutral.n3,
++  orange: PALETTE.warning,
++  purple: PALETTE.neutral.n2,
++  cyan:   PALETTE.neutral.n4,
++  indigo: PALETTE.neutral.n1,
+ } as const;
+diff --git a/frontend/src/index.css b/frontend/src/index.css
+index 7b08a9b..3d2d928 100644
+--- a/frontend/src/index.css
++++ b/frontend/src/index.css
+@@ -37,7 +37,7 @@ code, pre, kbd, samp, .font-mono {
+ }
+ 
+ ::selection {
+-  background: rgba(58, 80, 107, 0.16);
++  background: rgba(23, 23, 23, 0.1);
+   color: inherit;
+ }
+ 
+@@ -64,26 +64,3 @@ code, pre, kbd, samp, .font-mono {
+   -webkit-backdrop-filter: blur(16px);
+ }
+ 
+-/* ── Brand gradient text ── */
+-.gradient-text {
+-  background: linear-gradient(135deg, var(--n2) 0%, var(--color-accent) 50%, var(--color-info) 100%);
+-  -webkit-background-clip: text;
+-  -webkit-text-fill-color: transparent;
+-  background-clip: text;
+-}
+-.sider-logo:hover .gradient-text {
+-  opacity: 0.85;
+-}
+-
+-/* ── Stat card accent bar ── */
+-.stat-card-accent {
+-  position: relative;
+-  overflow: hidden;
+-}
+-.stat-card-accent::before {
+-  content: '';
+-  position: absolute;
+-  left: 0; top: 12px; bottom: 12px;
+-  width: 3px;
+-  border-radius: 0 3px 3px 0;
+-}
+diff --git a/frontend/src/pages/AccountPage.tsx b/frontend/src/pages/AccountPage.tsx
+index f390254..5ca358d 100644
+--- a/frontend/src/pages/AccountPage.tsx
++++ b/frontend/src/pages/AccountPage.tsx
+@@ -354,7 +354,7 @@ export function AccountPage() {
+             title={
+               <PageCardTitle
+                 icon={
+-                  <PageCardIcon color="#C9A68B" bg="rgba(201,166,139,0.15)">
++                  <PageCardIcon color="#B45309" bg="rgba(180,83,9,0.06)">
+                     <ThunderboltOutlined />
+                   </PageCardIcon>
+                 }
+@@ -406,7 +406,7 @@ export function AccountPage() {
+             title={
+               <PageCardTitle
+                 icon={
+-                  <PageCardIcon color="#3A506B" bg="rgba(58,80,107,0.12)">
++                  <PageCardIcon color="#404040" bg="rgba(0,0,0,0.04)">
+                     <KeyOutlined />
+                   </PageCardIcon>
+                 }
+@@ -418,7 +418,7 @@ export function AccountPage() {
+               <Button
+                 type="primary"
+                 icon={<PlusOutlined />}
+-                style={{ borderRadius: 10, background: 'var(--color-accent)', boxShadow: '0 4px 12px rgba(91,192,190,0.25)' }}
++                style={{ borderRadius: 10, background: 'var(--color-accent)', boxShadow: '0 4px 12px rgba(13,148,136,0.25)' }}
+                 onClick={() => {
+                   setNewToken(null);
+                   setTokenName('');
+@@ -448,7 +448,7 @@ export function AccountPage() {
+               title={
+                 <PageCardTitle
+                   icon={
+-                    <PageCardIcon color="#5BC0BE" bg="rgba(91,192,190,0.12)">
++                    <PageCardIcon color="var(--n2)" bg="rgba(23,23,23,0.06)">
+                       <BarChartOutlined />
+                     </PageCardIcon>
+                   }
+@@ -576,7 +576,7 @@ export function AccountPage() {
+               title={
+                 <PageCardTitle
+                   icon={
+-                    <PageCardIcon color="#C9A68B" bg="rgba(201,166,139,0.12)">
++                    <PageCardIcon color="#B45309" bg="rgba(180,83,9,0.06)">
+                       <SendOutlined />
+                     </PageCardIcon>
+                   }
+@@ -588,7 +588,7 @@ export function AccountPage() {
+                 <Button
+                   type="primary"
+                   icon={<PlusOutlined />}
+-                  style={{ borderRadius: 10, background: 'var(--color-warning)', boxShadow: '0 4px 12px rgba(201,166,139,0.25)' }}
++                  style={{ borderRadius: 10, background: 'var(--color-warning)', boxShadow: '0 4px 12px rgba(180,83,9,0.25)' }}
+                   onClick={() => {
+                     setNewInviteCodes(null);
+                     setInviteCount(1);
+diff --git a/frontend/src/pages/ChatPage.tsx b/frontend/src/pages/ChatPage.tsx
+index a8e65e6..674af66 100644
+--- a/frontend/src/pages/ChatPage.tsx
++++ b/frontend/src/pages/ChatPage.tsx
+@@ -28,7 +28,7 @@ export function ChatPage() {
+   const navigate = useNavigate();
+   const [createAgentLoading, setCreateAgentLoading] = useState(false);
+   const [bubbleColor, setBubbleColor] = useState<string>(() => {
+-    try { return localStorage.getItem('chat-bubble-color') || '#5c838c'; } catch { return '#5c838c'; }
++    try { return localStorage.getItem('chat-bubble-color') || '#404040'; } catch { return '#404040'; }
+   });
+ 
+   /** 根据 hex 计算亮度 → 浅色底配深字，深色底配白字 */
+@@ -41,7 +41,7 @@ export function ChatPage() {
+     // Relative luminance (sRGB)
+     const lum = 0.2126 * (r / 255) + 0.7152 * (g / 255) + 0.0722 * (b / 255);
+     if (lum > 0.55) {
+-      return { isLight: true, text: '#1C2636', border: 'rgba(0,0,0,0.1)' };
++      return { isLight: true, text: '#171717', border: 'rgba(0,0,0,0.1)' };
+     }
+     return { isLight: false, text: '#FFFFFF', border: 'rgba(255,255,255,0.15)' };
+   }, [bubbleColor]);
+@@ -255,7 +255,7 @@ export function ChatPage() {
+                 type="text"
+                 value={bubbleColor}
+                 onChange={(e) => handleBubbleColorChange(e.target.value)}
+-                placeholder="#5c838c"
++                placeholder="#404040"
+                 style={{
+                   width: 80,
+                   height: 26,
+diff --git a/frontend/src/pages/DashboardPage.tsx b/frontend/src/pages/DashboardPage.tsx
+index 13c56bd..e3a3dd1 100644
+--- a/frontend/src/pages/DashboardPage.tsx
++++ b/frontend/src/pages/DashboardPage.tsx
+@@ -62,10 +62,10 @@ export function DashboardPage() {
+   }, []);
+ 
+   const statCards = [
+-    { key: 'running', title: t('running'), value: stats?.counts.running ?? 0, icon: ThunderboltFilled, color: palette.chartAccent },
+-    { key: 'success', title: t('success24h'), value: stats?.counts.success_24h ?? 0, icon: CheckCircleFilled, color: palette.chartSuccess },
+-    { key: 'failed', title: t('failed24h'), value: stats?.counts.failed_24h ?? 0, icon: CloseCircleFilled, color: palette.chartError },
+-    { key: 'cancelled', title: t('cancelled24h'), value: stats?.counts.cancelled_24h ?? 0, icon: ExclamationCircleFilled, color: palette.chartWarning },
++    { key: 'running', title: t('running'), value: stats?.counts.running ?? 0, icon: ThunderboltFilled, color: token.colorText },
++    { key: 'success', title: t('success24h'), value: stats?.counts.success_24h ?? 0, icon: CheckCircleFilled, color: token.colorText },
++    { key: 'failed', title: t('failed24h'), value: stats?.counts.failed_24h ?? 0, icon: CloseCircleFilled, color: token.colorText },
++    { key: 'cancelled', title: t('cancelled24h'), value: stats?.counts.cancelled_24h ?? 0, icon: ExclamationCircleFilled, color: token.colorText },
+   ] as const;
+ 
+   return (
+diff --git a/frontend/src/pages/EvalsPage.tsx b/frontend/src/pages/EvalsPage.tsx
+index d2905c4..1343361 100644
+--- a/frontend/src/pages/EvalsPage.tsx
++++ b/frontend/src/pages/EvalsPage.tsx
+@@ -177,7 +177,7 @@ export function EvalsPage() {
+         title={
+           <PageCardTitle
+             icon={
+-              <PageCardIcon color="#3A506B" bg="rgba(58,80,107,0.12)">
++              <PageCardIcon color="#404040" bg="rgba(0,0,0,0.04)">
+                 <UnorderedListOutlined />
+               </PageCardIcon>
+             }
+diff --git a/frontend/src/pages/LoginPage.tsx b/frontend/src/pages/LoginPage.tsx
+index 105db2b..0da5faa 100644
+--- a/frontend/src/pages/LoginPage.tsx
++++ b/frontend/src/pages/LoginPage.tsx
+@@ -43,7 +43,7 @@ export function LoginPage() {
+         display: 'flex',
+         alignItems: 'center',
+         justifyContent: 'center',
+-        background: `linear-gradient(135deg, ${themeToken.colorPrimaryBg} 0%, ${themeToken.colorBgLayout} 100%)`,
++        background: themeToken.colorBgLayout,
+       }}
+     >
+       <Card
+@@ -52,7 +52,7 @@ export function LoginPage() {
+       >
+         <div style={{ textAlign: 'center', marginBottom: 36 }}>
+           <Typography.Title level={3} style={{ marginBottom: 4 }}>
+-            <span className="gradient-text">TaskPilot</span>
++            <span style={{ color: "var(--n0)" }}>TaskPilot</span>
+           </Typography.Title>
+           <Typography.Text type="secondary">{t('login.subtitle')}</Typography.Text>
+         </div>
+@@ -74,7 +74,7 @@ export function LoginPage() {
+ 
+           <Form.Item style={{ marginBottom: 16 }}>
+             <Button type="primary" htmlType="submit" loading={loading} block size="large"
+-              style={{ background: 'linear-gradient(135deg, var(--n2) 0%, var(--color-accent) 100%)', border: 'none' }}
++              style={{ background: 'var(--n0)', border: 'none' }}
+             >
+               {t('login.submitButton')}
+             </Button>
+diff --git a/frontend/src/pages/RegisterPage.tsx b/frontend/src/pages/RegisterPage.tsx
+index 52b747e..ad1b3f1 100644
+--- a/frontend/src/pages/RegisterPage.tsx
++++ b/frontend/src/pages/RegisterPage.tsx
+@@ -50,13 +50,13 @@ export function RegisterPage() {
+         display: 'flex',
+         alignItems: 'center',
+         justifyContent: 'center',
+-        background: `linear-gradient(135deg, ${themeToken.colorPrimaryBg} 0%, ${themeToken.colorBgLayout} 100%)`,
++        background: themeToken.colorBgLayout,
+       }}
+     >
+       <Card style={{ width: 420, borderRadius: 14, boxShadow: '0 4px 24px rgba(0,0,0,0.08)' }} bordered={false}>
+         <div style={{ textAlign: 'center', marginBottom: 36 }}>
+           <Typography.Title level={3} style={{ marginBottom: 4 }}>
+-            <span className="gradient-text">TaskPilot</span>
++            <span style={{ color: "var(--n0)" }}>TaskPilot</span>
+           </Typography.Title>
+           <Typography.Text type="secondary">{t('register.subtitle')}</Typography.Text>
+         </div>
+@@ -138,7 +138,7 @@ export function RegisterPage() {
+ 
+           <Form.Item style={{ marginBottom: 16 }}>
+             <Button type="primary" htmlType="submit" loading={loading} block size="large"
+-              style={{ background: 'linear-gradient(135deg, var(--n2) 0%, var(--color-accent) 100%)', border: 'none' }}
++              style={{ background: 'var(--n0)', border: 'none' }}
+             >
+               {t('register.submitButton')}
+             </Button>
+diff --git a/frontend/src/pages/RunsPage.tsx b/frontend/src/pages/RunsPage.tsx
+index 16e3897..8953f30 100644
+--- a/frontend/src/pages/RunsPage.tsx
++++ b/frontend/src/pages/RunsPage.tsx
+@@ -173,7 +173,7 @@ export function RunsPage() {
+         title={
+           <PageCardTitle
+             icon={
+-              <PageCardIcon color="#C9A68B" bg="rgba(201,166,139,0.12)">
++              <PageCardIcon color="#B45309" bg="rgba(180,83,9,0.06)">
+                 <FilterOutlined />
+               </PageCardIcon>
+             }
+diff --git a/frontend/src/pages/SkillsPage.css b/frontend/src/pages/SkillsPage.css
+index ee25a95..871c6ce 100644
+--- a/frontend/src/pages/SkillsPage.css
++++ b/frontend/src/pages/SkillsPage.css
+@@ -33,8 +33,8 @@
+ 
+ .skill-explorer-categoryButton.is-selected,
+ .skill-explorer-fileButton.is-selected {
+-  background: rgba(91, 192, 190, 0.12);
+-  color: var(--color-accent);
++  background: var(--color-primary-soft);
++  color: var(--n0);
+ }
+ 
+ .skill-explorer-categories {
+diff --git a/frontend/src/pages/SystemPage.tsx b/frontend/src/pages/SystemPage.tsx
+index 0f45ee8..37626bc 100644
+--- a/frontend/src/pages/SystemPage.tsx
++++ b/frontend/src/pages/SystemPage.tsx
+@@ -68,7 +68,7 @@ export function SystemPage() {
+         title={
+           <PageCardTitle
+             icon={
+-              <PageCardIcon color="#5BC0BE" bg="rgba(91,192,190,0.12)">
++              <PageCardIcon color="var(--n2)" bg="rgba(23,23,23,0.06)">
+                 <LineChartOutlined />
+               </PageCardIcon>
+             }
+diff --git a/frontend/src/pages/TaskDetailPage.tsx b/frontend/src/pages/TaskDetailPage.tsx
+index d144b49..5377bf0 100644
+--- a/frontend/src/pages/TaskDetailPage.tsx
++++ b/frontend/src/pages/TaskDetailPage.tsx
+@@ -208,7 +208,7 @@ export function TaskDetailPage() {
+             title={
+               <PageCardTitle
+                 icon={
+-                  <PageCardIcon color="#5BC0BE" bg="rgba(91,192,190,0.12)">
++                  <PageCardIcon color="var(--n2)" bg="rgba(23,23,23,0.06)">
+                     <SwapOutlined />
+                   </PageCardIcon>
+                 }
+diff --git a/frontend/src/pages/TasksPage.tsx b/frontend/src/pages/TasksPage.tsx
+index e08efe4..4e3801d 100644
+--- a/frontend/src/pages/TasksPage.tsx
++++ b/frontend/src/pages/TasksPage.tsx
+@@ -115,7 +115,7 @@ export function TasksPage() {
+         title={
+           <PageCardTitle
+             icon={
+-              <PageCardIcon color="#3A506B" bg="rgba(58,80,107,0.12)">
++              <PageCardIcon color="#404040" bg="rgba(0,0,0,0.04)">
+                 <FilterOutlined />
+               </PageCardIcon>
+             }
+diff --git a/frontend/src/theme/tokens.css b/frontend/src/theme/tokens.css
+index 3b06ba3..92a610b 100644
+--- a/frontend/src/theme/tokens.css
++++ b/frontend/src/theme/tokens.css
+@@ -1,48 +1,50 @@
+ /* ═══════════════════════════════════════════════════════════
+    TaskPilot 设计令牌 — CSS 定制属性层
+    〰〰〰〰〰〰〰〰〰〰〰〰〰〰〰〰〰〰〰〰〰〰〰〰〰〰〰〰〰〰〰〰〰〰〰
++   Muji / Notion 极简留白：暖灰中性色阶 + 纯黑强调
++
+    中性色阶 (Neutral Scale)     → 结构：页面/卡片/边框/文字
+    语义调色板 (Semantic Palette) → 交互：按钮/选中/状态/强调
+-   色谱:  #1C2636 ──→ #3A506B ──→ #B3C0CD ──→ #FBFCFD
+-          最深              锚点             边框            近白
++   色谱:  #171717 ──→ #525252 ──→ #D4D4D4 ──→ #FAFAF9
++          最深              中暗             亮灰            近白
+    ═══════════════════════════════════════════════════════════ */
+ 
+ :root {
+   /* ── 中性色阶 ──────────────────────────────────────────── */
+ 
+-  --n0: #1C2636;  /* 最深     — 暗色模式底色 */
+-  --n1: #253548;  /* 暗色抬高 — 暗色卡片 */
+-  --n2: #3A506B;  /* 锚点     — 品牌主色 / 深色边框 */
+-  --n3: #526881;  /* 中暗     — 次要文字 / 暗色文字 */
+-  --n4: #71869C;  /* 中       — 辅助文字 */
+-  --n5: #93A4B5;  /* 中亮     — 禁用态 / 占位 */
+-  --n6: #B3C0CD;  /* 亮灰     — 边框 / 分割线 */
+-  --n7: #D6DCE4;  /* 侧栏灰   — 亮色模式侧栏（退后，但不过暗） */
+-  --n8: #E8ECF1;  /* 卡片色   — 旧卡片基准 */
+-  --n9: #F3F5F8;  /* 近白偏灰 — 页面底色（突出） */
+-  --n10: #FBFCFD; /* 近白     — Header / 最亮面 */
++  --n0: #171717;  /* 最深     — 暗色模式底色 */
++  --n1: #262626;  /* 暗色抬高 — 暗色卡片 */
++  --n2: #404040;  /* 次深     — 深色边框 / 强调辅 */
++  --n3: #525252;  /* 中暗     — 次要文字 */
++  --n4: #737373;  /* 中       — 辅助文字 */
++  --n5: #A3A3A3;  /* 中亮     — 禁用态 / 占位 */
++  --n6: #D4D4D4;  /* 亮灰     — 边框 / 分割线 */
++  --n7: #E5E5E5;  /* 侧栏灰   — 亮色模式侧栏 */
++  --n8: #F0F0EE;  /* 暖白偏灰 — 卡片色 */
++  --n9: #F5F5F4;  /* 近白偏暖 — 页面底色 */
++  --n10: #FAFAF9; /* 近白     — Header / 最亮面 */
+ 
+   /* ── 语义调色板 ────────────────────────────────────────── */
+ 
+-  --color-primary:      var(--n2);
+-  --color-primary-hover: #2D3F56;
+-  --color-primary-soft: rgba(58, 80, 107, 0.08);
++  --color-primary:      var(--n0);
++  --color-primary-hover: #0A0A0A;
++  --color-primary-soft: rgba(23, 23, 23, 0.06);
+ 
+-  --color-accent:       #5BC0BE;  /* 柔青绿 — 选中 / 焦点 / 完成 */
+-  --color-accent-hover: #4AA9A7;
+-  --color-accent-soft:  rgba(91, 192, 190, 0.15); /* 侧栏选中背景，明显但不过跳 */
++  --color-accent:       #1A1A1A;  /* 纯黑强调 — 极简克制 */
++  --color-accent-hover: #0D0D0D;
++  --color-accent-soft:  rgba(26, 26, 26, 0.08);
+ 
+-  --color-warning:      #C9A68B;
+-  --color-warning-soft: rgba(201, 166, 139, 0.1);
++  --color-warning:      #B45309;
++  --color-warning-soft: rgba(180, 83, 9, 0.08);
+ 
+-  --color-info:         #A8B59F;
+-  --color-info-soft:    rgba(168, 181, 159, 0.1);
++  --color-info:         #525252;
++  --color-info-soft:    rgba(82, 82, 82, 0.08);
+ 
+-  --color-highlight:    #CDEDF6;
+-  --color-highlight-soft: rgba(205, 237, 246, 0.25);
++  --color-highlight:    #FEF3C7;
++  --color-highlight-soft: rgba(254, 243, 199, 0.25);
+ 
+-  --color-error:        #C96B6B;
+-  --color-error-soft:   rgba(201, 107, 107, 0.08);
++  --color-error:        #B91C1C;
++  --color-error-soft:   rgba(185, 28, 28, 0.08);
+ 
+   /* ── 文字色 ────────────────────────────────────────────── */
+ 
+@@ -54,8 +56,8 @@
+ 
+   /* ── 表面色 ────────────────────────────────────────────── */
+   /*
+-   * 阅读区 > 导航区：内容页底色(n9)最亮，侧栏(n7)退后
+-   * 符合人眼聚焦——书页是白的，页边距是灰的
++   * 内容页底色(n9)最亮，侧栏(n7)退后
++   * 书页是白的，页边距是灰的
+    */
+   --surface-page:     var(--n9);  /* 内容区底色 — 亮，聚焦 */
+   --surface-card:     var(--n7);  /* 侧栏 / 卡片 — 暗，退后 */
+@@ -64,15 +66,15 @@
+ 
+   /* ── 边框 ──────────────────────────────────────────────── */
+ 
+-  --border-default: rgba(0, 0, 0, 0.07);
+-  --border-light:   rgba(0, 0, 0, 0.04);
+-  --border-subtle:  rgba(0, 0, 0, 0.025);
++  --border-default: rgba(0, 0, 0, 0.06);
++  --border-light:   rgba(0, 0, 0, 0.03);
++  --border-subtle:  rgba(0, 0, 0, 0.02);
+ 
+   /* ── 阴影 ──────────────────────────────────────────────── */
+ 
+-  --shadow-card:     0 1px 3px rgba(0,0,0,0.04), 0 1px 2px rgba(0,0,0,0.06);
+-  --shadow-elevated: 0 4px 16px rgba(0,0,0,0.06);
+-  --shadow-button:   0 2px 8px rgba(58,80,107,0.15);
++  --shadow-card:     0 1px 2px rgba(0,0,0,0.04);
++  --shadow-elevated: 0 4px 12px rgba(0,0,0,0.06);
++  --shadow-button:   0 1px 3px rgba(0,0,0,0.08);
+ 
+   /* ── 字体 ──────────────────────────────────────────────── */
+ 
+diff --git a/frontend/src/theme/tokens.ts b/frontend/src/theme/tokens.ts
+index 3ae17b0..a4ea19f 100644
+--- a/frontend/src/theme/tokens.ts
++++ b/frontend/src/theme/tokens.ts
+@@ -2,26 +2,27 @@ import type { ThemeConfig } from 'antd';
+ import { theme as antdTheme } from 'antd';
+ 
+ // ── JS 侧色值引用（与 tokens.css 同名变量保持一致）─────────
++// Muji / Notion 极简留白：暖灰中性色阶 + 克制语义色
+ 
+ export const PALETTE = {
+   neutral: {
+-    n0: '#1C2636',
+-    n1: '#253548',
+-    n2: '#3A506B',
+-    n3: '#526881',
+-    n4: '#71869C',
+-    n5: '#93A4B5',
+-    n6: '#B3C0CD',
+-    n7: '#D6DCE4',
+-    n8: '#E8ECF1',
+-    n9: '#F3F5F8',
+-    n10: '#FBFCFD',
++    n0: '#171717',
++    n1: '#262626',
++    n2: '#404040',
++    n3: '#525252',
++    n4: '#737373',
++    n5: '#A3A3A3',
++    n6: '#D4D4D4',
++    n7: '#E5E5E5',
++    n8: '#F0F0EE',
++    n9: '#F5F5F4',
++    n10: '#FAFAF9',
+   },
+-  accent: '#5BC0BE',
+-  warning: '#C9A68B',
+-  info: '#A8B59F',
+-  highlight: '#CDEDF6',
+-  error: '#C96B6B',
++  accent: '#1A1A1A',
++  warning: '#B45309',
++  info: '#525252',
++  highlight: '#FEF3C7',
++  error: '#B91C1C',
+ } as const;
+ 
+ export function rgba(hex: string, alpha: number): string {
+@@ -31,18 +32,18 @@ export function rgba(hex: string, alpha: number): string {
+   return `rgba(${r},${g},${b},${alpha})`;
+ }
+ 
+-// ── 按钮/强调渐变（仅用于显式强调场景，不用于结构面）───────
++// ── 纯色引用（渐变已废弃，Muji/Notion 极简风格）───────────
+ 
+-export const GRADIENTS = {
+-  /** 主按钮：深灰蓝 → 柔青绿 */
+-  primaryBtn: `linear-gradient(135deg, ${PALETTE.neutral.n2} 0%, ${PALETTE.accent} 100%)`,
++export const SOLIDS = {
++  /** 主按钮 */
++  primaryBtn: PALETTE.neutral.n0,
+   /** 品牌文字 */
+-  brandText: `linear-gradient(135deg, ${PALETTE.neutral.n2} 0%, ${PALETTE.accent} 50%, ${PALETTE.info} 100%)`,
+-  /** PageCardIcon 渐变 */
++  brandText: PALETTE.neutral.n0,
++  /** PageCardIcon 纯色 */
+   pageIcon: {
+-    blue: `linear-gradient(135deg, ${PALETTE.neutral.n2} 0%, ${PALETTE.accent} 100%)`,
+-    green: `linear-gradient(135deg, ${PALETTE.info} 0%, ${PALETTE.accent} 100%)`,
+-    warm: `linear-gradient(135deg, ${PALETTE.warning} 0%, ${PALETTE.neutral.n2} 100%)`,
++    blue: PALETTE.neutral.n2,
++    green: PALETTE.neutral.n4,
++    warm: PALETTE.warning,
+   },
+ } as const;
+ 
+@@ -56,8 +57,8 @@ export function createAntdThemeConfig(dark: boolean): ThemeConfig {
+     algorithm: dark ? antdTheme.darkAlgorithm : antdTheme.defaultAlgorithm,
+ 
+     token: {
+-      // 语义映射：柔青绿 → success / 陶土 → warning / 鼠尾草 → info
+-      colorPrimary: n.n2,
++      // 语义映射
++      colorPrimary: n.n0,        // 纯黑 primary — 极简克制
+       colorSuccess: PALETTE.accent,
+       colorWarning: PALETTE.warning,
+       colorInfo: PALETTE.info,
+@@ -73,21 +74,20 @@ export function createAntdThemeConfig(dark: boolean): ThemeConfig {
+       paddingContentHorizontal: 20,
+       paddingContentVertical: 16,
+ 
+-      // 边框
++      // 边框 — 暖灰，极淡
+       colorBorder: dark ? 'rgba(255,255,255,0.08)' : n.n6,
+-      colorBorderSecondary: dark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)',
++      colorBorderSecondary: dark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.04)',
+ 
+-      // 文字 — 必须用显式 hex，CSS var 会导致 Ant Design 无法计算派生色
+-      colorText: dark ? '#E4E8EE' : n.n0,
+-      colorTextSecondary: dark ? '#93A4B5' : n.n3,
+-      colorTextTertiary: dark ? '#71869C' : n.n4,
+-      colorTextQuaternary: dark ? '#526881' : n.n5,
++      // 文字 — 暖灰阶，不用蓝黑
++      colorText: dark ? '#E5E5E5' : n.n0,
++      colorTextSecondary: dark ? '#A3A3A3' : n.n3,
++      colorTextTertiary: dark ? '#737373' : n.n4,
++      colorTextQuaternary: dark ? '#525252' : n.n5,
+     },
+ 
+     components: {
+       Layout: {
+         headerBg: dark ? n.n0 : n.n10,
+-        // 侧栏更深 → 退后；内容区更亮 → 聚焦
+         siderBg: dark ? n.n0 : n.n7,
+         bodyBg: dark ? n.n0 : n.n9,
+       },
+@@ -96,10 +96,9 @@ export function createAntdThemeConfig(dark: boolean): ThemeConfig {
+         itemMarginInline: 8,
+         itemHeight: 38,
+         iconSize: 17,
+-        // 选中颜色用柔青绿——晶脉透光
+         itemSelectedColor: PALETTE.accent,
+         itemColor: dark ? 'rgba(255,255,255,0.55)' : n.n3,
+-        itemHoverColor: dark ? 'rgba(255,255,255,0.85)' : n.n2,
++        itemHoverColor: dark ? 'rgba(255,255,255,0.85)' : n.n0,
+       },
+       Card: {
+         borderRadiusLG: 10,
+@@ -115,13 +114,13 @@ export function createAntdThemeConfig(dark: boolean): ThemeConfig {
+         borderRadius: 8,
+         controlHeight: 36,
+         activeBorderColor: PALETTE.accent,
+-        activeShadow: `0 0 0 2px ${rgba(PALETTE.accent, 0.15)}`,
++        activeShadow: `0 0 0 2px ${rgba(PALETTE.accent, 0.1)}`,
+       },
+       Table: {
+         borderRadiusLG: 10,
+         headerBg: dark ? n.n1 : n.n10,
+         headerBorderRadius: 10,
+-        rowHoverBg: dark ? 'rgba(255,255,255,0.04)' : rgba(PALETTE.accent, 0.08),
++        rowHoverBg: dark ? 'rgba(255,255,255,0.04)' : rgba(PALETTE.accent, 0.04),
+       },
+       Segmented: { borderRadius: 8 },
+       Select: { borderRadius: 8 },
+-- 
+2.39.5
+
+
+From 068b90c0b64fed7670c750a3a25c6a32686dbab9 Mon Sep 17 00:00:00 2001
+From: Kai <kai@taskpilot.dev>
+Date: Thu, 9 Jul 2026 05:37:34 +0000
+Subject: [PATCH 2/3] fix: chat bubble contrast, skill card selection, status
+ i18n key
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+- User bubble: solid black (#171717) + white text (was transparent + border)
+- Skill cards: subtle border highlight instead of dark fill
+- Status tag: fix i18n key prefix (tasks.status.x → status.x)
+- ChatPage default bubble color aligned to #171717
+---
+ frontend/src/api/types.ts                    | 12 ++++++------
+ frontend/src/components/chat/ChatMessage.css |  6 +++---
+ frontend/src/pages/ChatPage.tsx              |  4 ++--
+ frontend/src/pages/RunTaskPage.tsx           |  6 +++---
+ 4 files changed, 14 insertions(+), 14 deletions(-)
+
+diff --git a/frontend/src/api/types.ts b/frontend/src/api/types.ts
+index 3190ce5..ad17cb8 100644
+--- a/frontend/src/api/types.ts
++++ b/frontend/src/api/types.ts
+@@ -17,12 +17,12 @@ export enum TaskStatus {
+ }
+ 
+ export const TASK_STATUS_LABEL_KEYS: Record<TaskStatus, string> = {
+-  [TaskStatus.INIT]: 'tasks.status.init',
+-  [TaskStatus.PROCESSING]: 'tasks.status.processing',
+-  [TaskStatus.SUCCESS]: 'tasks.status.success',
+-  [TaskStatus.CANCELLED]: 'tasks.status.cancelled',
+-  [TaskStatus.CANCEL_REQUESTED]: 'tasks.status.cancelRequested',
+-  [TaskStatus.FAILED]: 'tasks.status.failed',
++  [TaskStatus.INIT]: 'status.init',
++  [TaskStatus.PROCESSING]: 'status.processing',
++  [TaskStatus.SUCCESS]: 'status.success',
++  [TaskStatus.CANCELLED]: 'status.cancelled',
++  [TaskStatus.CANCEL_REQUESTED]: 'status.cancelRequested',
++  [TaskStatus.FAILED]: 'status.failed',
+ };
+ 
+ // ============ 通用响应包装 ============
+diff --git a/frontend/src/components/chat/ChatMessage.css b/frontend/src/components/chat/ChatMessage.css
+index ab287df..18b092f 100644
+--- a/frontend/src/components/chat/ChatMessage.css
++++ b/frontend/src/components/chat/ChatMessage.css
+@@ -12,9 +12,9 @@
+ 
+ /* ── 消息列表 ── */
+ .chat-thread {
+-  --chat-user-bubble: transparent;
+-  --chat-user-border: var(--n6);
+-  --chat-user-text: var(--n0);
++  --chat-user-bubble: var(--n0);
++  --chat-user-border: var(--n0);
++  --chat-user-text: #FFFFFF;
+   --chat-user-shadow: var(--shadow-card);
+   --chat-assistant-bubble: var(--n8);
+   --chat-assistant-border: var(--border-light);
+diff --git a/frontend/src/pages/ChatPage.tsx b/frontend/src/pages/ChatPage.tsx
+index 674af66..bc0e620 100644
+--- a/frontend/src/pages/ChatPage.tsx
++++ b/frontend/src/pages/ChatPage.tsx
+@@ -28,7 +28,7 @@ export function ChatPage() {
+   const navigate = useNavigate();
+   const [createAgentLoading, setCreateAgentLoading] = useState(false);
+   const [bubbleColor, setBubbleColor] = useState<string>(() => {
+-    try { return localStorage.getItem('chat-bubble-color') || '#404040'; } catch { return '#404040'; }
++    try { return localStorage.getItem('chat-bubble-color') || '#171717'; } catch { return '#171717'; }
+   });
+ 
+   /** 根据 hex 计算亮度 → 浅色底配深字，深色底配白字 */
+@@ -255,7 +255,7 @@ export function ChatPage() {
+                 type="text"
+                 value={bubbleColor}
+                 onChange={(e) => handleBubbleColorChange(e.target.value)}
+-                placeholder="#404040"
++                placeholder="#171717"
+                 style={{
+                   width: 80,
+                   height: 26,
+diff --git a/frontend/src/pages/RunTaskPage.tsx b/frontend/src/pages/RunTaskPage.tsx
+index 056d592..156a0e1 100644
+--- a/frontend/src/pages/RunTaskPage.tsx
++++ b/frontend/src/pages/RunTaskPage.tsx
+@@ -315,8 +315,8 @@ export function RunTaskPage() {
+                       padding: '8px 10px',
+                       borderRadius: 6,
+                       cursor: inFlight ? 'not-allowed' : 'pointer',
+-                      border: `1px solid ${selected ? token.colorSuccess : token.colorBorderSecondary}`,
+-                      background: selected ? token.colorSuccessBg : token.colorBgContainer,
++                      border: `1px solid ${selected ? token.colorText : token.colorBorderSecondary}`,
++                      background: selected ? 'rgba(23, 23, 23, 0.04)' : token.colorBgContainer,
+                       opacity: inFlight ? 0.6 : 1,
+                       transition: 'all 0.2s',
+                     }}
+@@ -337,7 +337,7 @@ export function RunTaskPage() {
+                         </Typography.Text>
+                       </div>
+                       {selected && (
+-                        <CheckCircleOutlined style={{ color: token.colorSuccess, marginLeft: 'auto' }} />
++                        <CheckCircleOutlined style={{ color: token.colorText, marginLeft: 'auto' }} />
+                       )}
+                     </Space>
+                   </div>
+-- 
+2.39.5
+
+
+From 48c92f90c8c61f61c5b918f7046f93528bbf317e Mon Sep 17 00:00:00 2001
+From: Kai <kai@taskpilot.dev>
+Date: Thu, 9 Jul 2026 08:31:49 +0000
+Subject: [PATCH 3/3] =?UTF-8?q?refactor:=20P0=20visual=20system=20?=
+ =?UTF-8?q?=E2=80=94=20remove=20all=20decoration?=
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Per Aya's Visual System Spec:
+- Sidebar: pure white + text nav + left 2px vertical line selected
+- All box-shadow removed globally (CSS vars + inline styles)
+- All linear-gradient removed (tokens, page hero, buttons, avatars)
+- All backdrop-filter/blur removed (glass-morphism eliminated)
+- Table: transparent header, row border separation, no card wrap
+- Page hero: pure text, no background/border/decoration
+- Chat bubbles: transparent + border, no color fill, no blur
+- Ant Design theme: borderRadius 6px, no shadows, transparent backgrounds
+- Tokens: shadow vars zeroed out
+
+13 files changed. Zero decoration artifacts remaining.
+---
+ frontend/src/components/chat/ChatMessage.css  | 55 ++++++-------
+ frontend/src/components/chat/Composer.tsx     |  2 +-
+ .../src/components/chat/MessageBubble.tsx     |  2 +-
+ frontend/src/components/common/AppLayout.css  | 46 +++++++----
+ frontend/src/components/common/PageLayout.css | 78 ++++++++++---------
+ .../src/components/common/StickToBottom.tsx   |  2 +-
+ frontend/src/index.css                        |  2 -
+ frontend/src/pages/AccountPage.tsx            |  4 +-
+ frontend/src/pages/ChatPage.tsx               |  3 +-
+ frontend/src/pages/DashboardPage.tsx          |  2 +-
+ frontend/src/pages/LoginPage.tsx              |  2 +-
+ frontend/src/pages/RegisterPage.tsx           |  2 +-
+ frontend/src/theme/tokens.css                 |  6 +-
+ frontend/src/theme/tokens.ts                  | 77 +++++++++---------
+ 14 files changed, 151 insertions(+), 132 deletions(-)
+
+diff --git a/frontend/src/components/chat/ChatMessage.css b/frontend/src/components/chat/ChatMessage.css
+index 18b092f..b1e2b47 100644
+--- a/frontend/src/components/chat/ChatMessage.css
++++ b/frontend/src/components/chat/ChatMessage.css
+@@ -4,22 +4,20 @@
+ }
+ 
+ .chat-composer-bar {
+-  background: var(--n8) !important;
+-  backdrop-filter: blur(16px);
+-  -webkit-backdrop-filter: blur(16px);
++  background: #FFFFFF !important;
+   border-top: 1px solid var(--border-light) !important;
+ }
+ 
+ /* ── 消息列表 ── */
+ .chat-thread {
+-  --chat-user-bubble: var(--n0);
+-  --chat-user-border: var(--n0);
+-  --chat-user-text: #FFFFFF;
+-  --chat-user-shadow: var(--shadow-card);
+-  --chat-assistant-bubble: var(--n8);
+-  --chat-assistant-border: var(--border-light);
++  --chat-user-bubble: transparent;
++  --chat-user-border: var(--n6);
++  --chat-user-text: var(--n0);
++  --chat-user-shadow: none;
++  --chat-assistant-bubble: transparent;
++  --chat-assistant-border: transparent;
+   --chat-assistant-text: var(--n0);
+-  --chat-assistant-shadow: var(--shadow-card);
++  --chat-assistant-shadow: none;
+   --chat-avatar-user: var(--n0);
+   --chat-avatar-agent: var(--n6);
+   --chat-avatar-agent-icon: var(--n2);
+@@ -152,7 +150,6 @@
+   display: flex; align-items: center; gap: 10px;
+   padding: 10px 16px;
+   border-radius: 16px;
+-  backdrop-filter: blur(8px);
+ }
+ 
+ .tool-result-pre {
+@@ -189,7 +186,7 @@
+   align-items: center;
+   justify-content: center;
+   font-size: 15px;
+-  box-shadow: 0 1px 4px rgba(23, 23, 23, 0.1);
++  box-shadow: none;
+ }
+ .msg-row.user .msg-avatar {
+   background: var(--chat-avatar-user);
+@@ -246,49 +243,41 @@
+ 
+ /* ── 气泡 ── */
+ .msg-bubble {
+-  border-radius: 16px;
+-  padding: 11px 15px;
++  border-radius: 8px;
++  padding: 10px 14px;
+   word-break: break-word;
+-  line-height: 1.62;
++  line-height: 1.6;
+   font-size: 14px;
+   letter-spacing: -0.01em;
+-  transition: box-shadow 0.2s ease, border-color 0.2s ease;
+ }
+ .msg-bubble--user {
+   background: var(--chat-user-bubble);
+   color: var(--chat-user-text);
+   border: 1px solid var(--chat-user-border);
+-  border-bottom-right-radius: 5px;
+-  box-shadow: var(--chat-user-shadow);
+-  backdrop-filter: blur(10px);
+-  -webkit-backdrop-filter: blur(10px);
++  border-bottom-right-radius: 2px;
+ }
+ .msg-bubble--assistant {
+   background: var(--chat-assistant-bubble);
+   color: var(--chat-assistant-text);
+   border: 1px solid var(--chat-assistant-border);
+-  border-bottom-left-radius: 5px;
+-  box-shadow: var(--chat-assistant-shadow);
+-  backdrop-filter: blur(14px);
+-  -webkit-backdrop-filter: blur(14px);
++  border-bottom-left-radius: 2px;
+ }
+ .msg-bubble--tool {
+-  border-bottom-left-radius: 6px;
+-  backdrop-filter: blur(8px);
++  border-bottom-left-radius: 2px;
++  background: var(--n9);
++  border: 1px solid var(--border-light);
+ }
+ .msg-inline-parts { margin-top: 8px; width: 100%; }
+ .msg-inline-parts--only { margin-top: 0; }
+ 
+ /* ── 滚到底部按钮 ── */
+ .chat-scroll-bottom {
+-  border-radius: 20px !important;
+-  box-shadow: 0 2px 8px rgba(23, 23, 23, 0.12) !important;
+-  background: var(--surface-elevated) !important;
+-  color: var(--color-accent) !important;
+-  border: 1px solid rgba(23, 23, 23, 0.12) !important;
++  border-radius: 6px !important;
++  box-shadow: none !important;
++  background: #FFFFFF !important;
++  color: var(--n0) !important;
++  border: 1px solid var(--border-default) !important;
+   font-weight: 500;
+-  letter-spacing: -0.01em;
+-  backdrop-filter: blur(12px);
+ }
+ 
+ /* ── 消息选择 ── */
+diff --git a/frontend/src/components/chat/Composer.tsx b/frontend/src/components/chat/Composer.tsx
+index 5da0abd..6a026c6 100644
+--- a/frontend/src/components/chat/Composer.tsx
++++ b/frontend/src/components/chat/Composer.tsx
+@@ -55,7 +55,7 @@ export function Composer({ disabled, onSend }: Props) {
+           borderRadius: '0 12px 12px 0',
+           background: 'var(--n0)',
+           border: 'none',
+-          boxShadow: '0 1px 3px rgba(0,0,0,0.08)',
++          boxShadow: 'none',
+           minWidth: 60,
+         }}
+       >
+diff --git a/frontend/src/components/chat/MessageBubble.tsx b/frontend/src/components/chat/MessageBubble.tsx
+index 8666848..2f8337e 100644
+--- a/frontend/src/components/chat/MessageBubble.tsx
++++ b/frontend/src/components/chat/MessageBubble.tsx
+@@ -70,7 +70,7 @@ export function MessageBubble({ message, streaming = false, selectable = false,
+   const toolBubbleStyle: React.CSSProperties = {
+     background: palette.toolAvatarBg,
+     border: `1px solid ${palette.toolAvatarBorder}`,
+-    boxShadow: 'var(--chat-assistant-shadow)',
++    boxShadow: 'none',
+   };
+ 
+   return (
+diff --git a/frontend/src/components/common/AppLayout.css b/frontend/src/components/common/AppLayout.css
+index 6413ca6..9818b67 100644
+--- a/frontend/src/components/common/AppLayout.css
++++ b/frontend/src/components/common/AppLayout.css
+@@ -5,6 +5,7 @@
+   overflow: hidden;
+ }
+ 
++/* ── 侧栏：纯白底，无装饰 ── */
+ .app-layout__sider {
+   position: fixed;
+   left: 0; top: 0; bottom: 0;
+@@ -12,36 +13,54 @@
+   overflow-x: hidden;
+   overflow-y: auto;
+   z-index: 100;
+-  background: var(--n10) !important;
++  background: #FFFFFF !important;
+   border-right: none !important;
+-  border-left: 1px solid var(--border-light) !important;
++  border-left: none !important;
+   box-shadow: none !important;
+ }
+ 
+ .app-layout__sider .sider-logo {
+-  border-bottom: 1px solid var(--border-subtle);
++  border-bottom: 1px solid var(--border-light);
+ }
+ 
+ .app-layout__sider .ant-menu {
+   background: transparent !important;
+ }
+ 
++/* ── 导航项：纯文字，无背景色 ── */
+ .app-layout__sider .ant-menu-item {
+-  transition: background 0.2s ease;
++  transition: none;
++  margin: 0 !important;
++  padding-left: 20px !important;
++  border-radius: 0 !important;
++  height: 40px !important;
++  line-height: 40px !important;
+ }
+ 
++.app-layout__sider .ant-menu-item:hover {
++  background: transparent !important;
++  color: var(--n0) !important;
++}
++
++/* ── 选中态：左侧 2px 竖线 + 字重 600 ── */
+ .app-layout__sider .ant-menu-item-selected {
+-  background: var(--color-primary-soft) !important;
+-  font-weight: 600;
++  background: transparent !important;
++  font-weight: 600 !important;
+   color: var(--n0) !important;
++  position: relative;
+ }
+ 
+-.app-layout__sider .ant-menu-item-selected::after {
+-  display: none;
++.app-layout__sider .ant-menu-item-selected::before {
++  content: '';
++  position: absolute;
++  left: 0; top: 8px; bottom: 8px;
++  width: 2px;
++  background: var(--n0);
++  border-radius: 0 1px 1px 0;
+ }
+ 
+-.app-layout__sider .ant-menu-item:not(.ant-menu-item-selected):hover {
+-  background: var(--color-primary-soft) !important;
++.app-layout__sider .ant-menu-item-selected::after {
++  display: none;
+ }
+ 
+ .app-layout__main {
+@@ -53,12 +72,11 @@
+   min-width: 0;
+ }
+ 
++/* ── 顶栏：纯白底，极简 ── */
+ .app-layout__header {
+   flex-shrink: 0;
+   z-index: 99;
+-  background: var(--surface-header) !important;
+-  backdrop-filter: blur(12px);
+-  -webkit-backdrop-filter: blur(12px);
++  background: #FFFFFF !important;
+   border-bottom: 1px solid var(--border-light) !important;
+   box-shadow: none !important;
+ }
+@@ -68,5 +86,5 @@
+   min-height: 0;
+   overflow: auto;
+   -webkit-overflow-scrolling: touch;
+-  background: var(--surface-page);
++  background: #FFFFFF;
+ }
+diff --git a/frontend/src/components/common/PageLayout.css b/frontend/src/components/common/PageLayout.css
+index c8eca68..36c4531 100644
+--- a/frontend/src/components/common/PageLayout.css
++++ b/frontend/src/components/common/PageLayout.css
+@@ -1,84 +1,83 @@
++/* ── 页面结构：去装饰，靠排版和间距建立层级 ── */
++
+ .page-shell {
+   width: 100%;
+-  animation: page-enter 0.35s ease-out;
+ }
+ 
++/* ── Page Hero：纯文字，无背景/边框/阴影 ── */
+ .page-hero {
+   display: flex;
+   align-items: center;
+   gap: 20px;
+-  padding: 28px 32px;
+-  border-radius: 16px;
+-  margin-bottom: 24px;
+-  border: 1px solid var(--page-border);
+-  background: var(--page-hero-bg);
+-  box-shadow: var(--page-shadow);
++  padding: 0 0 32px 0;
++  margin-bottom: 0;
+ }
+ 
+ .page-hero__avatar {
+-  width: 64px;
+-  height: 64px;
+-  border-radius: 50%;
++  width: 48px;
++  height: 48px;
++  border-radius: 12px;
+   display: flex;
+   align-items: center;
+   justify-content: center;
+-  font-size: 26px;
++  font-size: 22px;
+   font-weight: 600;
+-  letter-spacing: -0.02em;
+-  color: #fff;
++  color: var(--n0);
+   flex-shrink: 0;
+-  box-shadow: 0 8px 24px rgba(23, 23, 23, 0.1);
++  background: var(--n8);
+ }
+ 
+ .page-hero__title {
+   margin: 0 !important;
+   font-size: 28px !important;
+-  font-weight: 600 !important;
++  font-weight: 700 !important;
+   letter-spacing: -0.03em !important;
+   line-height: 1.2 !important;
++  color: var(--n0) !important;
+ }
+ 
+ .page-hero__subtitle {
+   display: block;
+   margin-top: 4px;
+-  font-size: 15px;
++  font-size: 14px;
+   letter-spacing: -0.01em;
+ }
+ 
++/* ── Page Card：无阴影，border 仅需分隔时 ── */
+ .page-card {
+-  border-radius: 14px !important;
+-  border: 1px solid var(--page-border) !important;
+-  box-shadow: var(--page-shadow) !important;
++  border-radius: 8px !important;
++  border: 1px solid var(--border-default) !important;
++  box-shadow: none !important;
+   overflow: hidden;
+   height: 100%;
+ }
+ 
+ .page-card .ant-card-head {
+-  border-bottom: 1px solid var(--page-border);
+-  min-height: 52px;
+-  padding: 0 22px;
++  border-bottom: 1px solid var(--border-light);
++  min-height: 48px;
++  padding: 0 20px;
+ }
+ 
+ .page-card .ant-card-head-title {
+-  font-size: 15px;
++  font-size: 14px;
+   font-weight: 600;
+-  letter-spacing: -0.02em;
++  letter-spacing: -0.01em;
+ }
+ 
+ .page-card__title {
+   display: inline-flex;
+   align-items: center;
+-  gap: 10px;
++  gap: 8px;
+ }
+ 
+ .page-card__icon {
+-  width: 32px;
+-  height: 32px;
+-  border-radius: 8px;
++  width: 28px;
++  height: 28px;
++  border-radius: 6px;
+   display: inline-flex;
+   align-items: center;
+   justify-content: center;
+-  font-size: 15px;
++  font-size: 14px;
+ }
+ 
+ .page-info-grid {
+@@ -108,6 +107,7 @@
+   letter-spacing: -0.01em;
+ }
+ 
++/* ── 表格：无 header 背景，行间 border 分隔 ── */
+ .page-table-card .ant-table {
+   background: transparent;
+ }
+@@ -117,26 +117,34 @@
+   font-weight: 600;
+   letter-spacing: 0.03em;
+   text-transform: uppercase;
++  background: transparent !important;
++  border-bottom: 1px solid var(--border-default) !important;
+ }
+ 
+ .page-table-card .ant-table-tbody > tr > td {
+   font-size: 14px;
+   letter-spacing: -0.01em;
++  border-bottom: 1px solid var(--border-light) !important;
++}
++
++.page-table-card .ant-table-tbody > tr:last-child > td {
++  border-bottom: none !important;
+ }
+ 
+ .page-table-card .ant-table-tbody > tr:hover > td {
+-  background: var(--page-row-hover) !important;
++  background: rgba(0, 0, 0, 0.02) !important;
+ }
+ 
++/* ── 面板：极简 ── */
+ .page-panel {
+-  border-radius: 14px;
+-  border: 1px solid var(--page-border);
+-  box-shadow: var(--page-shadow);
++  border-radius: 8px;
++  border: 1px solid var(--border-default);
++  box-shadow: none;
+   overflow: hidden;
+-  background: var(--ant-color-bg-container, #fff);
++  background: #FFFFFF;
+ }
+ 
+-/* 填满主内容区（Chat / Run Task 等），避免再用 100vh 计算 */
++/* ── 填满主内容区 ── */
+ .page-shell--fill {
+   display: flex;
+   flex-direction: column;
+diff --git a/frontend/src/components/common/StickToBottom.tsx b/frontend/src/components/common/StickToBottom.tsx
+index 7571b42..78d5596 100644
+--- a/frontend/src/components/common/StickToBottom.tsx
++++ b/frontend/src/components/common/StickToBottom.tsx
+@@ -68,7 +68,7 @@ export function StickToBottom({ children, className, style, deps = [] }: Props)
+             left: '50%',
+             transform: 'translateX(-50%)',
+             zIndex: 10,
+-            boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
++            boxShadow: 'none',
+           }}
+         >
+           {t('scrollToBottom')}
+diff --git a/frontend/src/index.css b/frontend/src/index.css
+index 3d2d928..e86b9c9 100644
+--- a/frontend/src/index.css
++++ b/frontend/src/index.css
+@@ -60,7 +60,5 @@ code, pre, kbd, samp, .font-mono {
+ 
+ /* ── Glass ── */
+ .glass {
+-  backdrop-filter: blur(16px);
+-  -webkit-backdrop-filter: blur(16px);
+ }
+ 
+diff --git a/frontend/src/pages/AccountPage.tsx b/frontend/src/pages/AccountPage.tsx
+index 5ca358d..1ae9063 100644
+--- a/frontend/src/pages/AccountPage.tsx
++++ b/frontend/src/pages/AccountPage.tsx
+@@ -418,7 +418,7 @@ export function AccountPage() {
+               <Button
+                 type="primary"
+                 icon={<PlusOutlined />}
+-                style={{ borderRadius: 10, background: 'var(--color-accent)', boxShadow: '0 4px 12px rgba(13,148,136,0.25)' }}
++                style={{ borderRadius: 10, background: 'var(--color-accent)', boxShadow: 'none' }}
+                 onClick={() => {
+                   setNewToken(null);
+                   setTokenName('');
+@@ -588,7 +588,7 @@ export function AccountPage() {
+                 <Button
+                   type="primary"
+                   icon={<PlusOutlined />}
+-                  style={{ borderRadius: 10, background: 'var(--color-warning)', boxShadow: '0 4px 12px rgba(180,83,9,0.25)' }}
++                  style={{ borderRadius: 10, background: 'var(--color-warning)', boxShadow: 'none' }}
+                   onClick={() => {
+                     setNewInviteCodes(null);
+                     setInviteCount(1);
+diff --git a/frontend/src/pages/ChatPage.tsx b/frontend/src/pages/ChatPage.tsx
+index bc0e620..77e5314 100644
+--- a/frontend/src/pages/ChatPage.tsx
++++ b/frontend/src/pages/ChatPage.tsx
+@@ -190,8 +190,7 @@ export function ChatPage() {
+           style={{
+             padding: '10px 16px',
+             borderBottom: `1px solid ${token.colorBorderSecondary}`,
+-            background: 'rgba(255, 255, 255, 0.72)',
+-            backdropFilter: 'blur(12px)',
++            background: '#FFFFFF',
+             display: 'flex',
+             justifyContent: 'space-between',
+             alignItems: 'center',
+diff --git a/frontend/src/pages/DashboardPage.tsx b/frontend/src/pages/DashboardPage.tsx
+index e3a3dd1..d8ca4ce 100644
+--- a/frontend/src/pages/DashboardPage.tsx
++++ b/frontend/src/pages/DashboardPage.tsx
+@@ -125,7 +125,7 @@ export function DashboardPage() {
+                     contentStyle={{
+                       borderRadius: 8,
+                       border: `1px solid ${token.colorBorderSecondary}`,
+-                      boxShadow: '0 4px 12px rgba(0,0,0,0.08)',
++                      boxShadow: 'none',
+                     }}
+                   />
+                   <Legend />
+diff --git a/frontend/src/pages/LoginPage.tsx b/frontend/src/pages/LoginPage.tsx
+index 0da5faa..77c6aea 100644
+--- a/frontend/src/pages/LoginPage.tsx
++++ b/frontend/src/pages/LoginPage.tsx
+@@ -47,7 +47,7 @@ export function LoginPage() {
+       }}
+     >
+       <Card
+-        style={{ width: 400, borderRadius: 14, boxShadow: '0 4px 24px rgba(0,0,0,0.08)' }}
++        style={{ width: 400, borderRadius: 14, boxShadow: 'none' }}
+         bordered={false}
+       >
+         <div style={{ textAlign: 'center', marginBottom: 36 }}>
+diff --git a/frontend/src/pages/RegisterPage.tsx b/frontend/src/pages/RegisterPage.tsx
+index ad1b3f1..85628ed 100644
+--- a/frontend/src/pages/RegisterPage.tsx
++++ b/frontend/src/pages/RegisterPage.tsx
+@@ -53,7 +53,7 @@ export function RegisterPage() {
+         background: themeToken.colorBgLayout,
+       }}
+     >
+-      <Card style={{ width: 420, borderRadius: 14, boxShadow: '0 4px 24px rgba(0,0,0,0.08)' }} bordered={false}>
++      <Card style={{ width: 420, borderRadius: 14, boxShadow: 'none' }} bordered={false}>
+         <div style={{ textAlign: 'center', marginBottom: 36 }}>
+           <Typography.Title level={3} style={{ marginBottom: 4 }}>
+             <span style={{ color: "var(--n0)" }}>TaskPilot</span>
+diff --git a/frontend/src/theme/tokens.css b/frontend/src/theme/tokens.css
+index 92a610b..708456d 100644
+--- a/frontend/src/theme/tokens.css
++++ b/frontend/src/theme/tokens.css
+@@ -72,9 +72,9 @@
+ 
+   /* ── 阴影 ──────────────────────────────────────────────── */
+ 
+-  --shadow-card:     0 1px 2px rgba(0,0,0,0.04);
+-  --shadow-elevated: 0 4px 12px rgba(0,0,0,0.06);
+-  --shadow-button:   0 1px 3px rgba(0,0,0,0.08);
++  --shadow-card:     none;
++  --shadow-elevated: none;
++  --shadow-button:   none;
+ 
+   /* ── 字体 ──────────────────────────────────────────────── */
+ 
+diff --git a/frontend/src/theme/tokens.ts b/frontend/src/theme/tokens.ts
+index a4ea19f..802e188 100644
+--- a/frontend/src/theme/tokens.ts
++++ b/frontend/src/theme/tokens.ts
+@@ -58,78 +58,85 @@ export function createAntdThemeConfig(dark: boolean): ThemeConfig {
+ 
+     token: {
+       // 语义映射
+-      colorPrimary: n.n0,        // 纯黑 primary — 极简克制
++      colorPrimary: n.n0,
+       colorSuccess: PALETTE.accent,
+       colorWarning: PALETTE.warning,
+       colorInfo: PALETTE.info,
+       colorError: PALETTE.error,
+ 
+-      // 排版
++      // 排版 — 按 Aya 排版系统
+       fontFamily: "var(--font-sans)",
+       fontFamilyCode: "var(--font-mono)",
+       fontSize: 14,
+-      lineHeight: 1.6,
+-      borderRadius: 8,
++      lineHeight: 1.5,
++      borderRadius: 6,
+       controlHeight: 36,
+-      paddingContentHorizontal: 20,
+-      paddingContentVertical: 16,
++      paddingContentHorizontal: 16,
++      paddingContentVertical: 12,
+ 
+-      // 边框 — 暖灰，极淡
++      // 边框 — 极淡
+       colorBorder: dark ? 'rgba(255,255,255,0.08)' : n.n6,
+       colorBorderSecondary: dark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.04)',
+ 
+-      // 文字 — 暖灰阶，不用蓝黑
++      // 文字
+       colorText: dark ? '#E5E5E5' : n.n0,
+       colorTextSecondary: dark ? '#A3A3A3' : n.n3,
+       colorTextTertiary: dark ? '#737373' : n.n4,
+       colorTextQuaternary: dark ? '#525252' : n.n5,
++
++      // 去装饰
++      boxShadow: 'none',
++      boxShadowSecondary: 'none',
+     },
+ 
+     components: {
+       Layout: {
+-        headerBg: dark ? n.n0 : n.n10,
+-        siderBg: dark ? n.n0 : n.n7,
+-        bodyBg: dark ? n.n0 : n.n9,
++        headerBg: 'transparent',
++        siderBg: 'transparent',
++        bodyBg: '#FFFFFF',
+       },
+       Menu: {
+-        itemBorderRadius: 8,
+-        itemMarginInline: 8,
+-        itemHeight: 38,
+-        iconSize: 17,
+-        itemSelectedColor: PALETTE.accent,
+-        itemColor: dark ? 'rgba(255,255,255,0.55)' : n.n3,
+-        itemHoverColor: dark ? 'rgba(255,255,255,0.85)' : n.n0,
++        itemBorderRadius: 0,
++        itemMarginInline: 0,
++        itemHeight: 40,
++        iconSize: 16,
++        itemSelectedColor: n.n0,
++        itemColor: n.n4,
++        itemHoverColor: n.n0,
++        itemSelectedBg: 'transparent',
++        itemBg: 'transparent',
++        subMenuItemBg: 'transparent',
+       },
+       Card: {
+-        borderRadiusLG: 10,
+-        paddingLG: 20,
++        borderRadiusLG: 8,
++        paddingLG: 16,
++        boxShadow: 'none',
+       },
+       Button: {
+-        borderRadius: 8,
++        borderRadius: 6,
+         controlHeight: 36,
+-        paddingInline: 16,
++        paddingInline: 14,
+         contentFontSize: 14,
++        boxShadow: 'none',
+       },
+       Input: {
+-        borderRadius: 8,
++        borderRadius: 6,
+         controlHeight: 36,
+-        activeBorderColor: PALETTE.accent,
+-        activeShadow: `0 0 0 2px ${rgba(PALETTE.accent, 0.1)}`,
++        activeBorderColor: n.n0,
++        activeShadow: 'none',
+       },
+       Table: {
+-        borderRadiusLG: 10,
+-        headerBg: dark ? n.n1 : n.n10,
+-        headerBorderRadius: 10,
+-        rowHoverBg: dark ? 'rgba(255,255,255,0.04)' : rgba(PALETTE.accent, 0.04),
++        borderRadiusLG: 0,
++        headerBg: 'transparent',
++        headerBorderRadius: 0,
++        rowHoverBg: 'rgba(0,0,0,0.02)',
++        boxShadow: 'none',
+       },
+-      Segmented: { borderRadius: 8 },
+-      Select: { borderRadius: 8 },
+-      DatePicker: { borderRadius: 8 },
+       Tag: { borderRadiusSM: 4 },
+       Tabs: {
+-        itemActiveColor: PALETTE.accent,
+-        itemHoverColor: PALETTE.accent,
+-        inkBarColor: PALETTE.accent,
++        itemActiveColor: n.n0,
++        itemHoverColor: n.n3,
++        inkBarColor: n.n0,
+       },
+     },
+   };
+-- 
+2.39.5
+

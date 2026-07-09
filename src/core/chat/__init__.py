@@ -1,4 +1,4 @@
-"""Chat 领域模块：会话与消息持久化、对话编排、ChatTurnRunner 轻量 Loop。"""
+"""Chat 领域模块：会话与消息持久化、对话编排。"""
 
 from .ids import generate_conversation_id
 from .repository import (
@@ -11,7 +11,6 @@ from .repository import (
 )
 from .risk import ToolRisk, TOOL_RISK_REGISTRY, DEFAULT_RISK, get_tool_risk, is_high_risk
 from .events import ChatEventType
-from .runner import ChatTurnRunner, ChatTurnResult
 from .service import ChatService
 from .task_invoker import TaskInvoker
 
@@ -28,8 +27,6 @@ __all__ = [
     "get_tool_risk",
     "is_high_risk",
     "ChatEventType",
-    "ChatTurnRunner",
-    "ChatTurnResult",
     "ChatService",
     "TaskInvoker",
     "generate_conversation_id",
