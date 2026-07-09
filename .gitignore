@@ -41,7 +41,6 @@ CLAUDE.md
 package-lock.json
 node_modudles/
 docs/design
-frontend/
 nginx/
 /docs/deploy.md
 /src/infra/streaming/DESIGN.md
