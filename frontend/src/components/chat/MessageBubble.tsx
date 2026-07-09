@@ -75,17 +75,6 @@ export function MessageBubble({ message, streaming = false, selectable = false, 
 
   return (
     <div className={rowClass} onClick={handleClick} style={{ cursor: selectable ? 'pointer' : undefined }}>
-      {selectable && (
-        <div
-          className={`msg-select-checkbox${selected ? ' msg-select-checkbox--checked' : ''}`}
-          onClick={(e) => {
-            e.stopPropagation();
-            if (onToggleSelect && message.id > 0) onToggleSelect(message.id);
-          }}
-        >
-          {selected && '✓'}
-        </div>
-      )}
       {!isUser && (
         <div className="msg-avatar" style={isTool ? toolAvatarStyle : undefined}>
           {isAssistant ? <RobotOutlined /> : <ToolOutlined />}
@@ -99,14 +88,6 @@ export function MessageBubble({ message, streaming = false, selectable = false, 
           </span>
           {message.created_at && (
             <span className="msg-meta__time">{formatTime(message.created_at)}</span>
-          )}
-          {message.trace_id && !isUser && (
-            <Link
-              to={`/tasks/${encodeURIComponent(message.trace_id)}`}
-              className="msg-meta__trace"
-            >
-              trace
-            </Link>
           )}
         </div>
 
@@ -127,11 +108,34 @@ export function MessageBubble({ message, streaming = false, selectable = false, 
             <MessageRenderer parts={inlineParts} isUser={isUser} />
           </div>
         )}
+
+        {message.trace_id && !isUser && (
+          <div className="msg-actions">
+            <Link
+              to={`/tasks/${encodeURIComponent(message.trace_id)}`}
+              className="msg-actions__trace"
+            >
+              trace
+            </Link>
+          </div>
+        )}
       </div>
 
       {isUser && (
         <div className="msg-avatar">
           <UserOutlined />
+        </div>
+      )}
+
+      {selectable && (
+        <div
+          className={`msg-select-checkbox${selected ? ' msg-select-checkbox--checked' : ''}`}
+          onClick={(e) => {
+            e.stopPropagation();
+            if (onToggleSelect && message.id > 0) onToggleSelect(message.id);
+          }}
+        >
+          {selected && '✓'}
         </div>
       )}
     </div>

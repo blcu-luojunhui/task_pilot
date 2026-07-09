@@ -193,6 +193,9 @@
   color: var(--text-inverse);
   order: 2;
 }
+.msg-row.user .msg-select-checkbox {
+  order: 1;
+}
 .msg-row.assistant .msg-avatar {
   background: var(--chat-avatar-agent);
   color: var(--chat-avatar-agent-icon);
@@ -227,7 +230,14 @@
   color: var(--text-tertiary);
   letter-spacing: 0.01em;
 }
-.msg-meta__trace {
+.msg-actions {
+  display: flex;
+  justify-content: flex-start;
+  gap: 8px;
+  margin-top: 6px;
+  padding: 0 4px;
+}
+.msg-actions__trace {
   font-size: 11px;
   font-weight: 500;
   padding: 2px 8px;
@@ -237,7 +247,7 @@
   text-decoration: none !important;
   transition: background 0.15s;
 }
-.msg-meta__trace:hover {
+.msg-actions__trace:hover {
   background: rgba(23, 23, 23, 0.08);
 }
 
