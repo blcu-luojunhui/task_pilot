@@ -1,0 +1,707 @@
+diff --git a/frontend/src/components/chat/ChatMessage.css b/frontend/src/components/chat/ChatMessage.css
+index ab287df..97bb3c7 100644
+--- a/frontend/src/components/chat/ChatMessage.css
++++ b/frontend/src/components/chat/ChatMessage.css
+@@ -5,8 +5,6 @@
+ 
+ .chat-composer-bar {
+   background: var(--n8) !important;
+-  backdrop-filter: blur(16px);
+-  -webkit-backdrop-filter: blur(16px);
+   border-top: 1px solid var(--border-light) !important;
+ }
+ 
+@@ -15,11 +13,11 @@
+   --chat-user-bubble: transparent;
+   --chat-user-border: var(--n6);
+   --chat-user-text: var(--n0);
+-  --chat-user-shadow: var(--shadow-card);
++  --chat-user-shadow: none;
+   --chat-assistant-bubble: var(--n8);
+   --chat-assistant-border: var(--border-light);
+   --chat-assistant-text: var(--n0);
+-  --chat-assistant-shadow: var(--shadow-card);
++  --chat-assistant-shadow: none;
+   --chat-avatar-user: var(--n0);
+   --chat-avatar-agent: var(--n6);
+   --chat-avatar-agent-icon: var(--n2);
+@@ -152,7 +150,6 @@
+   display: flex; align-items: center; gap: 10px;
+   padding: 10px 16px;
+   border-radius: 16px;
+-  backdrop-filter: blur(8px);
+ }
+ 
+ .tool-result-pre {
+@@ -189,7 +186,7 @@
+   align-items: center;
+   justify-content: center;
+   font-size: 15px;
+-  box-shadow: 0 1px 4px rgba(23, 23, 23, 0.1);
++  box-shadow: none;
+ }
+ .msg-row.user .msg-avatar {
+   background: var(--chat-avatar-user);
+@@ -259,22 +256,17 @@
+   color: var(--chat-user-text);
+   border: 1px solid var(--chat-user-border);
+   border-bottom-right-radius: 5px;
+-  box-shadow: var(--chat-user-shadow);
+-  backdrop-filter: blur(10px);
+-  -webkit-backdrop-filter: blur(10px);
++  box-shadow: none;
+ }
+ .msg-bubble--assistant {
+   background: var(--chat-assistant-bubble);
+   color: var(--chat-assistant-text);
+   border: 1px solid var(--chat-assistant-border);
+   border-bottom-left-radius: 5px;
+-  box-shadow: var(--chat-assistant-shadow);
+-  backdrop-filter: blur(14px);
+-  -webkit-backdrop-filter: blur(14px);
++  box-shadow: none;
+ }
+ .msg-bubble--tool {
+   border-bottom-left-radius: 6px;
+-  backdrop-filter: blur(8px);
+ }
+ .msg-inline-parts { margin-top: 8px; width: 100%; }
+ .msg-inline-parts--only { margin-top: 0; }
+@@ -282,13 +274,12 @@
+ /* ── 滚到底部按钮 ── */
+ .chat-scroll-bottom {
+   border-radius: 20px !important;
+-  box-shadow: 0 2px 8px rgba(23, 23, 23, 0.12) !important;
++  box-shadow: none !important;
+   background: var(--surface-elevated) !important;
+   color: var(--color-accent) !important;
+   border: 1px solid rgba(23, 23, 23, 0.12) !important;
+   font-weight: 500;
+   letter-spacing: -0.01em;
+-  backdrop-filter: blur(12px);
+ }
+ 
+ /* ── 消息选择 ── */
+diff --git a/frontend/src/components/chat/Composer.tsx b/frontend/src/components/chat/Composer.tsx
+index 5da0abd..6a026c6 100644
+--- a/frontend/src/components/chat/Composer.tsx
++++ b/frontend/src/components/chat/Composer.tsx
+@@ -55,7 +55,7 @@ export function Composer({ disabled, onSend }: Props) {
+           borderRadius: '0 12px 12px 0',
+           background: 'var(--n0)',
+           border: 'none',
+-          boxShadow: '0 1px 3px rgba(0,0,0,0.08)',
++          boxShadow: 'none',
+           minWidth: 60,
+         }}
+       >
+diff --git a/frontend/src/components/chat/MessageBubble.tsx b/frontend/src/components/chat/MessageBubble.tsx
+index 8666848..2f8337e 100644
+--- a/frontend/src/components/chat/MessageBubble.tsx
++++ b/frontend/src/components/chat/MessageBubble.tsx
+@@ -70,7 +70,7 @@ export function MessageBubble({ message, streaming = false, selectable = false,
+   const toolBubbleStyle: React.CSSProperties = {
+     background: palette.toolAvatarBg,
+     border: `1px solid ${palette.toolAvatarBorder}`,
+-    boxShadow: 'var(--chat-assistant-shadow)',
++    boxShadow: 'none',
+   };
+ 
+   return (
+diff --git a/frontend/src/components/common/AppLayout.css b/frontend/src/components/common/AppLayout.css
+index 6413ca6..9818b67 100644
+--- a/frontend/src/components/common/AppLayout.css
++++ b/frontend/src/components/common/AppLayout.css
+@@ -5,6 +5,7 @@
+   overflow: hidden;
+ }
+ 
++/* ── 侧栏：纯白底，无装饰 ── */
+ .app-layout__sider {
+   position: fixed;
+   left: 0; top: 0; bottom: 0;
+@@ -12,36 +13,54 @@
+   overflow-x: hidden;
+   overflow-y: auto;
+   z-index: 100;
+-  background: var(--n10) !important;
++  background: #FFFFFF !important;
+   border-right: none !important;
+-  border-left: 1px solid var(--border-light) !important;
++  border-left: none !important;
+   box-shadow: none !important;
+ }
+ 
+ .app-layout__sider .sider-logo {
+-  border-bottom: 1px solid var(--border-subtle);
++  border-bottom: 1px solid var(--border-light);
+ }
+ 
+ .app-layout__sider .ant-menu {
+   background: transparent !important;
+ }
+ 
++/* ── 导航项：纯文字，无背景色 ── */
+ .app-layout__sider .ant-menu-item {
+-  transition: background 0.2s ease;
++  transition: none;
++  margin: 0 !important;
++  padding-left: 20px !important;
++  border-radius: 0 !important;
++  height: 40px !important;
++  line-height: 40px !important;
+ }
+ 
++.app-layout__sider .ant-menu-item:hover {
++  background: transparent !important;
++  color: var(--n0) !important;
++}
++
++/* ── 选中态：左侧 2px 竖线 + 字重 600 ── */
+ .app-layout__sider .ant-menu-item-selected {
+-  background: var(--color-primary-soft) !important;
+-  font-weight: 600;
++  background: transparent !important;
++  font-weight: 600 !important;
+   color: var(--n0) !important;
++  position: relative;
+ }
+ 
+-.app-layout__sider .ant-menu-item-selected::after {
+-  display: none;
++.app-layout__sider .ant-menu-item-selected::before {
++  content: '';
++  position: absolute;
++  left: 0; top: 8px; bottom: 8px;
++  width: 2px;
++  background: var(--n0);
++  border-radius: 0 1px 1px 0;
+ }
+ 
+-.app-layout__sider .ant-menu-item:not(.ant-menu-item-selected):hover {
+-  background: var(--color-primary-soft) !important;
++.app-layout__sider .ant-menu-item-selected::after {
++  display: none;
+ }
+ 
+ .app-layout__main {
+@@ -53,12 +72,11 @@
+   min-width: 0;
+ }
+ 
++/* ── 顶栏：纯白底，极简 ── */
+ .app-layout__header {
+   flex-shrink: 0;
+   z-index: 99;
+-  background: var(--surface-header) !important;
+-  backdrop-filter: blur(12px);
+-  -webkit-backdrop-filter: blur(12px);
++  background: #FFFFFF !important;
+   border-bottom: 1px solid var(--border-light) !important;
+   box-shadow: none !important;
+ }
+@@ -68,5 +86,5 @@
+   min-height: 0;
+   overflow: auto;
+   -webkit-overflow-scrolling: touch;
+-  background: var(--surface-page);
++  background: #FFFFFF;
+ }
+diff --git a/frontend/src/components/common/PageLayout.css b/frontend/src/components/common/PageLayout.css
+index c8eca68..36c4531 100644
+--- a/frontend/src/components/common/PageLayout.css
++++ b/frontend/src/components/common/PageLayout.css
+@@ -1,84 +1,83 @@
++/* ── 页面结构：去装饰，靠排版和间距建立层级 ── */
++
+ .page-shell {
+   width: 100%;
+-  animation: page-enter 0.35s ease-out;
+ }
+ 
++/* ── Page Hero：纯文字，无背景/边框/阴影 ── */
+ .page-hero {
+   display: flex;
+   align-items: center;
+   gap: 20px;
+-  padding: 28px 32px;
+-  border-radius: 16px;
+-  margin-bottom: 24px;
+-  border: 1px solid var(--page-border);
+-  background: var(--page-hero-bg);
+-  box-shadow: var(--page-shadow);
++  padding: 0 0 32px 0;
++  margin-bottom: 0;
+ }
+ 
+ .page-hero__avatar {
+-  width: 64px;
+-  height: 64px;
+-  border-radius: 50%;
++  width: 48px;
++  height: 48px;
++  border-radius: 12px;
+   display: flex;
+   align-items: center;
+   justify-content: center;
+-  font-size: 26px;
++  font-size: 22px;
+   font-weight: 600;
+-  letter-spacing: -0.02em;
+-  color: #fff;
++  color: var(--n0);
+   flex-shrink: 0;
+-  box-shadow: 0 8px 24px rgba(23, 23, 23, 0.1);
++  background: var(--n8);
+ }
+ 
+ .page-hero__title {
+   margin: 0 !important;
+   font-size: 28px !important;
+-  font-weight: 600 !important;
++  font-weight: 700 !important;
+   letter-spacing: -0.03em !important;
+   line-height: 1.2 !important;
++  color: var(--n0) !important;
+ }
+ 
+ .page-hero__subtitle {
+   display: block;
+   margin-top: 4px;
+-  font-size: 15px;
++  font-size: 14px;
+   letter-spacing: -0.01em;
+ }
+ 
++/* ── Page Card：无阴影，border 仅需分隔时 ── */
+ .page-card {
+-  border-radius: 14px !important;
+-  border: 1px solid var(--page-border) !important;
+-  box-shadow: var(--page-shadow) !important;
++  border-radius: 8px !important;
++  border: 1px solid var(--border-default) !important;
++  box-shadow: none !important;
+   overflow: hidden;
+   height: 100%;
+ }
+ 
+ .page-card .ant-card-head {
+-  border-bottom: 1px solid var(--page-border);
+-  min-height: 52px;
+-  padding: 0 22px;
++  border-bottom: 1px solid var(--border-light);
++  min-height: 48px;
++  padding: 0 20px;
+ }
+ 
+ .page-card .ant-card-head-title {
+-  font-size: 15px;
++  font-size: 14px;
+   font-weight: 600;
+-  letter-spacing: -0.02em;
++  letter-spacing: -0.01em;
+ }
+ 
+ .page-card__title {
+   display: inline-flex;
+   align-items: center;
+-  gap: 10px;
++  gap: 8px;
+ }
+ 
+ .page-card__icon {
+-  width: 32px;
+-  height: 32px;
+-  border-radius: 8px;
++  width: 28px;
++  height: 28px;
++  border-radius: 6px;
+   display: inline-flex;
+   align-items: center;
+   justify-content: center;
+-  font-size: 15px;
++  font-size: 14px;
+ }
+ 
+ .page-info-grid {
+@@ -108,6 +107,7 @@
+   letter-spacing: -0.01em;
+ }
+ 
++/* ── 表格：无 header 背景，行间 border 分隔 ── */
+ .page-table-card .ant-table {
+   background: transparent;
+ }
+@@ -117,26 +117,34 @@
+   font-weight: 600;
+   letter-spacing: 0.03em;
+   text-transform: uppercase;
++  background: transparent !important;
++  border-bottom: 1px solid var(--border-default) !important;
+ }
+ 
+ .page-table-card .ant-table-tbody > tr > td {
+   font-size: 14px;
+   letter-spacing: -0.01em;
++  border-bottom: 1px solid var(--border-light) !important;
++}
++
++.page-table-card .ant-table-tbody > tr:last-child > td {
++  border-bottom: none !important;
+ }
+ 
+ .page-table-card .ant-table-tbody > tr:hover > td {
+-  background: var(--page-row-hover) !important;
++  background: rgba(0, 0, 0, 0.02) !important;
+ }
+ 
++/* ── 面板：极简 ── */
+ .page-panel {
+-  border-radius: 14px;
+-  border: 1px solid var(--page-border);
+-  box-shadow: var(--page-shadow);
++  border-radius: 8px;
++  border: 1px solid var(--border-default);
++  box-shadow: none;
+   overflow: hidden;
+-  background: var(--ant-color-bg-container, #fff);
++  background: #FFFFFF;
+ }
+ 
+-/* 填满主内容区（Chat / Run Task 等），避免再用 100vh 计算 */
++/* ── 填满主内容区 ── */
+ .page-shell--fill {
+   display: flex;
+   flex-direction: column;
+diff --git a/frontend/src/components/common/StickToBottom.tsx b/frontend/src/components/common/StickToBottom.tsx
+index 7571b42..78d5596 100644
+--- a/frontend/src/components/common/StickToBottom.tsx
++++ b/frontend/src/components/common/StickToBottom.tsx
+@@ -68,7 +68,7 @@ export function StickToBottom({ children, className, style, deps = [] }: Props)
+             left: '50%',
+             transform: 'translateX(-50%)',
+             zIndex: 10,
+-            boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
++            boxShadow: 'none',
+           }}
+         >
+           {t('scrollToBottom')}
+diff --git a/frontend/src/hooks/usePageStyleVars.ts b/frontend/src/hooks/usePageStyleVars.ts
+index 54bc9ad..46ad976 100644
+--- a/frontend/src/hooks/usePageStyleVars.ts
++++ b/frontend/src/hooks/usePageStyleVars.ts
+@@ -4,7 +4,7 @@ import { PALETTE, rgba } from '@/theme/tokens';
+ export function usePageStyleVars(): React.CSSProperties {
+   return {
+     '--page-border': 'var(--border-default)',
+-    '--page-shadow': 'var(--shadow-elevated)',
++    '--page-shadow': 'none',
+     '--page-hero-bg': rgba(PALETTE.neutral.n6, 0.25),
+     '--page-row-hover': rgba(PALETTE.neutral.n2, 0.04),
+   } as React.CSSProperties;
+diff --git a/frontend/src/index.css b/frontend/src/index.css
+index 3d2d928..98d3d66 100644
+--- a/frontend/src/index.css
++++ b/frontend/src/index.css
+@@ -57,10 +57,3 @@ code, pre, kbd, samp, .font-mono {
+   from { opacity: 0; transform: translateY(6px); }
+   to   { opacity: 1; transform: translateY(0); }
+ }
+-
+-/* ── Glass ── */
+-.glass {
+-  backdrop-filter: blur(16px);
+-  -webkit-backdrop-filter: blur(16px);
+-}
+-
+diff --git a/frontend/src/pages/AccountPage.tsx b/frontend/src/pages/AccountPage.tsx
+index 5ca358d..1ae9063 100644
+--- a/frontend/src/pages/AccountPage.tsx
++++ b/frontend/src/pages/AccountPage.tsx
+@@ -418,7 +418,7 @@ export function AccountPage() {
+               <Button
+                 type="primary"
+                 icon={<PlusOutlined />}
+-                style={{ borderRadius: 10, background: 'var(--color-accent)', boxShadow: '0 4px 12px rgba(13,148,136,0.25)' }}
++                style={{ borderRadius: 10, background: 'var(--color-accent)', boxShadow: 'none' }}
+                 onClick={() => {
+                   setNewToken(null);
+                   setTokenName('');
+@@ -588,7 +588,7 @@ export function AccountPage() {
+                 <Button
+                   type="primary"
+                   icon={<PlusOutlined />}
+-                  style={{ borderRadius: 10, background: 'var(--color-warning)', boxShadow: '0 4px 12px rgba(180,83,9,0.25)' }}
++                  style={{ borderRadius: 10, background: 'var(--color-warning)', boxShadow: 'none' }}
+                   onClick={() => {
+                     setNewInviteCodes(null);
+                     setInviteCount(1);
+diff --git a/frontend/src/pages/ChatPage.tsx b/frontend/src/pages/ChatPage.tsx
+index 674af66..5f307b3 100644
+--- a/frontend/src/pages/ChatPage.tsx
++++ b/frontend/src/pages/ChatPage.tsx
+@@ -41,7 +41,7 @@ export function ChatPage() {
+     // Relative luminance (sRGB)
+     const lum = 0.2126 * (r / 255) + 0.7152 * (g / 255) + 0.0722 * (b / 255);
+     if (lum > 0.55) {
+-      return { isLight: true, text: '#171717', border: 'rgba(0,0,0,0.1)' };
++      return { isLight: true, text: '#37352F', border: 'rgba(0,0,0,0.1)' };
+     }
+     return { isLight: false, text: '#FFFFFF', border: 'rgba(255,255,255,0.15)' };
+   }, [bubbleColor]);
+@@ -191,7 +191,6 @@ export function ChatPage() {
+             padding: '10px 16px',
+             borderBottom: `1px solid ${token.colorBorderSecondary}`,
+             background: 'rgba(255, 255, 255, 0.72)',
+-            backdropFilter: 'blur(12px)',
+             display: 'flex',
+             justifyContent: 'space-between',
+             alignItems: 'center',
+diff --git a/frontend/src/pages/DashboardPage.tsx b/frontend/src/pages/DashboardPage.tsx
+index e3a3dd1..d8ca4ce 100644
+--- a/frontend/src/pages/DashboardPage.tsx
++++ b/frontend/src/pages/DashboardPage.tsx
+@@ -125,7 +125,7 @@ export function DashboardPage() {
+                     contentStyle={{
+                       borderRadius: 8,
+                       border: `1px solid ${token.colorBorderSecondary}`,
+-                      boxShadow: '0 4px 12px rgba(0,0,0,0.08)',
++                      boxShadow: 'none',
+                     }}
+                   />
+                   <Legend />
+diff --git a/frontend/src/pages/LoginPage.tsx b/frontend/src/pages/LoginPage.tsx
+index 0da5faa..77c6aea 100644
+--- a/frontend/src/pages/LoginPage.tsx
++++ b/frontend/src/pages/LoginPage.tsx
+@@ -47,7 +47,7 @@ export function LoginPage() {
+       }}
+     >
+       <Card
+-        style={{ width: 400, borderRadius: 14, boxShadow: '0 4px 24px rgba(0,0,0,0.08)' }}
++        style={{ width: 400, borderRadius: 14, boxShadow: 'none' }}
+         bordered={false}
+       >
+         <div style={{ textAlign: 'center', marginBottom: 36 }}>
+diff --git a/frontend/src/pages/RegisterPage.tsx b/frontend/src/pages/RegisterPage.tsx
+index ad1b3f1..85628ed 100644
+--- a/frontend/src/pages/RegisterPage.tsx
++++ b/frontend/src/pages/RegisterPage.tsx
+@@ -53,7 +53,7 @@ export function RegisterPage() {
+         background: themeToken.colorBgLayout,
+       }}
+     >
+-      <Card style={{ width: 420, borderRadius: 14, boxShadow: '0 4px 24px rgba(0,0,0,0.08)' }} bordered={false}>
++      <Card style={{ width: 420, borderRadius: 14, boxShadow: 'none' }} bordered={false}>
+         <div style={{ textAlign: 'center', marginBottom: 36 }}>
+           <Typography.Title level={3} style={{ marginBottom: 4 }}>
+             <span style={{ color: "var(--n0)" }}>TaskPilot</span>
+diff --git a/frontend/src/pages/SkillsPage.css b/frontend/src/pages/SkillsPage.css
+index 871c6ce..3a4cf0f 100644
+--- a/frontend/src/pages/SkillsPage.css
++++ b/frontend/src/pages/SkillsPage.css
+@@ -78,7 +78,7 @@
+ }
+ 
+ .skill-explorer-fileIcon {
+-  color: var(--color-accent);
++  color: var(--n0);
+   flex: 0 0 auto;
+   font-size: 12px;
+   opacity: 0.85;
+diff --git a/frontend/src/theme/tokens.css b/frontend/src/theme/tokens.css
+index 92a610b..ab7469c 100644
+--- a/frontend/src/theme/tokens.css
++++ b/frontend/src/theme/tokens.css
+@@ -5,14 +5,14 @@
+ 
+    中性色阶 (Neutral Scale)     → 结构：页面/卡片/边框/文字
+    语义调色板 (Semantic Palette) → 交互：按钮/选中/状态/强调
+-   色谱:  #171717 ──→ #525252 ──→ #D4D4D4 ──→ #FAFAF9
++   色谱:  #37352F ──→ #525252 ──→ #D4D4D4 ──→ #FAFAF9
+           最深              中暗             亮灰            近白
+    ═══════════════════════════════════════════════════════════ */
+ 
+ :root {
+   /* ── 中性色阶 ──────────────────────────────────────────── */
+ 
+-  --n0: #171717;  /* 最深     — 暗色模式底色 */
++  --n0: #37352F;  /* 最深     — 暗色模式底色 */
+   --n1: #262626;  /* 暗色抬高 — 暗色卡片 */
+   --n2: #404040;  /* 次深     — 深色边框 / 强调辅 */
+   --n3: #525252;  /* 中暗     — 次要文字 */
+@@ -72,9 +72,9 @@
+ 
+   /* ── 阴影 ──────────────────────────────────────────────── */
+ 
+-  --shadow-card:     0 1px 2px rgba(0,0,0,0.04);
+-  --shadow-elevated: 0 4px 12px rgba(0,0,0,0.06);
+-  --shadow-button:   0 1px 3px rgba(0,0,0,0.08);
++  --shadow-card:     none;
++  --shadow-elevated: none;
++  --shadow-button:   none;
+ 
+   /* ── 字体 ──────────────────────────────────────────────── */
+ 
+diff --git a/frontend/src/theme/tokens.ts b/frontend/src/theme/tokens.ts
+index a4ea19f..83ea59d 100644
+--- a/frontend/src/theme/tokens.ts
++++ b/frontend/src/theme/tokens.ts
+@@ -2,11 +2,11 @@ import type { ThemeConfig } from 'antd';
+ import { theme as antdTheme } from 'antd';
+ 
+ // ── JS 侧色值引用（与 tokens.css 同名变量保持一致）─────────
+-// Muji / Notion 极简留白：暖灰中性色阶 + 克制语义色
++// Muji / Notion 极简留白：暖灰中性色阶 + 纯黑强调
+ 
+ export const PALETTE = {
+   neutral: {
+-    n0: '#171717',
++    n0: '#37352F',
+     n1: '#262626',
+     n2: '#404040',
+     n3: '#525252',
+@@ -32,14 +32,11 @@ export function rgba(hex: string, alpha: number): string {
+   return `rgba(${r},${g},${b},${alpha})`;
+ }
+ 
+-// ── 纯色引用（渐变已废弃，Muji/Notion 极简风格）───────────
++// ── 纯色引用（渐变已废弃）──────────────────────────────────
+ 
+ export const SOLIDS = {
+-  /** 主按钮 */
+   primaryBtn: PALETTE.neutral.n0,
+-  /** 品牌文字 */
+   brandText: PALETTE.neutral.n0,
+-  /** PageCardIcon 纯色 */
+   pageIcon: {
+     blue: PALETTE.neutral.n2,
+     green: PALETTE.neutral.n4,
+@@ -48,7 +45,7 @@ export const SOLIDS = {
+ } as const;
+ 
+ // ── Ant Design ConfigProvider 配置 ──────────────────────────
+-// 关键：中性色主导 token，语义色仅映射到 Ant Design 语义 token
++// 去装饰：无阴影、无渐变、无背景色填充
+ 
+ export function createAntdThemeConfig(dark: boolean): ThemeConfig {
+   const n = PALETTE.neutral;
+@@ -57,79 +54,82 @@ export function createAntdThemeConfig(dark: boolean): ThemeConfig {
+     algorithm: dark ? antdTheme.darkAlgorithm : antdTheme.defaultAlgorithm,
+ 
+     token: {
+-      // 语义映射
+-      colorPrimary: n.n0,        // 纯黑 primary — 极简克制
++      colorPrimary: n.n0,
+       colorSuccess: PALETTE.accent,
+       colorWarning: PALETTE.warning,
+       colorInfo: PALETTE.info,
+       colorError: PALETTE.error,
+ 
+-      // 排版
+       fontFamily: "var(--font-sans)",
+       fontFamilyCode: "var(--font-mono)",
+       fontSize: 14,
+-      lineHeight: 1.6,
+-      borderRadius: 8,
++      lineHeight: 1.5,
++      borderRadius: 6,
+       controlHeight: 36,
+-      paddingContentHorizontal: 20,
+-      paddingContentVertical: 16,
++      paddingContentHorizontal: 16,
++      paddingContentVertical: 12,
+ 
+-      // 边框 — 暖灰，极淡
+       colorBorder: dark ? 'rgba(255,255,255,0.08)' : n.n6,
+       colorBorderSecondary: dark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.04)',
+ 
+-      // 文字 — 暖灰阶，不用蓝黑
+       colorText: dark ? '#E5E5E5' : n.n0,
+       colorTextSecondary: dark ? '#A3A3A3' : n.n3,
+       colorTextTertiary: dark ? '#737373' : n.n4,
+       colorTextQuaternary: dark ? '#525252' : n.n5,
++
++      // 去装饰
++      boxShadow: 'none',
++      boxShadowSecondary: 'none',
+     },
+ 
+     components: {
+       Layout: {
+-        headerBg: dark ? n.n0 : n.n10,
+-        siderBg: dark ? n.n0 : n.n7,
+-        bodyBg: dark ? n.n0 : n.n9,
++        headerBg: 'transparent',
++        siderBg: 'transparent',
++        bodyBg: '#FFFFFF',
+       },
+       Menu: {
+-        itemBorderRadius: 8,
+-        itemMarginInline: 8,
+-        itemHeight: 38,
+-        iconSize: 17,
+-        itemSelectedColor: PALETTE.accent,
+-        itemColor: dark ? 'rgba(255,255,255,0.55)' : n.n3,
+-        itemHoverColor: dark ? 'rgba(255,255,255,0.85)' : n.n0,
++        itemBorderRadius: 0,
++        itemMarginInline: 0,
++        itemHeight: 40,
++        iconSize: 16,
++        itemSelectedColor: n.n0,
++        itemColor: n.n4,
++        itemHoverColor: n.n0,
++        itemSelectedBg: 'transparent',
++        itemBg: 'transparent',
++        subMenuItemBg: 'transparent',
+       },
+       Card: {
+-        borderRadiusLG: 10,
+-        paddingLG: 20,
++        borderRadiusLG: 8,
++        paddingLG: 16,
++        boxShadow: 'none',
+       },
+       Button: {
+-        borderRadius: 8,
++        borderRadius: 6,
+         controlHeight: 36,
+-        paddingInline: 16,
++        paddingInline: 14,
+         contentFontSize: 14,
++        boxShadow: 'none',
+       },
+       Input: {
+-        borderRadius: 8,
++        borderRadius: 6,
+         controlHeight: 36,
+-        activeBorderColor: PALETTE.accent,
+-        activeShadow: `0 0 0 2px ${rgba(PALETTE.accent, 0.1)}`,
++        activeBorderColor: n.n0,
++        activeShadow: 'none',
+       },
+       Table: {
+-        borderRadiusLG: 10,
+-        headerBg: dark ? n.n1 : n.n10,
+-        headerBorderRadius: 10,
+-        rowHoverBg: dark ? 'rgba(255,255,255,0.04)' : rgba(PALETTE.accent, 0.04),
++        borderRadiusLG: 0,
++        headerBg: 'transparent',
++        headerBorderRadius: 0,
++        rowHoverBg: 'rgba(0,0,0,0.02)',
++        boxShadow: 'none',
+       },
+-      Segmented: { borderRadius: 8 },
+-      Select: { borderRadius: 8 },
+-      DatePicker: { borderRadius: 8 },
+       Tag: { borderRadiusSM: 4 },
+       Tabs: {
+-        itemActiveColor: PALETTE.accent,
+-        itemHoverColor: PALETTE.accent,
+-        inkBarColor: PALETTE.accent,
++        itemActiveColor: n.n0,
++        itemHoverColor: n.n3,
++        inkBarColor: n.n0,
+       },
+     },
+   };
