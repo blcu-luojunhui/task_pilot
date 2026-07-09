@@ -5,8 +5,6 @@
 
 .chat-composer-bar {
   background: var(--n8) !important;
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
   border-top: 1px solid var(--border-light) !important;
 }
 
@@ -15,11 +13,11 @@
   --chat-user-bubble: transparent;
   --chat-user-border: var(--n6);
   --chat-user-text: var(--n0);
-  --chat-user-shadow: var(--shadow-card);
+  --chat-user-shadow: none;
   --chat-assistant-bubble: var(--n8);
   --chat-assistant-border: var(--border-light);
   --chat-assistant-text: var(--n0);
-  --chat-assistant-shadow: var(--shadow-card);
+  --chat-assistant-shadow: none;
   --chat-avatar-user: var(--n0);
   --chat-avatar-agent: var(--n6);
   --chat-avatar-agent-icon: var(--n2);
@@ -152,7 +150,6 @@
   display: flex; align-items: center; gap: 10px;
   padding: 10px 16px;
   border-radius: 16px;
-  backdrop-filter: blur(8px);
 }
 
 .tool-result-pre {
@@ -189,7 +186,7 @@
   align-items: center;
   justify-content: center;
   font-size: 15px;
-  box-shadow: 0 1px 4px rgba(23, 23, 23, 0.1);
+  box-shadow: none;
 }
 .msg-row.user .msg-avatar {
   background: var(--chat-avatar-user);
@@ -259,22 +256,17 @@
   color: var(--chat-user-text);
   border: 1px solid var(--chat-user-border);
   border-bottom-right-radius: 5px;
-  box-shadow: var(--chat-user-shadow);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
+  box-shadow: none;
 }
 .msg-bubble--assistant {
   background: var(--chat-assistant-bubble);
   color: var(--chat-assistant-text);
   border: 1px solid var(--chat-assistant-border);
   border-bottom-left-radius: 5px;
-  box-shadow: var(--chat-assistant-shadow);
-  backdrop-filter: blur(14px);
-  -webkit-backdrop-filter: blur(14px);
+  box-shadow: none;
 }
 .msg-bubble--tool {
   border-bottom-left-radius: 6px;
-  backdrop-filter: blur(8px);
 }
 .msg-inline-parts { margin-top: 8px; width: 100%; }
 .msg-inline-parts--only { margin-top: 0; }
@@ -282,13 +274,12 @@
 /* ── 滚到底部按钮 ── */
 .chat-scroll-bottom {
   border-radius: 20px !important;
-  box-shadow: 0 2px 8px rgba(23, 23, 23, 0.12) !important;
+  box-shadow: none !important;
   background: var(--surface-elevated) !important;
   color: var(--color-accent) !important;
   border: 1px solid rgba(23, 23, 23, 0.12) !important;
   font-weight: 500;
   letter-spacing: -0.01em;
-  backdrop-filter: blur(12px);
 }
 
 /* ── 消息选择 ── */

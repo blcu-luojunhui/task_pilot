@@ -4,7 +4,7 @@ import { PALETTE, rgba } from '@/theme/tokens';
 export function usePageStyleVars(): React.CSSProperties {
   return {
     '--page-border': 'var(--border-default)',
-    '--page-shadow': 'var(--shadow-elevated)',
+    '--page-shadow': 'none',
     '--page-hero-bg': rgba(PALETTE.neutral.n6, 0.25),
     '--page-row-hover': rgba(PALETTE.neutral.n2, 0.04),
   } as React.CSSProperties;

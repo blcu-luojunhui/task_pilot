@@ -418,7 +418,7 @@ export function AccountPage() {
               <Button
                 type="primary"
                 icon={<PlusOutlined />}
-                style={{ borderRadius: 10, background: 'var(--color-accent)', boxShadow: '0 4px 12px rgba(13,148,136,0.25)' }}
+                style={{ borderRadius: 10, background: 'var(--color-accent)', boxShadow: 'none' }}
                 onClick={() => {
                   setNewToken(null);
                   setTokenName('');
@@ -588,7 +588,7 @@ export function AccountPage() {
                 <Button
                   type="primary"
                   icon={<PlusOutlined />}
-                  style={{ borderRadius: 10, background: 'var(--color-warning)', boxShadow: '0 4px 12px rgba(180,83,9,0.25)' }}
+                  style={{ borderRadius: 10, background: 'var(--color-warning)', boxShadow: 'none' }}
                   onClick={() => {
                     setNewInviteCodes(null);
                     setInviteCount(1);

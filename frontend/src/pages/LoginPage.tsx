@@ -47,7 +47,7 @@ export function LoginPage() {
       }}
     >
       <Card
-        style={{ width: 400, borderRadius: 14, boxShadow: '0 4px 24px rgba(0,0,0,0.08)' }}
+        style={{ width: 400, borderRadius: 14, boxShadow: 'none' }}
         bordered={false}
       >
         <div style={{ textAlign: 'center', marginBottom: 36 }}>

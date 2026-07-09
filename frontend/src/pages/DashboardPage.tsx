@@ -125,7 +125,7 @@ export function DashboardPage() {
                     contentStyle={{
                       borderRadius: 8,
                       border: `1px solid ${token.colorBorderSecondary}`,
-                      boxShadow: '0 4px 12px rgba(0,0,0,0.08)',
+                      boxShadow: 'none',
                     }}
                   />
                   <Legend />

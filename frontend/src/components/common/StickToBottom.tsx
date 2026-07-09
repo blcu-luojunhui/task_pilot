@@ -68,7 +68,7 @@ export function StickToBottom({ children, className, style, deps = [] }: Props) 
             left: '50%',
             transform: 'translateX(-50%)',
             zIndex: 10,
-            boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+            boxShadow: 'none',
           }}
         >
           {t('scrollToBottom')}

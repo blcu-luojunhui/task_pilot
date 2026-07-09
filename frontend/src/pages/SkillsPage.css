@@ -78,7 +78,7 @@
 }
 
 .skill-explorer-fileIcon {
-  color: var(--color-accent);
+  color: var(--n0);
   flex: 0 0 auto;
   font-size: 12px;
   opacity: 0.85;

@@ -70,7 +70,7 @@ export function MessageBubble({ message, streaming = false, selectable = false, 
   const toolBubbleStyle: React.CSSProperties = {
     background: palette.toolAvatarBg,
     border: `1px solid ${palette.toolAvatarBorder}`,
-    boxShadow: 'var(--chat-assistant-shadow)',
+    boxShadow: 'none',
   };
 
   return (

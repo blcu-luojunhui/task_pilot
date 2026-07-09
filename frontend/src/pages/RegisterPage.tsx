@@ -53,7 +53,7 @@ export function RegisterPage() {
         background: themeToken.colorBgLayout,
       }}
     >
-      <Card style={{ width: 420, borderRadius: 14, boxShadow: '0 4px 24px rgba(0,0,0,0.08)' }} bordered={false}>
+      <Card style={{ width: 420, borderRadius: 14, boxShadow: 'none' }} bordered={false}>
         <div style={{ textAlign: 'center', marginBottom: 36 }}>
           <Typography.Title level={3} style={{ marginBottom: 4 }}>
             <span style={{ color: "var(--n0)" }}>TaskPilot</span>

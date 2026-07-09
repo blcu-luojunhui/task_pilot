@@ -55,7 +55,7 @@ export function Composer({ disabled, onSend }: Props) {
           borderRadius: '0 12px 12px 0',
           background: 'var(--n0)',
           border: 'none',
-          boxShadow: '0 1px 3px rgba(0,0,0,0.08)',
+          boxShadow: 'none',
           minWidth: 60,
         }}
       >

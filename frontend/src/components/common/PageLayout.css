@@ -1,84 +1,83 @@
+/* ── 页面结构：去装饰，靠排版和间距建立层级 ── */
+
 .page-shell {
   width: 100%;
-  animation: page-enter 0.35s ease-out;
 }
 
+/* ── Page Hero：纯文字，无背景/边框/阴影 ── */
 .page-hero {
   display: flex;
   align-items: center;
   gap: 20px;
-  padding: 28px 32px;
-  border-radius: 16px;
-  margin-bottom: 24px;
-  border: 1px solid var(--page-border);
-  background: var(--page-hero-bg);
-  box-shadow: var(--page-shadow);
+  padding: 0 0 32px 0;
+  margin-bottom: 0;
 }
 
 .page-hero__avatar {
-  width: 64px;
-  height: 64px;
-  border-radius: 50%;
+  width: 48px;
+  height: 48px;
+  border-radius: 12px;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 26px;
+  font-size: 22px;
   font-weight: 600;
-  letter-spacing: -0.02em;
-  color: #fff;
+  color: var(--n0);
   flex-shrink: 0;
-  box-shadow: 0 8px 24px rgba(23, 23, 23, 0.1);
+  background: var(--n8);
 }
 
 .page-hero__title {
   margin: 0 !important;
   font-size: 28px !important;
-  font-weight: 600 !important;
+  font-weight: 700 !important;
   letter-spacing: -0.03em !important;
   line-height: 1.2 !important;
+  color: var(--n0) !important;
 }
 
 .page-hero__subtitle {
   display: block;
   margin-top: 4px;
-  font-size: 15px;
+  font-size: 14px;
   letter-spacing: -0.01em;
 }
 
+/* ── Page Card：无阴影，border 仅需分隔时 ── */
 .page-card {
-  border-radius: 14px !important;
-  border: 1px solid var(--page-border) !important;
-  box-shadow: var(--page-shadow) !important;
+  border-radius: 8px !important;
+  border: 1px solid var(--border-default) !important;
+  box-shadow: none !important;
   overflow: hidden;
   height: 100%;
 }
 
 .page-card .ant-card-head {
-  border-bottom: 1px solid var(--page-border);
-  min-height: 52px;
-  padding: 0 22px;
+  border-bottom: 1px solid var(--border-light);
+  min-height: 48px;
+  padding: 0 20px;
 }
 
 .page-card .ant-card-head-title {
-  font-size: 15px;
+  font-size: 14px;
   font-weight: 600;
-  letter-spacing: -0.02em;
+  letter-spacing: -0.01em;
 }
 
 .page-card__title {
   display: inline-flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
 }
 
 .page-card__icon {
-  width: 32px;
-  height: 32px;
-  border-radius: 8px;
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  font-size: 15px;
+  font-size: 14px;
 }
 
 .page-info-grid {
@@ -108,6 +107,7 @@
   letter-spacing: -0.01em;
 }
 
+/* ── 表格：无 header 背景，行间 border 分隔 ── */
 .page-table-card .ant-table {
   background: transparent;
 }
@@ -117,26 +117,34 @@
   font-weight: 600;
   letter-spacing: 0.03em;
   text-transform: uppercase;
+  background: transparent !important;
+  border-bottom: 1px solid var(--border-default) !important;
 }
 
 .page-table-card .ant-table-tbody > tr > td {
   font-size: 14px;
   letter-spacing: -0.01em;
+  border-bottom: 1px solid var(--border-light) !important;
+}
+
+.page-table-card .ant-table-tbody > tr:last-child > td {
+  border-bottom: none !important;
 }
 
 .page-table-card .ant-table-tbody > tr:hover > td {
-  background: var(--page-row-hover) !important;
+  background: rgba(0, 0, 0, 0.02) !important;
 }
 
+/* ── 面板：极简 ── */
 .page-panel {
-  border-radius: 14px;
-  border: 1px solid var(--page-border);
-  box-shadow: var(--page-shadow);
+  border-radius: 8px;
+  border: 1px solid var(--border-default);
+  box-shadow: none;
   overflow: hidden;
-  background: var(--ant-color-bg-container, #fff);
+  background: #FFFFFF;
 }
 
-/* 填满主内容区（Chat / Run Task 等），避免再用 100vh 计算 */
+/* ── 填满主内容区 ── */
 .page-shell--fill {
   display: flex;
   flex-direction: column;

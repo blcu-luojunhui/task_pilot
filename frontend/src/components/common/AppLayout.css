@@ -5,6 +5,7 @@
   overflow: hidden;
 }
 
+/* ── 侧栏：纯白底，无装饰 ── */
 .app-layout__sider {
   position: fixed;
   left: 0; top: 0; bottom: 0;
@@ -12,36 +13,54 @@
   overflow-x: hidden;
   overflow-y: auto;
   z-index: 100;
-  background: var(--n10) !important;
+  background: #FFFFFF !important;
   border-right: none !important;
-  border-left: 1px solid var(--border-light) !important;
+  border-left: none !important;
   box-shadow: none !important;
 }
 
 .app-layout__sider .sider-logo {
-  border-bottom: 1px solid var(--border-subtle);
+  border-bottom: 1px solid var(--border-light);
 }
 
 .app-layout__sider .ant-menu {
   background: transparent !important;
 }
 
+/* ── 导航项：纯文字，无背景色 ── */
 .app-layout__sider .ant-menu-item {
-  transition: background 0.2s ease;
+  transition: none;
+  margin: 0 !important;
+  padding-left: 20px !important;
+  border-radius: 0 !important;
+  height: 40px !important;
+  line-height: 40px !important;
 }
 
-.app-layout__sider .ant-menu-item-selected {
-  background: var(--color-primary-soft) !important;
-  font-weight: 600;
+.app-layout__sider .ant-menu-item:hover {
+  background: transparent !important;
   color: var(--n0) !important;
+}
+
+/* ── 选中态：左侧 2px 竖线 + 字重 600 ── */
+.app-layout__sider .ant-menu-item-selected {
+  background: transparent !important;
+  font-weight: 600 !important;
+  color: var(--n0) !important;
+  position: relative;
+}
+
+.app-layout__sider .ant-menu-item-selected::before {
+  content: '';
+  position: absolute;
+  left: 0; top: 8px; bottom: 8px;
+  width: 2px;
+  background: var(--n0);
+  border-radius: 0 1px 1px 0;
 }
 
 .app-layout__sider .ant-menu-item-selected::after {
   display: none;
-}
-
-.app-layout__sider .ant-menu-item:not(.ant-menu-item-selected):hover {
-  background: var(--color-primary-soft) !important;
 }
 
 .app-layout__main {
@@ -53,12 +72,11 @@
   min-width: 0;
 }
 
+/* ── 顶栏：纯白底，极简 ── */
 .app-layout__header {
   flex-shrink: 0;
   z-index: 99;
-  background: var(--surface-header) !important;
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
+  background: #FFFFFF !important;
   border-bottom: 1px solid var(--border-light) !important;
   box-shadow: none !important;
 }
@@ -68,5 +86,5 @@
   min-height: 0;
   overflow: auto;
   -webkit-overflow-scrolling: touch;
-  background: var(--surface-page);
+  background: #FFFFFF;
 }

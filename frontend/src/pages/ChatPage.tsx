@@ -191,7 +191,6 @@ export function ChatPage() {
             padding: '10px 16px',
             borderBottom: `1px solid ${token.colorBorderSecondary}`,
             background: 'rgba(255, 255, 255, 0.72)',
-            backdropFilter: 'blur(12px)',
             display: 'flex',
             justifyContent: 'space-between',
             alignItems: 'center',
