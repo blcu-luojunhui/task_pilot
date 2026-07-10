@@ -47,3 +47,6 @@ nginx/
 .mcp.json
 /docs/deep_thinks/
 data/avatars/
+study/
+frontend/
+dist/
