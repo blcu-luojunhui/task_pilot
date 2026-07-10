@@ -1,4 +1,4 @@
-import { PALETTE, rgba } from '@/theme/tokens';
+import { THEME_INK } from '@/theme/palette';
 import { useThemePaletteStore } from '@/stores/themePaletteStore';
 
 export type IconTone = 'accent' | 'warning' | 'neutral';
@@ -8,9 +8,9 @@ export type IconToneStyle = { color: string; bg: string };
 export function useIconTones(): Record<IconTone, IconToneStyle> {
   const palette = useThemePaletteStore((s) => s.palette);
   return {
-    accent: { color: palette.accent, bg: rgba(palette.accent, 0.1) },
-    warning: { color: PALETTE.warning, bg: rgba(PALETTE.warning, 0.1) },
-    neutral: { color: 'var(--n2)', bg: rgba(palette.accent, 0.06) },
+    accent: { color: '#fff', bg: THEME_INK },
+    warning: { color: '#fff', bg: palette.accent },
+    neutral: { color: '#fff', bg: 'var(--n2)' },
   };
 }
 
