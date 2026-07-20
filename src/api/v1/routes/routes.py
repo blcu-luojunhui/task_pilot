@@ -14,6 +14,7 @@ from src.api.v1.endpoints import (
     create_chat_bp,
     create_agent_bp,
     create_auth_bp,
+    create_skill_store_bp,
 )
 from src.core.config import ProjectConfigSettings
 from src.core.auth import AuthService
@@ -36,6 +37,7 @@ def register_v1_blueprints(deps: ApiDependencies) -> Blueprint:
     api.register_blueprint(create_replay_bp(deps))
     api.register_blueprint(create_chat_bp(deps))
     api.register_blueprint(create_agent_bp(deps))
+    api.register_blueprint(create_skill_store_bp(deps))
 
     return api
 

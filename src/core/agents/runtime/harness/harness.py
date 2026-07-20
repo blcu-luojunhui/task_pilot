@@ -242,7 +242,7 @@ class AgentLoopHarness:
                 state.lifecycle_state = self.lifecycle.state
             await self._emit("run_error", state, {"error": str(e)})
             # 发布 chat.turn_error 给前端
-            self._publish_chat_event(state, "chat.turn_error", {"error": str(e)})
+            self._publish_chat_event(state, "turn_error", {"error": str(e)})
 
         if self.lifecycle:
             self.lifecycle.current_loop_state = state
@@ -261,7 +261,7 @@ class AgentLoopHarness:
             )
         await self._emit("run_end", state, {"result": result})
         # 发布 chat.turn_end 给前端
-        self._publish_chat_event(state, "chat.turn_end", {
+        self._publish_chat_event(state, "turn_end", {
             "content": result.final_answer or "",
             "token_usage": dict(state.token_usage),
         })

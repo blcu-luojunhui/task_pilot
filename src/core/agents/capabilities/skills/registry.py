@@ -89,6 +89,29 @@ class SkillRegistry:
             self.register(skill)
         return len(skills)
 
+    def load_from_db_rows(self, rows: List[Dict[str, Any]]) -> int:
+        """从 MySQL skill_store_registry 查询结果批量加载为知识型技能。
+
+        每行需包含：dir_name, description, skill_md_content（SKILL.md 原文）。
+        使用 SkillLoader 解析 markdown 后注册到本 registry。
+
+        返回注册的技能数量。
+        """
+        from .loader import FrontmatterParser
+
+        parser = FrontmatterParser()
+        count = 0
+        for row in rows:
+            content = row.get("skill_md_content")
+            if not content:
+                continue
+            skill = parser.parse(content, row["dir_name"])
+            if skill:
+                self.register(skill)
+                count += 1
+                logger.info(f"DB loaded skill: {skill.name} (domain={skill.domain})")
+        return count
+
     @property
     def size(self) -> int:
         return len(self._skills)

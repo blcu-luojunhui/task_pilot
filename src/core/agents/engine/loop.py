@@ -158,7 +158,7 @@ class Think:
                 try:
                     _ebus.publish(
                         trace_id=_trace_id,
-                        event_type="chat.token_delta",
+                        event_type="token_delta",
                         data={"delta": token},
                         source="agent",
                         step=_step,
@@ -269,7 +269,7 @@ class Act:
         arguments = call.arguments
 
         # 发布 tool_call_start
-        self._publish_tool_event(state, "chat.tool_call_start",
+        self._publish_tool_event(state, "tool_call_start",
                                  {"call_id": call_id, "tool_name": tool_name, "arguments": arguments})
 
         skill = self.registry.get(tool_name)
@@ -329,7 +329,7 @@ class Act:
 
     def _tool_end(self, state: AgentLoopState, call_id: str, tool_name: str,
                   result_msg: Dict[str, Any], ok: bool) -> Dict[str, Any]:
-        self._publish_tool_event(state, "chat.tool_call_end",
+        self._publish_tool_event(state, "tool_call_end",
                                  {"call_id": call_id, "tool_name": tool_name, "ok": ok,
                                   "result": result_msg.get("content", "")[:4096]})
         return result_msg

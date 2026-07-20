@@ -94,7 +94,10 @@ def _build_planner(provider: LLMProvider, tools: List[Any]) -> AssistantPlanner:
 
         stream_callback: Optional[Callable[[str], Any]] = kwargs.get("stream_callback")
 
-        if stream_callback and provider.supports_streaming:
+        tools_param = openai_tools if openai_tools else None
+
+        # 有工具时走非流式，确保 tool_calls 不丢失
+        if stream_callback and provider.supports_streaming and not tools_param:
             full_content = ""
             async for token in provider.stream_chat(llm_messages, temperature=provider.config.temperature):
                 full_content += token
@@ -104,8 +107,7 @@ def _build_planner(provider: LLMProvider, tools: List[Any]) -> AssistantPlanner:
                     await result
             return {"role": "assistant", "content": full_content}
 
-        # 非流式
-        tools_param = openai_tools if openai_tools else None
+        # 非流式（有工具时必须走此路径以正确收集 tool_calls）
         resp = await provider.chat(
             messages=llm_messages, tools=tools_param,
             temperature=provider.config.temperature,
@@ -171,7 +173,7 @@ async def run_agent(scheduler: "TaskScheduler") -> int:
     trace_id = scheduler.trace_id
     provider = _build_llm_provider(scheduler.config.llm)
 
-    async def _cancel_checker() -> bool:
+    def _cancel_checker() -> bool:
         return cancel_flag["requested"]
 
     # ── Agent 模式 ──

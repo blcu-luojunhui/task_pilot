@@ -1,4 +1,34 @@
-CREATE TABLE IF NOT EXISTS task_manager (
+-- ============================================================
+-- TaskPilot 数据库初始化脚本
+-- 执行方式：mysql -u root -p < init.sql
+-- 注意：会先删除已有同名表，再重新创建
+-- ============================================================
+
+-- ============================================================
+-- Drop all tables
+-- ============================================================
+DROP TABLE IF EXISTS schema_migrations;
+DROP TABLE IF EXISTS trace_head;
+DROP TABLE IF EXISTS agent_memory;
+DROP TABLE IF EXISTS chat_messages;
+DROP TABLE IF EXISTS chat_conversations;
+DROP TABLE IF EXISTS agent_run_summaries;
+DROP TABLE IF EXISTS agent_events;
+DROP TABLE IF EXISTS task_manager;
+DROP TABLE IF EXISTS account_daily_usage;
+DROP TABLE IF EXISTS account_skills;
+DROP TABLE IF EXISTS system_skills;
+DROP TABLE IF EXISTS refresh_tokens;
+DROP TABLE IF EXISTS access_tokens;
+DROP TABLE IF EXISTS account_login_failures;
+DROP TABLE IF EXISTS invite_codes;
+DROP TABLE IF EXISTS accounts;
+
+-- ============================================================
+-- 任务引擎
+-- ============================================================
+
+CREATE TABLE task_manager (
     id               INT AUTO_INCREMENT PRIMARY KEY,
     date_string      VARCHAR(64)    NULL,
     task_name        VARCHAR(256)   NULL,
@@ -17,7 +47,11 @@ CREATE TABLE IF NOT EXISTS task_manager (
     INDEX idx_account_id (account_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
-CREATE TABLE IF NOT EXISTS agent_events (
+-- ============================================================
+-- Agent 可观测
+-- ============================================================
+
+CREATE TABLE agent_events (
     id              BIGINT AUTO_INCREMENT PRIMARY KEY,
     trace_id        VARCHAR(128)   NOT NULL,
     sequence        INT            NOT NULL,
@@ -35,7 +69,7 @@ CREATE TABLE IF NOT EXISTS agent_events (
     INDEX idx_account_id (account_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
-CREATE TABLE IF NOT EXISTS agent_run_summaries (
+CREATE TABLE agent_run_summaries (
     id              BIGINT AUTO_INCREMENT PRIMARY KEY,
     trace_id        VARCHAR(128)   NOT NULL,
     goal            TEXT           NULL,
@@ -57,7 +91,11 @@ CREATE TABLE IF NOT EXISTS agent_run_summaries (
     INDEX idx_account_id (account_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
-CREATE TABLE IF NOT EXISTS chat_conversations (
+-- ============================================================
+-- Chat 对话
+-- ============================================================
+
+CREATE TABLE chat_conversations (
     id              BIGINT AUTO_INCREMENT PRIMARY KEY,
     conversation_id VARCHAR(64)    NOT NULL
         COMMENT '对外稳定 ID，格式 Conv-YYYYmmddHHMMSS-xxxxxxxx',
@@ -75,7 +113,7 @@ CREATE TABLE IF NOT EXISTS chat_conversations (
     INDEX idx_account_id (account_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
-CREATE TABLE IF NOT EXISTS chat_messages (
+CREATE TABLE chat_messages (
     id              BIGINT AUTO_INCREMENT PRIMARY KEY,
     conversation_id VARCHAR(64)    NOT NULL,
     role            VARCHAR(16)    NOT NULL
@@ -88,6 +126,12 @@ CREATE TABLE IF NOT EXISTS chat_messages (
         COMMENT 'role=tool 时关联的 call id',
     trace_id        VARCHAR(128)   NULL
         COMMENT '本轮 chat task 的 trace_id，可关联 agent_events / agent_run_summaries',
+    seq             INT            NULL
+        COMMENT 'trace 内单增序号',
+    parent_seq      INT            NULL
+        COMMENT '父消息 seq，根为 NULL',
+    branch_type     VARCHAR(32)    NULL
+        COMMENT 'main/compression/reflection',
     token_usage     JSON           NULL,
     status          TINYINT        NOT NULL DEFAULT 0
         COMMENT '0=completed, 1=pending_confirmation, 2=rejected, 3=cancelled',
@@ -96,17 +140,48 @@ CREATE TABLE IF NOT EXISTS chat_messages (
     created_at      TIMESTAMP(3)   DEFAULT CURRENT_TIMESTAMP(3),
     INDEX idx_conv_created (conversation_id, created_at),
     INDEX idx_trace_id (trace_id),
+    INDEX idx_trace_seq (trace_id, seq),
     INDEX idx_account_id (account_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
--- 兼容已有数据库：chat_messages 新增 status 列（MySQL 5.7 不支持 IF NOT EXISTS，需手动判断执行）
--- ALTER TABLE chat_messages ADD COLUMN status TINYINT NOT NULL DEFAULT 0 COMMENT '0=completed, 1=pending_confirmation, 2=rejected, 3=cancelled' AFTER token_usage;
+-- ============================================================
+-- 消息树 head 指针
+-- ============================================================
+
+CREATE TABLE trace_head (
+    trace_id     VARCHAR(128) NOT NULL PRIMARY KEY,
+    head_seq     INT          NOT NULL DEFAULT 0
+        COMMENT '当前主路径最新 seq；0 = 尚无消息',
+    next_seq     INT          NOT NULL DEFAULT 1
+        COMMENT '下一条可分配 seq',
+    account_id   BIGINT       NOT NULL DEFAULT 0,
+    updated_at   TIMESTAMP    DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- ============================================================
+-- Agent 跨 run 记忆（反思）
+-- ============================================================
+
+CREATE TABLE agent_memory (
+    id              BIGINT AUTO_INCREMENT PRIMARY KEY,
+    account_id      BIGINT       NOT NULL DEFAULT 0,
+    scope_key       VARCHAR(256) NOT NULL
+        COMMENT '检索键：通常是 task_name 或 goal 的归一化关键词',
+    trace_id        VARCHAR(128) NULL
+        COMMENT '产生该反思的 run',
+    reflection      TEXT         NOT NULL
+        COMMENT 'LLM 生成的经验反思正文',
+    success         TINYINT      NOT NULL DEFAULT 0,
+    created_at      TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_account_scope (account_id, scope_key),
+    INDEX idx_created (created_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- ============================================================
 -- 账号系统
 -- ============================================================
 
-CREATE TABLE IF NOT EXISTS accounts (
+CREATE TABLE accounts (
     id                  BIGINT AUTO_INCREMENT PRIMARY KEY,
     username            VARCHAR(64)  NOT NULL,
     email               VARCHAR(128) NOT NULL,
@@ -128,7 +203,7 @@ CREATE TABLE IF NOT EXISTS accounts (
     UNIQUE INDEX uk_email (email)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
-CREATE TABLE IF NOT EXISTS access_tokens (
+CREATE TABLE access_tokens (
     id              BIGINT AUTO_INCREMENT PRIMARY KEY,
     account_id      BIGINT       NOT NULL,
     token_hash      VARCHAR(128) NOT NULL
@@ -144,7 +219,7 @@ CREATE TABLE IF NOT EXISTS access_tokens (
     INDEX idx_account_id (account_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
-CREATE TABLE IF NOT EXISTS refresh_tokens (
+CREATE TABLE refresh_tokens (
     id              BIGINT AUTO_INCREMENT PRIMARY KEY,
     account_id      BIGINT       NOT NULL,
     token_hash      VARCHAR(128) NOT NULL
@@ -159,7 +234,7 @@ CREATE TABLE IF NOT EXISTS refresh_tokens (
     INDEX idx_rt_account_id (account_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
-CREATE TABLE IF NOT EXISTS account_daily_usage (
+CREATE TABLE account_daily_usage (
     id              BIGINT AUTO_INCREMENT PRIMARY KEY,
     account_id      BIGINT       NOT NULL,
     usage_date      DATE         NOT NULL,
@@ -167,7 +242,7 @@ CREATE TABLE IF NOT EXISTS account_daily_usage (
     UNIQUE INDEX uk_account_date (account_id, usage_date)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
-CREATE TABLE IF NOT EXISTS account_skills (
+CREATE TABLE account_skills (
     id              BIGINT AUTO_INCREMENT PRIMARY KEY,
     account_id      BIGINT       NOT NULL,
     name            VARCHAR(128) NOT NULL
@@ -185,7 +260,22 @@ CREATE TABLE IF NOT EXISTS account_skills (
     INDEX idx_account_category (account_id, category)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
-CREATE TABLE IF NOT EXISTS invite_codes (
+CREATE TABLE account_login_failures (
+    account_id      BIGINT       NOT NULL,
+    ip_address      VARCHAR(45)  NOT NULL
+        COMMENT '最近一次登录失败的 IP',
+    fail_count      INT          NOT NULL DEFAULT 1
+        COMMENT '连续失败次数',
+    first_fail_at   TIMESTAMP    DEFAULT CURRENT_TIMESTAMP
+        COMMENT '首次失败时间',
+    last_fail_at    TIMESTAMP    DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+        COMMENT '最近失败时间',
+    locked_until    TIMESTAMP    NULL
+        COMMENT '锁定到期时间',
+    PRIMARY KEY (account_id)
+) ENGINE=InnoDB;
+
+CREATE TABLE invite_codes (
     id              BIGINT AUTO_INCREMENT PRIMARY KEY,
     code            VARCHAR(32)  NOT NULL
         COMMENT '邀请码字符串',
@@ -202,22 +292,7 @@ CREATE TABLE IF NOT EXISTS invite_codes (
     INDEX idx_created_by (created_by)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
-CREATE TABLE IF NOT EXISTS account_login_failures (
-    account_id      BIGINT       NOT NULL,
-    ip_address      VARCHAR(45)  NOT NULL
-        COMMENT '最近一次登录失败的 IP',
-    fail_count      INT          NOT NULL DEFAULT 1
-        COMMENT '连续失败次数',
-    first_fail_at   TIMESTAMP    DEFAULT CURRENT_TIMESTAMP
-        COMMENT '首次失败时间',
-    last_fail_at    TIMESTAMP    DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
-        COMMENT '最近失败时间',
-    locked_until    TIMESTAMP    NULL
-        COMMENT '锁定到期时间',
-    PRIMARY KEY (account_id)
-) ENGINE=InnoDB;
-
-CREATE TABLE IF NOT EXISTS system_skills (
+CREATE TABLE system_skills (
     id              BIGINT AUTO_INCREMENT PRIMARY KEY,
     name            VARCHAR(128) NOT NULL
         COMMENT 'Skill 唯一标识（slug）',
@@ -234,54 +309,156 @@ CREATE TABLE IF NOT EXISTS system_skills (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- ============================================================
--- 数据隔离迁移：为已有数据库添加 account_id 列
--- MySQL 5.7 不兼容 IF NOT EXISTS for ALTER TABLE ADD COLUMN，
--- 若列已存在会报错，忽略即可。
+-- Skill Store — Claude Code Skill 文件目录的持久化存储与检索
 -- ============================================================
 
--- 邀请码支持字符串：为已有 invite_codes 表增加 code 列（分步执行，避免唯一索引冲突）
--- ALTER TABLE invite_codes ADD COLUMN code VARCHAR(32) NOT NULL DEFAULT '' AFTER id;
--- UPDATE invite_codes SET code = CAST(id AS CHAR) WHERE code = '';
--- ALTER TABLE invite_codes ADD UNIQUE INDEX uk_code (code);
-
--- ALTER TABLE task_manager ADD COLUMN account_id BIGINT NOT NULL DEFAULT 0 COMMENT '归属账户 ID，0=无主/系统', ADD INDEX idx_account_id (account_id);
--- ALTER TABLE agent_events ADD COLUMN account_id BIGINT NOT NULL DEFAULT 0 COMMENT '归属账户 ID，0=无主/系统', ADD INDEX idx_account_id (account_id);
--- ALTER TABLE agent_run_summaries ADD COLUMN account_id BIGINT NOT NULL DEFAULT 0 COMMENT '归属账户 ID，0=无主/系统', ADD INDEX idx_account_id (account_id);
--- ALTER TABLE chat_conversations ADD COLUMN account_id BIGINT NOT NULL DEFAULT 0 COMMENT '归属账户 ID，0=无主/系统', ADD INDEX idx_account_id (account_id);
--- ALTER TABLE chat_messages ADD COLUMN account_id BIGINT NOT NULL DEFAULT 0 COMMENT '归属账户 ID，0=无主/系统', ADD INDEX idx_account_id (account_id);
-
--- ============================================================
--- Agent 跨 run 记忆（反思）
--- ============================================================
-CREATE TABLE IF NOT EXISTS agent_memory (
-    id              BIGINT AUTO_INCREMENT PRIMARY KEY,
-    account_id      BIGINT       NOT NULL DEFAULT 0,
-    scope_key       VARCHAR(256) NOT NULL
-        COMMENT '检索键：通常是 task_name 或 goal 的归一化关键词',
-    trace_id        VARCHAR(128) NULL
-        COMMENT '产生该反思的 run',
-    reflection      TEXT         NOT NULL
-        COMMENT 'LLM 生成的经验反思正文',
-    success         TINYINT      NOT NULL DEFAULT 0,
+CREATE TABLE skill_store_categories (
+    id              INT AUTO_INCREMENT PRIMARY KEY,
+    slug            VARCHAR(64)  NOT NULL UNIQUE
+        COMMENT '分类英文标识',
+    name            VARCHAR(128) NOT NULL
+        COMMENT '分类中文名',
+    description     TEXT         NULL,
+    sort_order      INT          DEFAULT 0,
     created_at      TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
-    INDEX idx_account_scope (account_id, scope_key),
-    INDEX idx_created (created_at)
+    updated_at      TIMESTAMP    DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+INSERT INTO skill_store_categories (slug, name, sort_order) VALUES
+    ('engineering',  '工程类',  1),
+    ('arkcli',       'ARK CLI', 2),
+    ('personal',     '个人',    3),
+    ('productivity', '生产力',  4),
+    ('in_progress',  '开发中',  5),
+    ('misc',         '杂项',    6),
+    ('deprecated',   '已弃用',  7);
+
+CREATE TABLE skill_store_registry (
+    id              INT AUTO_INCREMENT PRIMARY KEY,
+    dir_name        VARCHAR(128) NOT NULL UNIQUE
+        COMMENT 'Skill 目录名，如 learn / arkcli-deploy',
+    display_name    VARCHAR(256) NULL
+        COMMENT 'frontmatter.name',
+    description     TEXT         NULL
+        COMMENT 'frontmatter.description — 供 Agent 选 skill 时扫描',
+    version         VARCHAR(32)  NULL
+        COMMENT 'frontmatter.version',
+    frontmatter     JSON         NULL
+        COMMENT '完整 frontmatter 原始数据（保留所有灵活字段）',
+    category_id     INT          NULL,
+    status          VARCHAR(16)  NOT NULL DEFAULT 'active'
+        COMMENT 'active / in_progress / deprecated',
+    source          VARCHAR(32)  NOT NULL DEFAULT 'third-party'
+        COMMENT 'matt-pocock / arkcli / third-party / personal',
+    file_count      INT          DEFAULT 0,
+    total_size_bytes BIGINT      DEFAULT 0,
+    content_plain   LONGTEXT     NULL
+        COMMENT '所有文本文件拼接（供 FULLTEXT 搜索）',
+    content_hash    VARCHAR(64)  NULL
+        COMMENT 'content_plain 的 SHA-256，增量同步用',
+    created_at      TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
+    updated_at      TIMESTAMP    DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    INDEX idx_category (category_id),
+    INDEX idx_status (status),
+    INDEX idx_source (source),
+    INDEX idx_dir_name (dir_name),
+    FULLTEXT idx_ft_content (content_plain),
+    FULLTEXT idx_ft_desc (description),
+    FOREIGN KEY (category_id) REFERENCES skill_store_categories(id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE skill_store_files (
+    id              INT AUTO_INCREMENT PRIMARY KEY,
+    skill_id        INT          NOT NULL,
+    relative_path   VARCHAR(768) NOT NULL
+        COMMENT 'skill 目录内的相对路径，如 REFERENCE.md / references/detail.md',
+    filename        VARCHAR(255) NOT NULL,
+    file_type       VARCHAR(16)  NOT NULL DEFAULT 'other'
+        COMMENT 'skill_md / reference / example / manifest / script / readme / image / other',
+    mime_type       VARCHAR(128) NULL,
+    content         LONGTEXT     NULL
+        COMMENT '文本文件内容；二进制留空',
+    content_hash    VARCHAR(64)  NULL
+        COMMENT '文件 SHA-256',
+    file_size       INT          DEFAULT 0,
+    is_primary      TINYINT      DEFAULT 0
+        COMMENT '1 = SKILL.md',
+    created_at      TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
+    updated_at      TIMESTAMP    DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    INDEX idx_skill_id (skill_id),
+    INDEX idx_file_type (file_type),
+    UNIQUE KEY uk_skill_file (skill_id, relative_path(255)),
+    FULLTEXT idx_ft_file_content (content),
+    FOREIGN KEY (skill_id) REFERENCES skill_store_registry(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE skill_store_keywords (
+    id          INT AUTO_INCREMENT PRIMARY KEY,
+    skill_id    INT          NOT NULL,
+    keyword     VARCHAR(128) NOT NULL
+        COMMENT '触发词 / 搜索关键词',
+    source      VARCHAR(32)  NOT NULL DEFAULT 'description_extracted'
+        COMMENT 'frontmatter_keywords / description_extracted / manual',
+    created_at  TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_skill_id (skill_id),
+    INDEX idx_keyword (keyword),
+    UNIQUE KEY uk_skill_kw (skill_id, keyword),
+    FOREIGN KEY (skill_id) REFERENCES skill_store_registry(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE skill_store_tags (
+    id          INT AUTO_INCREMENT PRIMARY KEY,
+    skill_id    INT          NOT NULL,
+    tag         VARCHAR(64)  NOT NULL
+        COMMENT '自由标签，跨分类标注',
+    created_at  TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_skill_id (skill_id),
+    INDEX idx_tag (tag),
+    UNIQUE KEY uk_skill_tag (skill_id, tag),
+    FOREIGN KEY (skill_id) REFERENCES skill_store_registry(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE skill_store_dependencies (
+    id                  INT AUTO_INCREMENT PRIMARY KEY,
+    source_skill_id     INT          NOT NULL
+        COMMENT '引用方 skill_id',
+    target_skill_id     INT          NOT NULL
+        COMMENT '被引用方 skill_id',
+    relation_type       VARCHAR(16)  NOT NULL DEFAULT 'references'
+        COMMENT 'references / requires / extends / related',
+    reference_path      VARCHAR(768) NULL
+        COMMENT '引用来源的相对路径，如 ../arkcli-shared/SKILL.md',
+    created_at          TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_source (source_skill_id),
+    INDEX idx_target (target_skill_id),
+    UNIQUE KEY uk_dep (source_skill_id, target_skill_id, relation_type),
+    FOREIGN KEY (source_skill_id) REFERENCES skill_store_registry(id) ON DELETE CASCADE,
+    FOREIGN KEY (target_skill_id) REFERENCES skill_store_registry(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- ============================================================
--- Phase 5: 消息树 — chat_messages 树结构列 + trace_head
--- (MySQL 5.7 不支持 ADD COLUMN IF NOT EXISTS，需在新环境手动执行)
--- ALTER TABLE chat_messages ADD COLUMN seq INT NULL        COMMENT 'trace 内单增序号' AFTER trace_id;
--- ALTER TABLE chat_messages ADD COLUMN parent_seq INT NULL COMMENT '父消息 seq，根为 NULL' AFTER seq;
--- ALTER TABLE chat_messages ADD COLUMN branch_type VARCHAR(32) NULL COMMENT 'main/compression/reflection' AFTER parent_seq;
--- CREATE INDEX idx_trace_seq ON chat_messages(trace_id, seq);
+-- 迁移版本记录（init.sql 已包含所有迁移的列/表，标记为已应用）
 -- ============================================================
-CREATE TABLE IF NOT EXISTS trace_head (
-    trace_id     VARCHAR(128) NOT NULL PRIMARY KEY,
-    head_seq     INT          NOT NULL DEFAULT 0
-        COMMENT '当前主路径最新 seq；0 = 尚无消息',
-    next_seq     INT          NOT NULL DEFAULT 1
-        COMMENT '下一条可分配 seq',
-    account_id   BIGINT       NOT NULL DEFAULT 0,
-    updated_at   TIMESTAMP    DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+
+CREATE TABLE IF NOT EXISTS schema_migrations (
+    version     VARCHAR(64)  NOT NULL PRIMARY KEY
+        COMMENT '已执行的迁移文件名（不含 .sql）',
+    applied_at  TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
+    checksum    VARCHAR(64)  NULL
+        COMMENT '文件 SHA-256，用于检测文件被修改',
+    INDEX idx_applied (applied_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+INSERT IGNORE INTO schema_migrations (version) VALUES ('001_message_tree'), ('002_account_avatars'), ('003_skill_store');
+
+-- ============================================================
+-- 默认管理员账号
+-- 用户名: admin
+-- 密码:   admin123
+-- ⚠️ 生产环境请立即修改密码
+-- ============================================================
+
+INSERT INTO accounts (username, email, password_hash, password_salt, role, daily_token_limit)
+VALUES ('admin', 'admin@taskpilot.local',
+        '$2b$12$iL3bXV08uRAtCSFm49X42.BiVA/k2iKGMzNAgURxNY516/qMpnC6G',
+        NULL, 'admin', 10000000);

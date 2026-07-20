@@ -5,7 +5,7 @@ from __future__ import annotations
 import json as _json
 import time as _time
 from dataclasses import dataclass
-from typing import Any, Awaitable, Callable, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Optional
 
 from src.core.agents.capabilities.llm.base import LLMProvider, LLMMessage
 from src.core.agents.capabilities.skills import (
@@ -43,7 +43,7 @@ class ChatTurnRunner:
         tools: List[Skill],
         trace_id: str,
         event_bus: TraceEventBus,
-        cancel_checker: Callable[[], Awaitable[bool]],
+        cancel_checker: Callable[[], bool],
         tool_dependencies: Optional[Dict[str, Any]] = None,
     ):
         self._provider = llm_provider
@@ -86,7 +86,7 @@ class ChatTurnRunner:
 
         for _ in range(_MAX_ITERATIONS):
             self._step += 1
-            if await self._cancel_checker():
+            if self._cancel_checker():
                 return ChatTurnResult(status="cancelled", content="")
 
             await self._publish_harness("step_start", {"deps": []})
