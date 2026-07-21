@@ -59,7 +59,7 @@ class TaskPilotMySQLConfig(MySQLConfig):
     password: str
 
     model_config = SettingsConfigDict(
-        env_prefix="TASK_Pilot_DB_",
+        env_prefix="TASK_PILOT_DB_",
         env_file=".env",
         case_sensitive=False,
         extra="ignore",

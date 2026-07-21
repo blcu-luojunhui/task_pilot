@@ -8,9 +8,11 @@ import logging
 from typing import Callable, Dict, List, Optional, Any
 
 from .model import Skill, SkillType, RiskLevel
-from .loader import SkillLoader
 from .serializer import ToolSpecSerializer, OpenAIAdapter
 from .types import ToolSpecAdapter
+
+# 注：本地文件系统加载能力已移除，Skill 来源为 MySQL。
+# load_from_db_rows() 内部 import FrontmatterParser。
 
 logger = logging.getLogger(__name__)
 
@@ -81,19 +83,11 @@ class SkillRegistry:
             lines.append("")
         return "\n".join(lines)
 
-    def load_from_directory(self, path: str) -> int:
-        """从目录批量加载 Markdown 知识技能"""
-        loader = SkillLoader(path)
-        skills = loader.load_all()
-        for skill in skills:
-            self.register(skill)
-        return len(skills)
-
     def load_from_db_rows(self, rows: List[Dict[str, Any]]) -> int:
-        """从 MySQL skill_store_registry 查询结果批量加载为知识型技能。
+        """从 MySQL skill_registry 查询结果批量加载为知识型技能。
 
         每行需包含：dir_name, description, skill_md_content（SKILL.md 原文）。
-        使用 SkillLoader 解析 markdown 后注册到本 registry。
+        使用 FrontmatterParser 解析 markdown 后注册到本 registry。
 
         返回注册的技能数量。
         """

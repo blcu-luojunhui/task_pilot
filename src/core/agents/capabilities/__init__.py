@@ -2,7 +2,7 @@
 Capabilities Layer - 能力层
 
 提供 Agent 的核心能力：
-- skills: 技能系统
+- skill_hub: 技能系统
 - tools: 工具集合
 - llm: LLM 集成
 """
@@ -20,10 +20,8 @@ from .skills import (
     SkillRegistry,
     skill,
     get_global_registry,
-    SkillLoader,
     FrontmatterParser,
     InlineMetadataParser,
-    load_skills_from_dir,
     OpenAIAdapter,
     ClaudeAdapter,
     ToolSpecSerializer,
@@ -60,10 +58,8 @@ __all__ = [
     "SkillRegistry",
     "skill",
     "get_global_registry",
-    "SkillLoader",
     "FrontmatterParser",
     "InlineMetadataParser",
-    "load_skills_from_dir",
     "OpenAIAdapter",
     "ClaudeAdapter",
     "ToolSpecSerializer",

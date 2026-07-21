@@ -25,33 +25,32 @@ class AppContext:
         loaded = load_agentic_tools(["database", "http", "task", "utils", "chat_ops"])
         logger.info("Agentic tools loaded in this worker: %s", ", ".join(loaded))
 
-        from pathlib import Path
-
-        from src.core.agents.capabilities.skills import get_global_registry
-        from src.core.agents.capabilities.skills.loader import SkillLoader
-
-        knowledge_dir = Path(__file__).resolve().parents[2].parent / "skills" / "knowledge"
-        if knowledge_dir.exists():
-            registry = get_global_registry()
-            knowledge_skills = SkillLoader(str(knowledge_dir)).load_all()
-            for skill in knowledge_skills:
-                registry.register(skill)
-            logger.info("Knowledge skills loaded in this worker: %d", len(knowledge_skills))
-
         logger.info("=== Phase 1: Initializing MySQL pools ===")
         pool = self.container.async_mysql_pool()
         await pool.init_pools()
 
-        logger.info("=== Phase 1.5: Loading system skills from DB ===")
-        from src.core.skills.system_repository import SystemSkillRepository
+        logger.info("=== Phase 1.5: Loading skills from skill_registry ===")
+        from src.core.skill_store import SkillStoreRepository
         from src.core.agents.capabilities.skills import get_global_registry
+
+        try:
+            store_repo = SkillStoreRepository(pool)
+            rows = await store_repo.load_all_for_agent()
+            registry = get_global_registry()
+            loaded = registry.load_from_db_rows(rows)
+            logger.info("Skills loaded from skill_registry: %d", loaded)
+        except Exception:
+            logger.warning("Failed to load skills from skill_registry (table may not exist yet)", exc_info=True)
+
+        logger.info("=== Phase 1.6: Loading system_skills from DB (legacy) ===")
+        from src.core.skills.system_repository import SystemSkillRepository
         from src.core.agents.capabilities.skills.model import Skill
 
         try:
             sys_repo = SystemSkillRepository(pool)
-            rows = await sys_repo.list_all()
+            sys_rows = await sys_repo.list_all()
             registry = get_global_registry()
-            for row in rows:
+            for row in sys_rows:
                 skill = Skill.knowledge(
                     name=row["name"],
                     description=row["description"],
@@ -61,9 +60,9 @@ class AppContext:
                 )
                 registry.register(skill)
                 logger.debug("Loaded system skill from DB: %s", row["name"])
-            logger.info("System skills loaded from DB: %d", len(rows))
+            logger.info("System skills loaded from DB: %d", len(sys_rows))
         except Exception:
-            logger.warning("Failed to load system skills from DB (table may not exist yet)", exc_info=True)
+            logger.warning("Failed to load system_skills from DB (table may not exist yet)", exc_info=True)
         logger.info("MySQL pools initialized")
 
         logger.info("=== Phase 2: Starting log service ===")

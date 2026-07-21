@@ -1,7 +1,7 @@
 """
 Knowledge selector for dynamic prompt injection.
 
-Selects relevant knowledge skills based on current goal and tool usage.
+Selects relevant knowledge skill_hub based on current goal and tool usage.
 Supports keyword-based (default) and embedding-based semantic selection.
 """
 

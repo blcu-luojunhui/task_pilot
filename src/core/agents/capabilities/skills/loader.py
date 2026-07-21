@@ -1,15 +1,14 @@
 """
-Skill Loader - 从 Markdown 文件加载 Skills
+Skill Markdown 解析器 — 解析 SKILL.md YAML frontmatter。
 
-支持插件式解析器
+注意：本地文件系统加载能力已移除，Skill 唯一来源为 MySQL skill_registry 表。
+FrontmatterParser 供 Registry.load_from_db_rows() 解析 DB 中的 Markdown 内容。
 """
 
 import logging
-from pathlib import Path
 from typing import Dict, List, Optional
 
 from .model import Skill
-from .types import MarkdownParser
 
 logger = logging.getLogger(__name__)
 
@@ -49,7 +48,7 @@ def _extract_list_items(lines: List[str], section_name: str) -> List[str]:
 
 
 class FrontmatterParser:
-    """YAML Frontmatter 格式解析器"""
+    """YAML Frontmatter 格式解析器 — 供 Registry.load_from_db_rows() 使用。"""
 
     def can_parse(self, content: str) -> bool:
         return content.strip().startswith("---")
@@ -100,7 +99,7 @@ class FrontmatterParser:
 
 
 class InlineMetadataParser:
-    """行内元数据格式解析器"""
+    """行内元数据格式解析器（备用）。"""
 
     def can_parse(self, content: str) -> bool:
         return not content.strip().startswith("---")
@@ -164,73 +163,4 @@ class InlineMetadataParser:
         return metadata
 
 
-class SkillLoader:
-    """从 Markdown 文件加载 Skills，支持插件式解析器"""
-
-    def __init__(self, skills_dir: str, parsers: Optional[List[MarkdownParser]] = None):
-        self.skills_dir = Path(skills_dir)
-        self.parsers: List[MarkdownParser] = parsers or [
-            FrontmatterParser(),
-            InlineMetadataParser(),
-        ]
-
-        if not self.skills_dir.exists():
-            logger.warning(f"Skills 目录不存在: {skills_dir}")
-
-    def load_all(self) -> List[Skill]:
-        if not self.skills_dir.exists():
-            return []
-
-        skills = []
-        for md_file in self.skills_dir.glob("*.md"):
-            try:
-                skill = self.load_file(md_file)
-                if skill:
-                    skills.append(skill)
-                    logger.info(f"成功加载 skill: {skill.name} from {md_file.name}")
-            except Exception as e:
-                logger.error(f"加载 skill 失败 {md_file}: {e}", exc_info=True)
-
-        return skills
-
-    def load_file(self, file_path: Path) -> Optional[Skill]:
-        if not file_path.exists():
-            logger.warning(f"文件不存在: {file_path}")
-            return None
-
-        with open(file_path, "r", encoding="utf-8") as f:
-            content = f.read()
-
-        return self.parse_markdown(content, file_path.stem)
-
-    def parse_markdown(self, content: str, filename: str) -> Optional[Skill]:
-        """使用注册的解析器链解析 Markdown"""
-        for parser in self.parsers:
-            if parser.can_parse(content):
-                return parser.parse(content, filename)
-        return None
-
-
-def load_skills_from_dir(skills_dir: Optional[str] = None) -> List[Skill]:
-    """从目录加载所有 Skills"""
-    all_skills = []
-
-    # 加载内置 skills
-    builtin_skills_dir = Path(__file__).parent.parent.parent.parent.parent / "skills"
-    if builtin_skills_dir.exists():
-        loader = SkillLoader(str(builtin_skills_dir))
-        builtin_skills = loader.load_all()
-        all_skills.extend(builtin_skills)
-        logger.info(f"加载了 {len(builtin_skills)} 个内置 skills")
-
-    # 加载用户自定义 skills
-    if skills_dir:
-        loader = SkillLoader(skills_dir)
-        custom_skills = loader.load_all()
-        all_skills.extend(custom_skills)
-        logger.info(f"加载了 {len(custom_skills)} 个自定义 skills")
-
-    return all_skills
-
-
-__all__ = ["SkillLoader", "FrontmatterParser", "InlineMetadataParser", "load_skills_from_dir"]
+__all__ = ["FrontmatterParser", "InlineMetadataParser"]

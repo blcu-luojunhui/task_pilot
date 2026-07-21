@@ -145,12 +145,11 @@ def _extract_guidelines(content: str) -> list[str]:
 
 
 def create_skills_bp(deps: ApiDependencies) -> Blueprint:
-    bp = Blueprint("skills", __name__)
+    bp = Blueprint("skill_hub", __name__)
     personal_repo = PersonalSkillRepository(deps.mysql)
     system_repo = SystemSkillRepository(deps.mysql)
 
-    @bp.route("/skills", methods=["GET"])
-    async def list_skills():
+    async def _list_skills():
         from src.core.agents.capabilities.skills import get_global_registry
 
         registry = get_global_registry()
@@ -164,11 +163,20 @@ def create_skills_bp(deps: ApiDependencies) -> Blueprint:
                 personal_rows = await personal_repo.list_by_account(account_id)
                 skills.extend(_serialize_personal_skill(row) for row in personal_rows)
             except Exception:
-                logger.exception("Failed to load personal skills for account_id=%s", account_id)
+                logger.exception("Failed to load personal skill_hub for account_id=%s", account_id)
 
         return jsonify({"code": 0, "data": skills})
 
-    @bp.route("/skills/personal/template", methods=["GET"])
+    # 兼容前端旧路径 /api/skills
+    @bp.route("/skills", methods=["GET"])
+    async def list_skills_v2():
+        return await _list_skills()
+
+    @bp.route("/skill_hub", methods=["GET"])
+    async def list_skills():
+        return await _list_skills()
+
+    @bp.route("/skill_hub/personal/template", methods=["GET"])
     async def personal_skill_template():
         name = request.args.get("name", "new-skill")
         category = request.args.get("category", "chat_ops")
@@ -181,7 +189,7 @@ def create_skills_bp(deps: ApiDependencies) -> Blueprint:
             }
         )
 
-    @bp.route("/skills/personal", methods=["POST"])
+    @bp.route("/skill_hub/personal", methods=["POST"])
     async def create_personal_skill():
         account_id = get_current_account_id()
         if not account_id:
@@ -216,7 +224,7 @@ def create_skills_bp(deps: ApiDependencies) -> Blueprint:
 
         return jsonify({"code": 0, "data": _serialize_personal_skill(row)})
 
-    @bp.route("/skills/personal/<int:skill_id>", methods=["PUT"])
+    @bp.route("/skill_hub/personal/<int:skill_id>", methods=["PUT"])
     async def update_personal_skill(skill_id: int):
         account_id = get_current_account_id()
         if not account_id:
@@ -252,7 +260,7 @@ def create_skills_bp(deps: ApiDependencies) -> Blueprint:
         row = await personal_repo.get_by_id(account_id, skill_id)
         return jsonify({"code": 0, "data": _serialize_personal_skill(row)})
 
-    @bp.route("/skills/personal/<int:skill_id>", methods=["DELETE"])
+    @bp.route("/skill_hub/personal/<int:skill_id>", methods=["DELETE"])
     async def delete_personal_skill(skill_id: int):
         account_id = get_current_account_id()
         if not account_id:
@@ -263,7 +271,7 @@ def create_skills_bp(deps: ApiDependencies) -> Blueprint:
             return jsonify({"code": 404, "message": "Skill not found"}), 404
         return jsonify({"code": 0, "data": {"deleted": True, "skill_id": str(skill_id)}})
 
-    @bp.route("/skills/<skill_name>/calls", methods=["GET"])
+    @bp.route("/skill_hub/<skill_name>/calls", methods=["GET"])
     async def skill_calls(skill_name: str):
         try:
             limit = min(int(request.args.get("limit", 50)), 100)
@@ -303,7 +311,7 @@ def create_skills_bp(deps: ApiDependencies) -> Blueprint:
 
         return jsonify({"code": 0, "data": {"skill_name": skill_name, "calls": calls}})
 
-    @bp.route("/skills/<skill_name>/invoke", methods=["POST"])
+    @bp.route("/skill_hub/<skill_name>/invoke", methods=["POST"])
     async def invoke_skill(skill_name: str):
         if not _ALLOW_INVOKE:
             return jsonify(
@@ -384,7 +392,7 @@ def create_skills_bp(deps: ApiDependencies) -> Blueprint:
     from src.core.agents.capabilities.skills import get_global_registry
     from src.core.agents.capabilities.skills.model import Skill
 
-    @bp.route("/skills/system", methods=["POST"])
+    @bp.route("/skill_hub/system", methods=["POST"])
     @require_role("admin")
     async def create_system_skill():
         try:
@@ -427,7 +435,7 @@ def create_skills_bp(deps: ApiDependencies) -> Blueprint:
 
         return jsonify({"code": 0, "data": _serialize_system_skill_row(row)})
 
-    @bp.route("/skills/system/<int:skill_id>", methods=["PUT"])
+    @bp.route("/skill_hub/system/<int:skill_id>", methods=["PUT"])
     @require_role("admin")
     async def update_system_skill(skill_id: int):
         existing = await system_repo.get_by_id(skill_id)
@@ -472,7 +480,7 @@ def create_skills_bp(deps: ApiDependencies) -> Blueprint:
         row = await system_repo.get_by_id(skill_id)
         return jsonify({"code": 0, "data": _serialize_system_skill_row(row)})
 
-    @bp.route("/skills/system/<int:skill_id>", methods=["DELETE"])
+    @bp.route("/skill_hub/system/<int:skill_id>", methods=["DELETE"])
     @require_role("admin")
     async def delete_system_skill(skill_id: int):
         existing = await system_repo.get_by_id(skill_id)

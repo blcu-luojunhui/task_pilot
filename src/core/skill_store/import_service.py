@@ -1,7 +1,7 @@
 """Skill Store 导入服务 — 从本地文件系统批量导入到 MySQL。
 
-一次性迁移工具：扫描 ~/.claude/skills/ 目录，把每个 skill 目录导入到
-skill_store_registry + skill_store_files 表。之后所有 CRUD 走 API。
+一次性迁移工具：扫描 ~/.claude/skill_hub/ 目录，把每个 skill 目录导入到
+skill_registry + skill_files 表。之后所有 CRUD 走 API。
 """
 
 from __future__ import annotations
@@ -19,7 +19,7 @@ _SKIP_PREFIXES = ("_", ".")
 
 
 class SkillImportService:
-    """本地 skills/ 目录 → MySQL 的一次性导入。"""
+    """本地 skill_hub/ 目录 → MySQL 的一次性导入。"""
 
     def __init__(self, repo: SkillStoreRepository, parser: SkillMarkdownParser | None = None):
         self._repo = repo
@@ -62,7 +62,7 @@ class SkillImportService:
         """执行导入。
 
         Args:
-            base_path: skills 根目录路径
+            base_path: skill_hub 根目录路径
             source_hint: 来源标记（matt-pocock / arkcli / personal / third-party）
             overwrite: 是否覆盖已存在的 skill（False 则跳过）
 
@@ -156,7 +156,7 @@ class SkillImportService:
         return stats
 
     async def _resolve_dependencies(self, base: Path) -> None:
-        """解析跨 skill 的 Markdown 链接，写入 skill_store_dependencies。"""
+        """解析跨 skill 的 Markdown 链接，写入 skill_dependencies。"""
         import re
 
         name_to_id = await self._repo.get_all_dir_name_to_id()
@@ -189,6 +189,128 @@ class SkillImportService:
             return "matt-pocock"
         return fallback
 
+    async def run_flat(
+        self,
+        base_path: str,
+        *,
+        source_hint: str = "personal",
+        category_slug: str | None = None,
+        overwrite: bool = False,
+    ) -> Dict:
+        """从扁平 .md 文件目录导入（每个 .md 文件即一个 skill）。
+
+        适用于 src/infra/skill_hub/ 这类非 Claude Code skill 目录结构。
+
+        Args:
+            base_path: 包含 .md 文件的根目录（递归扫描）
+            source_hint: 来源标记
+            category_slug: 固定分类，None 则从 frontmatter 推断
+            overwrite: 是否覆盖已存在的 skill
+
+        Returns:
+            统计信息：{total, imported, skipped, errors}
+        """
+        base = Path(base_path).expanduser().resolve()
+        if not base.is_dir():
+            raise FileNotFoundError(f"Directory not found: {base}")
+
+        existing_dirs = set()
+        if not overwrite:
+            rows = await self._repo.get_all_dir_name_to_id()
+            existing_dirs = set(rows.keys())
+
+        stats = {"total": 0, "imported": 0, "skipped": 0, "errors": 0, "details": []}
+
+        for md_file in sorted(base.rglob("*.md")):
+            if md_file.name.startswith("_") or md_file.name.startswith("."):
+                continue
+            if ".git" in md_file.parts or "__pycache__" in md_file.parts:
+                continue
+
+            stats["total"] += 1
+
+            try:
+                content = md_file.read_text(encoding="utf-8", errors="replace")
+            except Exception as exc:
+                stats["errors"] += 1
+                stats["details"].append({
+                    "dir_name": md_file.name, "status": "error", "error": str(exc),
+                })
+                continue
+
+            meta = self._parser.parse_frontmatter(content)
+            dir_name = meta.name.strip() or md_file.stem
+            if not dir_name:
+                stats["errors"] += 1
+                stats["details"].append({
+                    "dir_name": md_file.name, "status": "error", "error": "无法解析 skill 名称",
+                })
+                continue
+
+            # 规范化 dir_name
+            import re
+            dir_name_slug = dir_name.lower().strip()
+            dir_name_slug = re.sub(r"[^\w\-]+", "-", dir_name_slug)
+            dir_name_slug = re.sub(r"-{2,}", "-", dir_name_slug).strip("-") or dir_name
+
+            if dir_name_slug in existing_dirs:
+                if not overwrite:
+                    stats["skipped"] += 1
+                    stats["details"].append({"dir_name": dir_name_slug, "status": "skipped"})
+                    continue
+                # overwrite
+                existing = await self._repo.get_skill_by_dir(dir_name_slug)
+                if existing:
+                    try:
+                        await self._repo.update_skill_from_markdown(existing["id"], content)
+                        stats["imported"] += 1
+                        stats["details"].append({
+                            "dir_name": dir_name_slug, "status": "imported",
+                            "skill_id": existing["id"],
+                        })
+                    except Exception as exc:
+                        stats["errors"] += 1
+                        stats["details"].append({
+                            "dir_name": dir_name_slug, "status": "error", "error": str(exc),
+                        })
+                    continue
+
+            try:
+                # 从父目录名推断 category
+                inferred_category = category_slug
+                if not inferred_category:
+                    parent = md_file.parent.name.lower()
+                    if parent not in ("skill_hub", "skills", ".", "src"):
+                        inferred_category = parent
+
+                skill_id = await self._repo.create_skill_from_markdown(
+                    content,
+                    source=source_hint,
+                    category_slug=inferred_category,
+                )
+                stats["imported"] += 1
+                stats["details"].append({
+                    "dir_name": dir_name_slug, "status": "imported", "skill_id": skill_id,
+                })
+                existing_dirs.add(dir_name_slug)
+            except ValueError as exc:
+                stats["skipped"] += 1
+                stats["details"].append({
+                    "dir_name": dir_name_slug, "status": "skipped", "error": str(exc),
+                })
+            except Exception as exc:
+                logger.exception("Failed to import flat skill: %s", dir_name_slug)
+                stats["errors"] += 1
+                stats["details"].append({
+                    "dir_name": dir_name_slug, "status": "error", "error": str(exc),
+                })
+
+        logger.info(
+            "Flat import complete: total=%d imported=%d skipped=%d errors=%d",
+            stats["total"], stats["imported"], stats["skipped"], stats["errors"],
+        )
+        return stats
+
     def _infer_category(self, dir_name: str, scan) -> str | None:
         fm_category = scan.meta.raw_frontmatter.get("category", "").strip()
         if fm_category:
@@ -198,7 +320,7 @@ class SkillImportService:
         known = {
             "engineering": {"diagnose", "grill-me", "grill-with-docs", "triage",
                             "improve-codebase-architecture", "tdd", "to-issues", "to-prd",
-                            "zoom-out", "prototype", "review", "setup-matt-pocock-skills",
+                            "zoom-out", "prototype", "review", "setup-matt-pocock-skill_hub",
                             "caveman", "handoff", "write-a-skill",
                             "git-guardrails-claude-code", "setup-pre-commit",
                             "migrate-to-shoehorn", "scaffold-exercises",

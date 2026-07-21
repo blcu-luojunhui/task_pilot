@@ -5,7 +5,7 @@ This module is deprecated. Use ``DeepSeekProvider`` from
 ``src.core.agents.capabilities.llm.providers.deepseek`` instead.
 
 DeepSeek exposes an OpenAI-compatible chat completions API, so this planner
-serializes registered skills as tools and normalizes returned tool calls into
+serializes registered skill_hub as tools and normalizes returned tool calls into
 the internal AgentLoopRunner message shape.
 """
 

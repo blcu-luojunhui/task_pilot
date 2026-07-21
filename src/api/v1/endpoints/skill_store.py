@@ -1,23 +1,23 @@
 """Skill Store API — MySQL 为 skill 唯一事实源。
 
 完整 CRUD：
-  POST   /skill-store/skills           创建 skill（上传 Markdown）
-  PUT    /skill-store/skills/<dir_name> 更新 skill 内容
-  DELETE /skill-store/skills/<dir_name> 删除 skill
+  POST   /skill-store/skill_hub           创建 skill（上传 Markdown）
+  PUT    /skill-store/skill_hub/<dir_name> 更新 skill 内容
+  DELETE /skill-store/skill_hub/<dir_name> 删除 skill
 
 搜索与浏览：
-  GET    /skill-store/skills           列表（分页 + 过滤）
-  GET    /skill-store/skills/search    全文搜索
-  GET    /skill-store/skills/<dir_name> 详情（含文件树 + 依赖图）
-  GET    /skill-store/skills/<dir_name>/dependencies  依赖图
+  GET    /skill-store/skill_hub           列表（分页 + 过滤）
+  GET    /skill-store/skill_hub/search    全文搜索
+  GET    /skill-store/skill_hub/<dir_name> 详情（含文件树 + 依赖图）
+  GET    /skill-store/skill_hub/<dir_name>/dependencies  依赖图
 
 导入（管理员）：
   POST   /skill-store/import           从本地目录批量导入
   GET    /skill-store/import/preview   预览将要导入的 skill
 
 标签管理：
-  POST   /skill-store/skills/<dir_name>/tags       添加标签
-  DELETE /skill-store/skills/<dir_name>/tags/<tag>  删除标签
+  POST   /skill-store/skill_hub/<dir_name>/tags       添加标签
+  DELETE /skill-store/skill_hub/<dir_name>/tags/<tag>  删除标签
 
 辅助：
   GET    /skill-store/stats            仪表盘统计
@@ -100,7 +100,7 @@ def create_skill_store_bp(deps: ApiDependencies) -> Blueprint:
     # Skill CRUD
     # ════════════════════════════════════════════════════
 
-    @bp.route("/skills", methods=["GET"])
+    @bp.route("/skill_hub", methods=["GET"])
     async def list_skills():
         category = request.args.get("category")
         status = request.args.get("status")
@@ -124,7 +124,7 @@ def create_skill_store_bp(deps: ApiDependencies) -> Blueprint:
             "data": {"items": items, "total": total, "page": page, "page_size": page_size},
         })
 
-    @bp.route("/skills", methods=["POST"])
+    @bp.route("/skill_hub", methods=["POST"])
     async def create_skill():
         """上传 Markdown 创建新 skill。
 
@@ -157,7 +157,7 @@ def create_skill_store_bp(deps: ApiDependencies) -> Blueprint:
         item = _skill_row(row) if row else {}
         return jsonify({"code": 0, "data": item})
 
-    @bp.route("/skills/<dir_name>", methods=["GET"])
+    @bp.route("/skill_hub/<dir_name>", methods=["GET"])
     async def get_skill(dir_name: str):
         row = await repo.get_skill_by_dir(dir_name)
         if not row:
@@ -198,7 +198,7 @@ def create_skill_store_bp(deps: ApiDependencies) -> Blueprint:
 
         return jsonify({"code": 0, "data": item})
 
-    @bp.route("/skills/<dir_name>", methods=["PUT"])
+    @bp.route("/skill_hub/<dir_name>", methods=["PUT"])
     async def update_skill(dir_name: str):
         """更新 skill 的 Markdown 内容。"""
         row = await repo.get_skill_by_dir(dir_name)
@@ -227,7 +227,7 @@ def create_skill_store_bp(deps: ApiDependencies) -> Blueprint:
         updated = await repo.get_skill_by_dir(dir_name)
         return jsonify({"code": 0, "data": _skill_row(updated) if updated else {}})
 
-    @bp.route("/skills/<dir_name>", methods=["DELETE"])
+    @bp.route("/skill_hub/<dir_name>", methods=["DELETE"])
     async def delete_skill(dir_name: str):
         row = await repo.get_skill_by_dir(dir_name)
         if not row:
@@ -244,7 +244,7 @@ def create_skill_store_bp(deps: ApiDependencies) -> Blueprint:
     # 搜索
     # ════════════════════════════════════════════════════
 
-    @bp.route("/skills/search", methods=["GET"])
+    @bp.route("/skill_hub/search", methods=["GET"])
     async def search_skills():
         q = request.args.get("q", "")
         category = request.args.get("category")
@@ -267,7 +267,7 @@ def create_skill_store_bp(deps: ApiDependencies) -> Blueprint:
     # 依赖图
     # ════════════════════════════════════════════════════
 
-    @bp.route("/skills/<dir_name>/dependencies", methods=["GET"])
+    @bp.route("/skill_hub/<dir_name>/dependencies", methods=["GET"])
     async def skill_dependencies(dir_name: str):
         row = await repo.get_skill_by_dir(dir_name)
         if not row:
@@ -294,7 +294,7 @@ def create_skill_store_bp(deps: ApiDependencies) -> Blueprint:
     # 标签管理
     # ════════════════════════════════════════════════════
 
-    @bp.route("/skills/<dir_name>/tags", methods=["POST"])
+    @bp.route("/skill_hub/<dir_name>/tags", methods=["POST"])
     async def add_skill_tag(dir_name: str):
         row = await repo.get_skill_by_dir(dir_name)
         if not row:
@@ -310,7 +310,7 @@ def create_skill_store_bp(deps: ApiDependencies) -> Blueprint:
         tags = await repo.get_skill_tags(row["id"])
         return jsonify({"code": 0, "data": {"dir_name": dir_name, "tags": tags}})
 
-    @bp.route("/skills/<dir_name>/tags/<tag>", methods=["DELETE"])
+    @bp.route("/skill_hub/<dir_name>/tags/<tag>", methods=["DELETE"])
     async def remove_skill_tag(dir_name: str, tag: str):
         row = await repo.get_skill_by_dir(dir_name)
         if not row:

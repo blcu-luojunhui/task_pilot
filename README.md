@@ -79,7 +79,7 @@ cp .env.example .env
 ```bash
 mysql -h 127.0.0.1 -u root -p -e "CREATE DATABASE IF NOT EXISTS task_pilot"
 mysql -h 127.0.0.1 -u root -p task_pilot < init.sql
-hypercorn app:app -c app_config.toml
+hypercorn app:app -c config.toml
 ```
 
 或使用 Docker Compose：
@@ -101,7 +101,7 @@ npm run dev
 ```bash
 cd frontend && npm run build
 cd ..
-FRONTEND_DIST=frontend/dist hypercorn app:app -c app_config.toml
+FRONTEND_DIST=frontend/dist hypercorn app:app -c config.toml
 ```
 
 服务默认监听 `http://127.0.0.1:6060`，前端开发服务默认监听 `http://127.0.0.1:5173`。

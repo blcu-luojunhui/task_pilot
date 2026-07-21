@@ -23,6 +23,18 @@ DROP TABLE IF EXISTS access_tokens;
 DROP TABLE IF EXISTS account_login_failures;
 DROP TABLE IF EXISTS invite_codes;
 DROP TABLE IF EXISTS accounts;
+DROP TABLE IF EXISTS skill_store_dependencies;
+DROP TABLE IF EXISTS skill_store_tags;
+DROP TABLE IF EXISTS skill_store_keywords;
+DROP TABLE IF EXISTS skill_store_files;
+DROP TABLE IF EXISTS skill_store_registry;
+DROP TABLE IF EXISTS skill_store_categories;
+DROP TABLE IF EXISTS skill_dependencies;
+DROP TABLE IF EXISTS skill_tags;
+DROP TABLE IF EXISTS skill_keywords;
+DROP TABLE IF EXISTS skill_files;
+DROP TABLE IF EXISTS skill_registry;
+DROP TABLE IF EXISTS skill_categories;
 
 -- ============================================================
 -- 任务引擎
@@ -312,7 +324,7 @@ CREATE TABLE system_skills (
 -- Skill Store — Claude Code Skill 文件目录的持久化存储与检索
 -- ============================================================
 
-CREATE TABLE skill_store_categories (
+CREATE TABLE skill_categories (
     id              INT AUTO_INCREMENT PRIMARY KEY,
     slug            VARCHAR(64)  NOT NULL UNIQUE
         COMMENT '分类英文标识',
@@ -324,7 +336,7 @@ CREATE TABLE skill_store_categories (
     updated_at      TIMESTAMP    DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
-INSERT INTO skill_store_categories (slug, name, sort_order) VALUES
+INSERT INTO skill_categories (slug, name, sort_order) VALUES
     ('engineering',  '工程类',  1),
     ('arkcli',       'ARK CLI', 2),
     ('personal',     '个人',    3),
@@ -333,7 +345,7 @@ INSERT INTO skill_store_categories (slug, name, sort_order) VALUES
     ('misc',         '杂项',    6),
     ('deprecated',   '已弃用',  7);
 
-CREATE TABLE skill_store_registry (
+CREATE TABLE skill_registry (
     id              INT AUTO_INCREMENT PRIMARY KEY,
     dir_name        VARCHAR(128) NOT NULL UNIQUE
         COMMENT 'Skill 目录名，如 learn / arkcli-deploy',
@@ -364,10 +376,10 @@ CREATE TABLE skill_store_registry (
     INDEX idx_dir_name (dir_name),
     FULLTEXT idx_ft_content (content_plain),
     FULLTEXT idx_ft_desc (description),
-    FOREIGN KEY (category_id) REFERENCES skill_store_categories(id) ON DELETE SET NULL
+    FOREIGN KEY (category_id) REFERENCES skill_categories(id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
-CREATE TABLE skill_store_files (
+CREATE TABLE skill_files (
     id              INT AUTO_INCREMENT PRIMARY KEY,
     skill_id        INT          NOT NULL,
     relative_path   VARCHAR(768) NOT NULL
@@ -389,10 +401,10 @@ CREATE TABLE skill_store_files (
     INDEX idx_file_type (file_type),
     UNIQUE KEY uk_skill_file (skill_id, relative_path(255)),
     FULLTEXT idx_ft_file_content (content),
-    FOREIGN KEY (skill_id) REFERENCES skill_store_registry(id) ON DELETE CASCADE
+    FOREIGN KEY (skill_id) REFERENCES skill_registry(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
-CREATE TABLE skill_store_keywords (
+CREATE TABLE skill_keywords (
     id          INT AUTO_INCREMENT PRIMARY KEY,
     skill_id    INT          NOT NULL,
     keyword     VARCHAR(128) NOT NULL
@@ -403,10 +415,10 @@ CREATE TABLE skill_store_keywords (
     INDEX idx_skill_id (skill_id),
     INDEX idx_keyword (keyword),
     UNIQUE KEY uk_skill_kw (skill_id, keyword),
-    FOREIGN KEY (skill_id) REFERENCES skill_store_registry(id) ON DELETE CASCADE
+    FOREIGN KEY (skill_id) REFERENCES skill_registry(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
-CREATE TABLE skill_store_tags (
+CREATE TABLE skill_tags (
     id          INT AUTO_INCREMENT PRIMARY KEY,
     skill_id    INT          NOT NULL,
     tag         VARCHAR(64)  NOT NULL
@@ -415,10 +427,10 @@ CREATE TABLE skill_store_tags (
     INDEX idx_skill_id (skill_id),
     INDEX idx_tag (tag),
     UNIQUE KEY uk_skill_tag (skill_id, tag),
-    FOREIGN KEY (skill_id) REFERENCES skill_store_registry(id) ON DELETE CASCADE
+    FOREIGN KEY (skill_id) REFERENCES skill_registry(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
-CREATE TABLE skill_store_dependencies (
+CREATE TABLE skill_dependencies (
     id                  INT AUTO_INCREMENT PRIMARY KEY,
     source_skill_id     INT          NOT NULL
         COMMENT '引用方 skill_id',
@@ -432,8 +444,8 @@ CREATE TABLE skill_store_dependencies (
     INDEX idx_source (source_skill_id),
     INDEX idx_target (target_skill_id),
     UNIQUE KEY uk_dep (source_skill_id, target_skill_id, relation_type),
-    FOREIGN KEY (source_skill_id) REFERENCES skill_store_registry(id) ON DELETE CASCADE,
-    FOREIGN KEY (target_skill_id) REFERENCES skill_store_registry(id) ON DELETE CASCADE
+    FOREIGN KEY (source_skill_id) REFERENCES skill_registry(id) ON DELETE CASCADE,
+    FOREIGN KEY (target_skill_id) REFERENCES skill_registry(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- ============================================================

@@ -1,7 +1,7 @@
 from .model import Skill, SkillType, RiskLevel
 from .context import SkillContext, ContainerResolver, MappingResolver
 from .registry import SkillRegistry, skill, get_global_registry
-from .loader import SkillLoader, FrontmatterParser, InlineMetadataParser, load_skills_from_dir
+from .loader import FrontmatterParser, InlineMetadataParser
 from .executor import SkillExecutor, SkillExecutionError, execute_skill
 from .validator import ParameterValidator, SkillValidationError
 from .serializer import OpenAIAdapter, ClaudeAdapter, ToolSpecSerializer
@@ -25,11 +25,9 @@ __all__ = [
     "SkillRegistry",
     "skill",
     "get_global_registry",
-    # 加载
-    "SkillLoader",
+    # 解析
     "FrontmatterParser",
     "InlineMetadataParser",
-    "load_skills_from_dir",
     # 序列化
     "OpenAIAdapter",
     "ClaudeAdapter",

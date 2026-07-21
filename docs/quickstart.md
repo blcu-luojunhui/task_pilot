@@ -49,7 +49,7 @@ mysql -h 127.0.0.1 -u root -p task_pilot < init.sql
 启动服务：
 
 ```bash
-hypercorn app:app -c app_config.toml
+hypercorn app:app -c config.toml
 ```
 
 后端默认监听 `0.0.0.0:6060`。
@@ -84,7 +84,7 @@ cd frontend
 npm install
 npm run build
 cd ..
-FRONTEND_DIST=frontend/dist hypercorn app:app -c app_config.toml
+FRONTEND_DIST=frontend/dist hypercorn app:app -c config.toml
 ```
 
 如果未构建前端，访问 `/` 会返回提示；API 不受影响。
