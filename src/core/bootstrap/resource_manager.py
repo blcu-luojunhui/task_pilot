@@ -4,6 +4,8 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from src.core.dependency import ServerContainer
 
+from src.core.yggdrasil.store import _DEFAULT_DOMAINS
+
 logger = logging.getLogger(__name__)
 
 
@@ -89,6 +91,37 @@ class AppContext:
         http_client = self.container.http_client()
         await http_client.start()
         logger.info("Shared HTTP client started")
+
+        logger.info("=== Phase 6: Initializing Yggdrasil world tree ===")
+        try:
+            yggdrasil_config = self.container.yggdrasil_config()
+            if yggdrasil_config.enabled:
+                yggdrasil_store = self.container.yggdrasil_store()
+                await yggdrasil_store.ensure_skeleton()
+
+                # 检查是否需要迁移
+                node_count = await yggdrasil_store.count_nodes()
+                if node_count <= len(_DEFAULT_DOMAINS) * 3 + 1:  # 只有骨架节点
+                    from src.core.yggdrasil.migration import DataMigration
+                    migration = DataMigration(
+                        store=yggdrasil_store,
+                        db=self.container.async_mysql_pool(),
+                    )
+                    report = await migration.migrate_all()
+                    logger.info(
+                        "Yggdrasil migration: %d skills, %d knowledge, %d memories (%d errors)",
+                        report.skills_migrated, report.knowledge_migrated,
+                        report.memories_migrated, len(report.errors),
+                    )
+
+                # 初始化 ChromaDB 索引
+                yggdrasil_embedding = self.container.yggdrasil_embedding()
+                await yggdrasil_embedding.initialize()
+                logger.info("Yggdrasil: ChromaDB initialized")
+            else:
+                logger.info("Yggdrasil: disabled, skipping initialization")
+        except Exception:
+            logger.warning("Yggdrasil initialization failed, continuing without it", exc_info=True)
 
         logger.info("=== Application startup complete ===")
 

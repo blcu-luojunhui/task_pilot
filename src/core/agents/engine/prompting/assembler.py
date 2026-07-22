@@ -4,13 +4,18 @@ Dynamic prompt assembly for the Think stage.
 Builds a per-step system message from current agent state and selected knowledge.
 """
 
+import logging
 from dataclasses import dataclass
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, TYPE_CHECKING
 
 from ...state import AgentLoopState
 from ...state.context.tokenizer import TokenCounter
 from .knowledge_selector import KnowledgeSelector
 
+if TYPE_CHECKING:
+    from src.core.yggdrasil import ContextAssembler, TreeRetriever
+
+logger = logging.getLogger("agent.prompting")
 
 _CHAT_INSTRUCTIONS = (
     "You are a helpful assistant. Reply concisely and naturally in a conversational tone. "
@@ -28,17 +33,19 @@ class PromptAssembler:
     knowledge_selector: Optional[KnowledgeSelector] = None
     token_counter: Optional[TokenCounter] = None
     chat_mode: bool = False
+    yggdrasil_retriever: "Optional[TreeRetriever]" = None
+    yggdrasil_assembler: "Optional[ContextAssembler]" = None
 
     def __post_init__(self):
         if self.token_counter is None:
             self.token_counter = TokenCounter()
 
-    def assemble(self, state: AgentLoopState) -> Dict[str, Any]:
+    async def assemble(self, state: AgentLoopState) -> Dict[str, Any]:
         if self.chat_mode:
             return self._assemble_chat(state)
-        return self._assemble_agent(state)
+        return await self._assemble_agent(state)
 
-    def _assemble_agent(self, state: AgentLoopState) -> Dict[str, Any]:
+    async def _assemble_agent(self, state: AgentLoopState) -> Dict[str, Any]:
         sections = [
             ("base", self.base_instructions.strip()),
             ("goal", self._goal_section(state)),
@@ -54,7 +61,7 @@ class PromptAssembler:
         if error_hint:
             sections.append(("error_hint", error_hint))
 
-        knowledge = self._knowledge_section(state)
+        knowledge = await self._knowledge_section(state)
         if knowledge:
             sections.append(("knowledge", knowledge))
 
@@ -124,13 +131,33 @@ class PromptAssembler:
             "Try a different tool, different parameters, or provide the best possible answer without repeating the same failing action."
         )
 
-    def _knowledge_section(self, state: AgentLoopState) -> str:
+    async def _knowledge_section(self, state: AgentLoopState) -> str:
+        # 优先使用 Yggdrasil 子树检索
+        if self.yggdrasil_retriever and self.yggdrasil_assembler:
+            return await self._yggdrasil_section(state)
+
         if not self.knowledge_selector:
             return ""
         knowledge = self.knowledge_selector.select(state).strip()
         if not knowledge:
             return ""
         return f"## Reference Knowledge\n{knowledge}"
+
+    async def _yggdrasil_section(self, state: AgentLoopState) -> str:
+        """使用 Yggdrasil 子树检索获取拓扑相关的上下文"""
+        try:
+            subtree = await self.yggdrasil_retriever.retrieve_subtree(
+                intent=state.goal,
+                max_tokens=self.max_system_tokens // 3,
+            )
+            return self.yggdrasil_assembler.assemble_prompt_injection(subtree)
+        except Exception as e:
+            logger.warning("Yggdrasil retrieval failed, falling back to legacy: %s", e)
+            if self.knowledge_selector:
+                knowledge = self.knowledge_selector.select(state).strip()
+                if knowledge:
+                    return f"## Reference Knowledge\n{knowledge}"
+            return ""
 
 
 __all__ = ["PromptAssembler"]

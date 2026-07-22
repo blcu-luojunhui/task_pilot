@@ -7,6 +7,10 @@
 -- ============================================================
 -- Drop all tables
 -- ============================================================
+DROP TABLE IF EXISTS tree_operation_log;
+DROP TABLE IF EXISTS node_links;
+DROP TABLE IF EXISTS tree_node;
+DROP TABLE IF EXISTS tree_snapshots;
 DROP TABLE IF EXISTS schema_migrations;
 DROP TABLE IF EXISTS trace_head;
 DROP TABLE IF EXISTS agent_memory;
@@ -449,6 +453,105 @@ CREATE TABLE skill_dependencies (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- ============================================================
+-- Yggdrasil 认知架构 —— 世界树节点与关系
+-- ============================================================
+
+CREATE TABLE tree_node (
+    id            VARCHAR(64) NOT NULL PRIMARY KEY
+        COMMENT '节点唯一 ID，格式 {type}-{slug}，如 skill-database-query',
+    parent_id     VARCHAR(64) DEFAULT NULL
+        COMMENT '父节点 ID，NULL 表示根节点',
+    domain        VARCHAR(512) NOT NULL DEFAULT '/'
+        COMMENT '领域路径，如 /database/mysql/',
+    node_type     ENUM('root', 'domain', 'skill', 'knowledge', 'memory') NOT NULL,
+    title         VARCHAR(512) NOT NULL
+        COMMENT '节点标题',
+    content       LONGTEXT
+        COMMENT '完整内容：Skill 存 prompt 描述，Knowledge 存 Markdown，Memory 存反思文本',
+    summary       TEXT
+        COMMENT 'LLM 生成的摘要，检索时优先使用以节省 token',
+    metadata      JSON
+        COMMENT '灵活元数据：tags, scope_key, trace_id, source_ref 等',
+    weight        DOUBLE NOT NULL DEFAULT 1.0
+        COMMENT '动态权重，常用则高，不常用则衰减',
+    health        DOUBLE NOT NULL DEFAULT 1.0
+        COMMENT '健康值 0-1，被污染后降低',
+    branch_id     VARCHAR(64) NOT NULL DEFAULT 'main'
+        COMMENT '分支标识，沙盒 fork 时创建新分支',
+    version       INT NOT NULL DEFAULT 1
+        COMMENT '乐观锁版本号，沙盒合并时 CAS 校验',
+    created_at    DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    updated_at    DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+
+    INDEX idx_parent      (parent_id),
+    INDEX idx_domain      (domain),
+    INDEX idx_node_type   (node_type),
+    INDEX idx_branch      (branch_id),
+    INDEX idx_weight      (weight),
+    INDEX idx_health      (health),
+    INDEX idx_domain_type (domain, node_type)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE node_links (
+    id              VARCHAR(64) NOT NULL PRIMARY KEY
+        COMMENT '边唯一 ID',
+    source_id       VARCHAR(64) NOT NULL
+        COMMENT '源节点 ID',
+    target_id       VARCHAR(64) NOT NULL
+        COMMENT '目标节点 ID',
+    relation_type   ENUM('explicit', 'implicit', 'cooccurrence') NOT NULL
+        COMMENT 'explicit=显式结构, implicit=语义关联, cooccurrence=共现统计',
+    label           VARCHAR(255)
+        COMMENT '关系标签，如 depends_on, produced_by, related_to',
+    weight          DOUBLE NOT NULL DEFAULT 1.0
+        COMMENT '边权重，共现边随频率累积',
+    metadata        JSON
+        COMMENT '边元数据',
+    created_at      DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    updated_at      DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+
+    INDEX idx_source   (source_id),
+    INDEX idx_target   (target_id),
+    INDEX idx_rel_type (relation_type),
+    UNIQUE KEY uk_link  (source_id, target_id, relation_type)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE tree_operation_log (
+    id              BIGINT AUTO_INCREMENT PRIMARY KEY,
+    node_id         VARCHAR(64)
+        COMMENT '关联节点 ID',
+    operation       ENUM('create', 'update', 'delete', 'move', 'link', 'unlink') NOT NULL,
+    before_snapshot JSON
+        COMMENT '变更前节点状态',
+    after_snapshot  JSON
+        COMMENT '变更后节点状态',
+    operator        VARCHAR(128)
+        COMMENT '操作者: agent-{trace_id} 或 user-{account_id}',
+    branch_id       VARCHAR(64) NOT NULL DEFAULT 'main',
+    created_at      DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+
+    INDEX idx_node     (node_id),
+    INDEX idx_branch   (branch_id),
+    INDEX idx_created  (created_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE tree_snapshots (
+    id          VARCHAR(64) NOT NULL PRIMARY KEY
+        COMMENT '快照唯一 ID',
+    branch_id   VARCHAR(64) NOT NULL
+        COMMENT '分支标识',
+    version     INT NOT NULL
+        COMMENT '该分支内的版本号',
+    message     TEXT
+        COMMENT '快照描述信息',
+    state       JSON NOT NULL
+        COMMENT '该版本的完整树状态摘要',
+    created_at  DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+
+    UNIQUE KEY uk_branch_version (branch_id, version)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ============================================================
 -- 迁移版本记录（init.sql 已包含所有迁移的列/表，标记为已应用）
 -- ============================================================
 
@@ -461,7 +564,7 @@ CREATE TABLE IF NOT EXISTS schema_migrations (
     INDEX idx_applied (applied_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
-INSERT IGNORE INTO schema_migrations (version) VALUES ('001_message_tree'), ('002_account_avatars'), ('003_skill_store');
+INSERT IGNORE INTO schema_migrations (version) VALUES ('001_message_tree'), ('002_account_avatars'), ('003_skill_store'), ('004_yggdrasil_tree');
 
 -- ============================================================
 -- 默认管理员账号

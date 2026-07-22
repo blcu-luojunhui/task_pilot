@@ -4,6 +4,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 from .auth_config import AuthConfig
 from .database import TaskPilotMySQLConfig
 from .observability import LogConfig, AlertConfig
+from src.core.yggdrasil.config import YggdrasilConfig
 
 
 class OpenAICompatibleLLMConfig(BaseSettings):
@@ -49,6 +50,9 @@ class ProjectConfigSettings(BaseSettings):
 
     # ============ Agent / LLM 配置 ============
     llm: OpenAICompatibleLLMConfig = Field(default_factory=OpenAICompatibleLLMConfig)
+
+    # ============ Yggdrasil 认知架构 ============
+    yggdrasil: YggdrasilConfig = Field(default_factory=YggdrasilConfig)
 
     # ============ 认证配置 ============
     auth: AuthConfig = Field(default_factory=AuthConfig)

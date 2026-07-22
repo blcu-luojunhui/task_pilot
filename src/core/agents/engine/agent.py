@@ -115,6 +115,9 @@ class AgentConfig:
     # MCP (OPT-15)
     mcp_servers: Optional[List[dict]] = None
 
+    # Yggdrasil 认知架构
+    yggdrasil_enabled: bool = False
+
     # 其他配置
     enable_routing: bool = False
     is_cancelled: Optional[Callable[[], bool]] = None
@@ -404,6 +407,9 @@ class Agent:
             memory_backend=config.memory_backend,
             long_term_memory_path=config.long_term_memory_path,
             embedding_provider=config.embedding_provider,
+            yggdrasil_enabled=config.yggdrasil_enabled,
+            yggdrasil_retriever=kwargs.get("yggdrasil_retriever"),
+            yggdrasil_assembler=kwargs.get("yggdrasil_assembler"),
         )
 
     # ── 生命周期控制 ──────────────────────────────────────

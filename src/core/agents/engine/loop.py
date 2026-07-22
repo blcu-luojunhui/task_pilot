@@ -51,7 +51,7 @@ class Think:
         # 组装 prompt
         tools_spec = None
         if self.prompt_assembler:
-            system_msg = self.prompt_assembler.assemble(state)
+            system_msg = await self.prompt_assembler.assemble(state)
             messages = [system_msg] + messages
             content = system_msg.get("content", "")
             logger.debug(

@@ -32,6 +32,7 @@ from .prompting import KnowledgeSelector, PromptAssembler
 
 if TYPE_CHECKING:
     from .lifecycle import LifecycleManager
+    from src.core.yggdrasil import TreeRetriever, ContextAssembler
 
 
 @dataclass
@@ -75,6 +76,9 @@ class AgentLoopRunner:
     llm_provider: Optional[Any] = None  # 用于构造 compactor；None 时压缩回退到截断
     enable_summary_compaction: bool = False  # 开关：True 才启用 LLM 摘要压缩
     event_bus: Optional[Any] = None  # TraceEventBus，harness 用其发布 chat.* 事件
+    yggdrasil_retriever: "Optional[TreeRetriever]" = None
+    yggdrasil_assembler: "Optional[ContextAssembler]" = None
+    yggdrasil_enabled: bool = False
 
     def __post_init__(self) -> None:
         if self.budget is None:
@@ -117,6 +121,8 @@ class AgentLoopRunner:
             prompt_assembler = PromptAssembler(
                 knowledge_selector=knowledge_selector,
                 chat_mode=self.chat_mode,
+                yggdrasil_retriever=self.yggdrasil_retriever if self.yggdrasil_enabled else None,
+                yggdrasil_assembler=self.yggdrasil_assembler if self.yggdrasil_enabled else None,
             )
             self.thinker = Think(
                 self.planner,

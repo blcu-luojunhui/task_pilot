@@ -9,6 +9,7 @@ from src.infra.observability import LogService, AlertService
 from src.infra.shared import AsyncHttpClient
 from src.infra.streaming import TraceEventBus, EventPersister
 from src.jobs.task_lifecycle import TaskLifecycleManager
+from src.core.yggdrasil import TreeStore, EmbeddingService, TreeRetriever, ContextAssembler
 
 
 class ServerContainer(containers.DeclarativeContainer):
@@ -63,6 +64,30 @@ class ServerContainer(containers.DeclarativeContainer):
         db=async_mysql_pool,
         config=config.provided.auth,
     )
+
+    # ============ Yggdrasil 认知架构 ============
+    yggdrasil_config = providers.Singleton(lambda: config().yggdrasil)
+
+    yggdrasil_store = providers.Singleton(
+        TreeStore,
+        db=async_mysql_pool,
+        config=yggdrasil_config,
+    )
+
+    yggdrasil_embedding = providers.Singleton(
+        EmbeddingService,
+        config=yggdrasil_config,
+        llm_provider=None,  # 使用 mock embedding，后续可注入 LLM provider
+    )
+
+    yggdrasil_retriever = providers.Singleton(
+        TreeRetriever,
+        store=yggdrasil_store,
+        embedding=yggdrasil_embedding,
+        config=yggdrasil_config,
+    )
+
+    yggdrasil_assembler = providers.Singleton(ContextAssembler)
 
 
 __all__ = ["ServerContainer"]
