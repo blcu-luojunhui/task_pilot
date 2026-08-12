@@ -144,6 +144,11 @@ async def http_post(
 ) -> Any:
     """发送 POST 请求"""
     _validate_url(url)
+    request_headers = dict(headers or {})
+    if ctx.idempotency_key and not any(
+        key.lower() == "idempotency-key" for key in request_headers
+    ):
+        request_headers["Idempotency-Key"] = ctx.idempotency_key
     await ctx.log.log(
         {
             "event": "http_post",
@@ -154,5 +159,5 @@ async def http_post(
     )
 
     async with AsyncHttpClient() as client:
-        response = await client.post(url=url, json=json, data=data, headers=headers)
+        response = await client.post(url=url, json=json, data=data, headers=request_headers)
         return response

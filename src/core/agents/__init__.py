@@ -67,8 +67,6 @@ from .capabilities import (
     load_agentic_tools,
     TOOL_AREAS,
     DEFAULT_TOOL_AREAS,
-    DeepSeekPlanner,
-    DeepSeekSettings,
 )
 # 执行层 - 从 execution 导出
 from .execution import (
@@ -94,6 +92,17 @@ from .multi_agents import (
     MessageHandler,
     TaskAssignment,
 )
+
+
+_LEGACY_LLM_EXPORTS = {"DeepSeekPlanner", "DeepSeekSettings"}
+
+
+def __getattr__(name: str):
+    if name not in _LEGACY_LLM_EXPORTS:
+        raise AttributeError(name)
+    from . import capabilities
+
+    return getattr(capabilities, name)
 
 __all__ = [
     # Core

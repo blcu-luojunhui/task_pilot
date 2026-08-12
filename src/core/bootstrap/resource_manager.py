@@ -29,6 +29,19 @@ class AppContext:
         pool = self.container.async_mysql_pool()
         await pool.init_pools()
 
+        logger.info("=== Phase 1.1: Ensuring durable tool execution ledger ===")
+        from src.core.agents.execution import ensure_tool_execution_ledger
+
+        try:
+            await ensure_tool_execution_ledger(pool)
+        except Exception:
+            # Keep read-only service paths available. DBToolExecutionLedger is
+            # fail-closed, so side-effecting Agent tools still cannot execute.
+            logger.error(
+                "Durable tool execution ledger unavailable; Agent writes are disabled",
+                exc_info=True,
+            )
+
         logger.info("=== Phase 1.5: Loading skills from skill_registry ===")
         from src.core.skill_store import SkillStoreRepository
         from src.core.agents.capabilities.skills import get_global_registry

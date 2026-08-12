@@ -34,7 +34,7 @@ ENV/
 .DS_Store
 .claude
 .logs/
-tests/
+.worktrees/
 examples/
 scripts/
 CLAUDE.md

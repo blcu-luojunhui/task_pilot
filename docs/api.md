@@ -88,6 +88,56 @@ curl -X POST http://127.0.0.1:6060/api/agent/run \
   }'
 ```
 
+Agent Run 默认只向模型开放 `READ` 工具。写操作必须为本次运行显式声明能力：
+
+```json
+{
+  "goal": "取消指定的失败任务",
+  "tool_areas": ["task"],
+  "max_steps": 8,
+  "tool_policy": {
+    "allowed_risk_levels": ["read", "write"],
+    "allowed_tools": ["task_query_status", "task_cancel"],
+    "blocked_tools": []
+  },
+  "approval_policy": {
+    "required_risk_levels": ["write", "destructive"],
+    "required_tools": [],
+    "exempt_tools": []
+  }
+}
+```
+
+`max_steps` 允许范围为 `1..50`。服务会把实际生效的工具策略和步数预算写入
+run metadata，方便追踪与回放。未显式声明 `write` 或 `destructive` 时，相应工具既
+不会发送给模型，也无法绕过执行器直接调用。
+
+写入/破坏性工具即使已由 `tool_policy` 授权，默认仍会在执行前进入人工审批，任务状态为
+`5`（`WAITING_APPROVAL`）。从任务详情的 `data.pending_approval` 取得 `request_id` 后：
+
+```bash
+curl -X POST http://127.0.0.1:6060/api/agent/runs/<trace_id>/approval \
+  -H 'Content-Type: application/json' \
+  -d '{"request_id":"apr-...","decision":"approve","reason":"reviewed"}'
+```
+
+也可把 `decision` 设为 `reject`。审批采用原子状态转换，重复请求不会重复执行工具；恢复
+使用持久化 Checkpoint，服务重启后仍可继续，并沿用同一 `trace_id` 和事件序号。
+
+若写入工具开始执行后进程中断、返回结果无法写入执行账本，任务进入状态
+`6`（`WAITING_RECONCILIATION`），不会自动重试副作用。从
+`data.pending_reconciliation` 读取精确的 `tool_call_id`，人工检查下游系统后裁决：
+
+```bash
+curl -X POST http://127.0.0.1:6060/api/agent/runs/<trace_id>/reconciliation \
+  -H 'Content-Type: application/json' \
+  -d '{"tool_call_id":"call-...","decision":"completed","result_content":"verified result","reason":"checked audit log"}'
+```
+
+如果确认副作用未发生，使用 `decision: "failed"` 并填写 `reason`。两种裁决都不会重新
+执行不确定的工具调用；接口会原子抢占任务状态，强制使用当前登录账户作为 actor，并在
+同一 `trace_id` 上续接事件序号。`completed` 的人工结果会先脱敏再写入 Checkpoint 和账本。
+
 生产场景更建议通过 Task API 进入任务生命周期；Agent API 更适合调试、演示和轻量执行。
 
 ## Chat API

@@ -8,7 +8,7 @@ import asyncio
 import json as _json
 import aiohttp
 from abc import ABC, abstractmethod
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Any, Dict, List, Optional, AsyncIterator
 from enum import Enum
 
@@ -88,7 +88,12 @@ class LLMProvider(ABC):
                 text = await resp.text()
                 if resp.status != 200:
                     if resp.status == 429:
-                        raise LLMRateLimitError(self.name)
+                        retry_after = resp.headers.get("Retry-After", "0")
+                        try:
+                            retry_after_seconds = float(retry_after)
+                        except (TypeError, ValueError):
+                            retry_after_seconds = 0
+                        raise LLMRateLimitError(self.name, retry_after_seconds)
                     raise LLMProviderError(self.name, text, resp.status)
                 try:
                     return _json.loads(text)
@@ -96,6 +101,20 @@ class LLMProvider(ABC):
                     raise LLMResponseError(f"{self.name} returned invalid JSON: {e}")
         except asyncio.TimeoutError:
             raise LLMTimeoutError(f"{self.name} request timed out after {self.config.timeout}s")
+
+    async def _ensure_stream_response(self, resp: aiohttp.ClientResponse) -> None:
+        """Validate an SSE response before yielding its first token."""
+        if resp.status == 200:
+            return
+        text = await resp.text()
+        if resp.status == 429:
+            retry_after = resp.headers.get("Retry-After", "0")
+            try:
+                retry_after_seconds = float(retry_after)
+            except (TypeError, ValueError):
+                retry_after_seconds = 0
+            raise LLMRateLimitError(self.name, retry_after_seconds)
+        raise LLMProviderError(self.name, text, resp.status)
 
     @abstractmethod
     async def chat(

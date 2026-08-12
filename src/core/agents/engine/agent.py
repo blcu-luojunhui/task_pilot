@@ -4,20 +4,20 @@ Agent - 统一的 Agent 创建和使用接口
 提供简洁的 API 来创建、配置和使用 Agent
 """
 
+import inspect
 import logging
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Mapping, Optional
+from typing import TYPE_CHECKING, Any, Awaitable, Callable, Dict, List, Mapping, Optional
 
 from src.core.agents.capabilities.llm.base import LLMMessage
-from src.core.agents.state import AgentLoopState, AgentLoopResult, AgentState
+from src.core.agents.state import AgentLoopResult, AgentState
 from src.core.agents.state.snapshot import StateSnapshot
 from src.core.agents.capabilities import (
     SkillRegistry,
     SkillExecutor,
     get_global_registry,
     load_agentic_tools,
-    DeepSeekSettings,
     Skill,
     SkillType,
     RiskLevel,
@@ -29,7 +29,6 @@ from src.core.agents.capabilities.llm.providers import (
     DeepSeekProvider,
 )
 from src.core.agents.capabilities.skills.serializer import (
-    _build_json_schema,
     OpenAIAdapter,
     ClaudeAdapter,
     ToolSpecSerializer,
@@ -37,6 +36,13 @@ from src.core.agents.capabilities.skills.serializer import (
 from src.core.agents.exceptions import AgentConfigError
 from .lifecycle import LifecycleManager
 from .runner import AgentLoopRunner
+
+if TYPE_CHECKING:
+    from src.core.agents.runtime.harness.approval import ApprovalDecision, ApprovalPolicy
+    from src.core.agents.runtime.harness.reconciliation import ReconciliationDecision
+
+
+AssistantPlanner = Callable[..., Awaitable[Dict[str, Any]]]
 
 
 # 支持的 LLM Provider 映射
@@ -79,6 +85,9 @@ class AgentConfig:
     llm_model: Optional[str] = None  # None 表示使用 provider 默认值
     llm_base_url: Optional[str] = None  # None 表示使用 provider 默认值
     llm_temperature: float = 0.2
+    llm_timeout: float = 60.0
+    llm_max_retries: int = 2
+    llm_retry_backoff_seconds: float = 1.0
 
     # 执行配置
     max_steps: int = 8
@@ -100,6 +109,9 @@ class AgentConfig:
     memory_backend: str = "keyword"  # keyword | embedding
     long_term_memory_path: Optional[str] = None
     embedding_provider: Optional[str] = None
+
+    # 人工审批：默认写和破坏性工具在执行前暂停。
+    approval_policy: Optional["ApprovalPolicy"] = None
 
     # 上下文卸载 (OPT-5)
     enable_context_offload: bool = False
@@ -134,6 +146,12 @@ class AgentConfig:
             raise AgentConfigError("max_steps must be > 0")
         if not (0 <= self.llm_temperature <= 2):
             raise AgentConfigError("llm_temperature must be in [0, 2]")
+        if self.llm_timeout <= 0:
+            raise AgentConfigError("llm_timeout must be > 0")
+        if self.llm_max_retries < 0:
+            raise AgentConfigError("llm_max_retries must be >= 0")
+        if self.llm_retry_backoff_seconds < 0:
+            raise AgentConfigError("llm_retry_backoff_seconds must be >= 0")
         if self.max_context_tokens <= 0:
             raise AgentConfigError("max_context_tokens must be > 0")
         if self.max_tool_result_length <= 0:
@@ -254,6 +272,10 @@ class Agent:
             strategy=strategy,
             **kwargs,
         )
+        if config.approval_policy is None:
+            from src.core.agents.runtime.harness.approval import ApprovalPolicy
+
+            config.approval_policy = ApprovalPolicy()
 
         # 加载工具到 bootstrap registry（全局共享的只读源）
         if tool_areas:
@@ -318,6 +340,7 @@ class Agent:
             model=resolved_model,
             base_url=resolved_base_url,
             temperature=config.llm_temperature,
+            timeout=config.llm_timeout,
         )
         return provider_cls(llm_config)
 
@@ -327,6 +350,13 @@ class Agent:
         provider: LLMProvider,
         config: AgentConfig,
     ) -> "AssistantPlanner":
+        from src.core.agents.capabilities.llm.retry import LLMRetryPolicy
+
+        retry_policy = LLMRetryPolicy(
+            max_retries=config.llm_max_retries,
+            base_delay_seconds=config.llm_retry_backoff_seconds,
+        )
+
         async def planner_factory(messages: List[Dict[str, Any]], step: int, **kwargs) -> Dict[str, Any]:
             llm_messages = [
                 LLMMessage(
@@ -339,25 +369,35 @@ class Agent:
             ]
 
             stream_callback = kwargs.get("stream_callback")
+            tools = _skills_to_tools(
+                registry.list_executable(),
+                llm_provider=config.llm_provider,
+            )
 
-            if stream_callback and provider.supports_streaming:
+            if stream_callback and provider.supports_streaming and not tools:
                 # ── 流式模式 ──
                 full_content = ""
-                async for token in provider.stream_chat(llm_messages, temperature=config.llm_temperature):
+                async for token in retry_policy.iterate(
+                    lambda: provider.stream_chat(
+                        llm_messages,
+                        temperature=config.llm_temperature,
+                    ),
+                    on_retry=kwargs.get("on_retry"),
+                ):
                     full_content += token
                     result = stream_callback(token)
-                    import inspect
                     if inspect.isawaitable(result):
                         await result
                 result: Dict[str, Any] = {"role": "assistant", "content": full_content}
                 return result
 
-            tools = _skills_to_tools(registry.list_executable(), llm_provider=config.llm_provider)
-
-            response = await provider.chat(
-                messages=llm_messages,
-                tools=tools if tools else None,
-                temperature=config.llm_temperature,
+            response = await retry_policy.call(
+                lambda: provider.chat(
+                    messages=llm_messages,
+                    tools=tools if tools else None,
+                    temperature=config.llm_temperature,
+                ),
+                on_retry=kwargs.get("on_retry"),
             )
 
             result: Dict[str, Any] = {"role": "assistant", "content": response.content}
@@ -404,6 +444,7 @@ class Agent:
             memory_backend=config.memory_backend,
             long_term_memory_path=config.long_term_memory_path,
             embedding_provider=config.embedding_provider,
+            approval_policy=config.approval_policy,
         )
 
     # ── 生命周期控制 ──────────────────────────────────────
@@ -516,6 +557,10 @@ class Agent:
         snapshot_id: str,
         snapshot_dir: Optional[str | Path] = None,
         metadata: Optional[Dict[str, Any]] = None,
+        approval_decision: Optional[Mapping[str, Any] | "ApprovalDecision"] = None,
+        reconciliation_decision: Optional[
+            Mapping[str, Any] | "ReconciliationDecision"
+        ] = None,
     ) -> AgentLoopResult:
         """
         从快照恢复执行。
@@ -542,12 +587,55 @@ class Agent:
         # 合并元数据
         merged_metadata = {**(snap_metadata or {}), **(metadata or {})}
 
-        # 更新生命周期管理器状态（通过 transition_to 确保状态机完整）
-        self._lifecycle.reset()
-        if lifecycle_state == AgentState.PAUSED:
-            self._lifecycle.transition_to(AgentState.PAUSED, reason="snapshot restored (paused)")
-        # 如果是其他状态，reset 已回到 IDLE，后续 run() 会 transition_to(RUNNING)
+        try:
+            from src.core.agents.runtime.harness.approval import (
+                ApprovalDecision,
+                ApprovalPolicyError,
+            )
+            from src.core.agents.runtime.harness.reconciliation import (
+                ReconciliationDecision,
+                ReconciliationError,
+            )
 
+            parsed_decision = (
+                approval_decision
+                if isinstance(approval_decision, ApprovalDecision)
+                else ApprovalDecision.from_mapping(approval_decision)
+            )
+        except ApprovalPolicyError as exc:
+            raise AgentConfigError(str(exc)) from exc
+
+        try:
+            parsed_reconciliation = (
+                reconciliation_decision
+                if isinstance(reconciliation_decision, ReconciliationDecision)
+                else ReconciliationDecision.from_mapping(reconciliation_decision)
+            )
+        except ReconciliationError as exc:
+            raise AgentConfigError(str(exc)) from exc
+
+        if loop_state.pending_approval and parsed_decision is None:
+            raise AgentConfigError(
+                "approval_decision is required for a snapshot with pending approval"
+            )
+        if loop_state.pending_reconciliation and parsed_reconciliation is None:
+            raise AgentConfigError(
+                "reconciliation_decision is required for a snapshot with pending reconciliation"
+            )
+
+        # Restore through valid transitions. Approval resumes immediately;
+        # ordinary paused snapshots remain paused until resume() is called.
+        self._lifecycle.reset()
+        self._lifecycle.transition_to(AgentState.RUNNING, reason="snapshot restored")
+        if (
+            lifecycle_state == AgentState.PAUSED
+            and not loop_state.pending_approval
+            and not loop_state.pending_reconciliation
+        ):
+            self._lifecycle.transition_to(
+                AgentState.PAUSED,
+                reason="snapshot restored (paused)",
+            )
         self._lifecycle.current_loop_state = loop_state
 
         _logger = logging.getLogger("agent.loop")
@@ -558,6 +646,9 @@ class Agent:
             messages=loop_state.messages,
             metadata=merged_metadata,
             trace_id=loop_state.trace_id,
+            initial_state=loop_state,
+            approval_decision=parsed_decision,
+            reconciliation_decision=parsed_reconciliation,
         )
 
     # ── Skill 注册 ────────────────────────────────────────

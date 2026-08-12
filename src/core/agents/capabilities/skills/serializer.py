@@ -32,16 +32,16 @@ def _build_json_schema(skill: Skill) -> Dict[str, Any]:
     required = []
 
     for param_name, param_spec in skill.parameters.items():
+        # Preserve the supported JSON Schema subset so model and executor see
+        # the same contract, while keeping TaskPilot's top-level `required` flag
+        # out of the property schema.
         prop = {
-            "type": param_spec.get("type", "string"),
-            "description": param_spec.get("description", ""),
+            key: value
+            for key, value in param_spec.items()
+            if key != "required"
         }
-
-        if "default" in param_spec:
-            prop["default"] = param_spec["default"]
-
-        if "enum" in param_spec:
-            prop["enum"] = param_spec["enum"]
+        prop.setdefault("type", "string")
+        prop.setdefault("description", "")
 
         properties[param_name] = prop
 
@@ -53,6 +53,7 @@ def _build_json_schema(skill: Skill) -> Dict[str, Any]:
         "type": "object",
         "properties": properties,
         "required": required,
+        "additionalProperties": False,
     }
 
 

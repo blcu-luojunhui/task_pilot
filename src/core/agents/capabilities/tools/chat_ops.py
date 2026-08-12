@@ -173,9 +173,9 @@ async def run_task(
         },
         "status": {
             "type": "integer",
-            "description": "按状态过滤：0=INIT 1=PROCESSING 2=SUCCESS 3=CANCELLED 4=CANCEL_REQUESTED 99=FAILED；不填则不过滤",
+            "description": "按状态过滤：0=INIT 1=PROCESSING 2=SUCCESS 3=CANCELLED 4=CANCEL_REQUESTED 5=WAITING_APPROVAL 6=WAITING_RECONCILIATION 99=FAILED；不填则不过滤",
             "required": False,
-            "enum": [0, 1, 2, 3, 4, 99],
+            "enum": [0, 1, 2, 3, 4, 5, 99],
         },
         "task_name": {
             "type": "string",

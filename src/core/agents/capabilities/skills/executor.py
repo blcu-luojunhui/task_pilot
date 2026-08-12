@@ -77,7 +77,11 @@ class SkillExecutor:
             SkillValidationError: 参数验证失败
             SkillExecutionError: 执行失败
         """
-        # 权限检查
+        self.validate_call(skill, params)
+        return await self.execute_prevalidated(skill, ctx, **params)
+
+    def validate_call(self, skill: Skill, params: Dict[str, Any]) -> None:
+        """Validate permissions and parameters before a durable execution claim."""
         if self.permission_guard:
             denial = self.permission_guard.check(skill)
             if denial:
@@ -92,6 +96,9 @@ class SkillExecutor:
             except SkillValidationError as e:
                 logger.error(f"Parameter validation failed for skill '{skill.name}': {e}")
                 raise
+
+    async def execute_prevalidated(self, skill: Skill, ctx: SkillContext, **params) -> Any:
+        """Execute a call already validated by :meth:`validate_call`."""
 
         # 执行（带重试）
         last_error = None

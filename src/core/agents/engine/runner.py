@@ -13,6 +13,9 @@ from .prompting import TaskRouter
 from src.core.agents.runtime.harness import (
     AgentBudget,
     AgentLoopHarness,
+    ApprovalDecision,
+    ApprovalPolicy,
+    ReconciliationDecision,
     ConstraintSet,
     ContinuousImprovement,
     FeedbackLoop,
@@ -75,6 +78,8 @@ class AgentLoopRunner:
     llm_provider: Optional[Any] = None  # 用于构造 compactor；None 时压缩回退到截断
     enable_summary_compaction: bool = False  # 开关：True 才启用 LLM 摘要压缩
     event_bus: Optional[Any] = None  # TraceEventBus，harness 用其发布 chat.* 事件
+    approval_policy: Optional[ApprovalPolicy] = None
+    execution_ledger: Optional[Any] = None
 
     def __post_init__(self) -> None:
         if self.budget is None:
@@ -129,6 +134,8 @@ class AgentLoopRunner:
             )
 
         if self.actor is None:
+            if self.permission_guard is not None:
+                self.executor.permission_guard = self.permission_guard
             self.actor = Act(
                 registry=self.registry,
                 executor=self.executor,
@@ -137,6 +144,7 @@ class AgentLoopRunner:
                 max_tool_result_length=self.max_tool_result_length,
                 is_cancelled=self.is_cancelled,
                 event_bus=self.event_bus,
+                execution_ledger=self.execution_ledger,
             )
 
         if self.observer is None:
@@ -176,6 +184,7 @@ class AgentLoopRunner:
                 lifecycle=self.lifecycle,
                 strategy=strategy_instance,
                 event_bus=self.event_bus,
+                approval_policy=self.approval_policy,
             )
         # OPT-3: 启用反思
         if self.enable_reflection:
@@ -225,6 +234,9 @@ class AgentLoopRunner:
         messages: Optional[List[Dict[str, Any]]] = None,
         metadata: Optional[Dict[str, Any]] = None,
         trace_id: Optional[str] = None,
+        initial_state: Optional[Any] = None,
+        approval_decision: Optional[ApprovalDecision] = None,
+        reconciliation_decision: Optional[ReconciliationDecision] = None,
     ) -> AgentLoopResult:
         assert self.harness is not None
         return await self.harness.run(
@@ -232,6 +244,9 @@ class AgentLoopRunner:
             messages=messages,
             metadata=metadata,
             trace_id=trace_id,
+            initial_state=initial_state,
+            approval_decision=approval_decision,
+            reconciliation_decision=reconciliation_decision,
         )
 
     async def run_with_routing(

@@ -8,6 +8,7 @@ Agent Loop - 整合 Think-Act-Observe 循环
 """
 
 import asyncio
+import inspect
 import json
 import logging
 import time
@@ -17,12 +18,20 @@ from typing import Any, Awaitable, Callable, Dict, List, Mapping, Optional
 from ..state import AgentLoopState, StopReason, ToolCallRecord
 from ..state.protocol import ToolCall, get_tool_calls, tool_result_message
 from ..state.context import ContextWindowManager
-from ..capabilities.skills import SkillContext, SkillExecutor, SkillRegistry, MappingResolver
+from ..capabilities.skills import (
+    MappingResolver,
+    RiskLevel,
+    SkillContext,
+    SkillExecutor,
+    SkillRegistry,
+)
 from ..capabilities.skills.tool_result_memory import (
     annotate_tool_message, collapse_old_tool_results,
 )
+from ..capabilities.skills.security import redact_sensitive_data, wrap_untrusted_tool_output
 from ..exceptions import ToolNotFoundError, ToolExecutionError
 from .prompting import PromptAssembler
+from ..execution.ledger import LedgerState, ToolExecutionLedgerError
 
 logger = logging.getLogger("agent.loop")
 
@@ -74,7 +83,6 @@ class Think:
             query = self.memory_manager.build_memory_query(state)
             # 优先使用异步检索（支持语义后端），回退同步检索
             if hasattr(self.memory_manager, "aretrieve"):
-                import inspect
                 result = self.memory_manager.aretrieve(query=query, k=3)
                 if inspect.isawaitable(result):
                     relevant = await result
@@ -167,11 +175,25 @@ class Think:
                 except Exception:
                     pass
 
+        async def _on_llm_retry(detail: Dict[str, Any]) -> None:
+            if _ebus:
+                try:
+                    _ebus.publish(
+                        trace_id=_trace_id,
+                        event_type="llm_retry",
+                        data=detail,
+                        source="agent",
+                        step=_step,
+                    )
+                except Exception:
+                    pass
+
         # 调用 planner
         try:
             result = await self.planner(
                 messages, state.step,
                 stream_callback=_wrapped_stream if (_original_stream or _ebus) else None,
+                on_retry=_on_llm_retry,
             )
             # 累积 token 使用量
             if result and "_usage" in result:
@@ -237,6 +259,7 @@ class Act:
     enable_offload: bool = False  # OPT-5: 上下文卸载开关
     offload_threshold_chars: int = 4000
     event_bus: Optional[Any] = None  # TraceEventBus，用于发布 chat.tool_call_* 事件
+    execution_ledger: Optional[Any] = None
 
     def __post_init__(self):
         if self.max_concurrency > 0:
@@ -246,10 +269,35 @@ class Act:
         """执行工具调用"""
         if not tool_calls:
             return []
-        if len(tool_calls) == 1:
-            return [annotate_tool_message(await self._execute_one(state, tool_calls[0]))]
+        has_side_effect = any(
+            (skill := self.registry.get(call.name)) is not None
+            and skill.risk_level in {RiskLevel.WRITE, RiskLevel.DESTRUCTIVE}
+            for call in tool_calls
+        )
+        if len(tool_calls) == 1 or has_side_effect:
+            results = []
+            for call in tool_calls:
+                results.append(annotate_tool_message(await self._execute_one(state, call)))
+                if state.pending_reconciliation:
+                    break
+            return results
         tasks = [self._execute_one(state, call) for call in tool_calls]
         return [annotate_tool_message(r) for r in list(await asyncio.gather(*tasks))]
+
+    @staticmethod
+    def _mark_reconciliation(
+        state: AgentLoopState,
+        call: ToolCall,
+        reason: str,
+    ) -> None:
+        state.stop_reason = StopReason.EXECUTION_IN_DOUBT
+        state.pending_reconciliation = {
+            "tool_call_id": call.id,
+            "tool_name": call.name,
+            "arguments": redact_sensitive_data(call.arguments),
+            "ledger_status": "running",
+            "reason": reason,
+        }
 
     async def _execute_one(self, state: AgentLoopState, call: ToolCall) -> Dict[str, Any]:
         if hasattr(self, "_semaphore"):
@@ -270,25 +318,104 @@ class Act:
 
         # 发布 tool_call_start
         self._publish_tool_event(state, "tool_call_start",
-                                 {"call_id": call_id, "tool_name": tool_name, "arguments": arguments})
+                                 {"call_id": call_id, "tool_name": tool_name,
+                                  "arguments": redact_sensitive_data(arguments)})
 
         skill = self.registry.get(tool_name)
         if not skill:
             raise ToolNotFoundError(tool_name)
+
+        uses_ledger = (
+            self.execution_ledger is not None
+            and skill.risk_level in {RiskLevel.WRITE, RiskLevel.DESTRUCTIVE}
+        )
+        if uses_ledger:
+            try:
+                self.executor.validate_call(skill, arguments)
+                claim = await self.execution_ledger.claim(
+                    state.trace_id,
+                    call_id,
+                    tool_name,
+                    arguments,
+                )
+            except Exception as exc:
+                return self._tool_end(
+                    state,
+                    call_id,
+                    tool_name,
+                    self._record_error(state, call_id, tool_name, str(exc)),
+                    False,
+                )
+            if claim.state == LedgerState.COMPLETED:
+                state.tool_calls.append(
+                    ToolCallRecord(
+                        tool_name=tool_name,
+                        tool_input=redact_sensitive_data(arguments),
+                        tool_output=claim.result_content or "",
+                    )
+                )
+                replayed = tool_result_message(
+                    call_id,
+                    claim.result_content or "",
+                )
+                self._publish_tool_event(
+                    state,
+                    "tool_call_replayed",
+                    {"call_id": call_id, "tool_name": tool_name, "status": "completed"},
+                )
+                return self._tool_end(state, call_id, tool_name, replayed, True)
+            if claim.state == LedgerState.FAILED:
+                failed = claim.error_message or "previous execution failed"
+                return self._tool_end(
+                    state,
+                    call_id,
+                    tool_name,
+                    self._record_error(
+                        state,
+                        call_id,
+                        tool_name,
+                        failed,
+                    ),
+                    False,
+                )
+            if claim.state == LedgerState.IN_DOUBT:
+                reason = (
+                    "previous process may have completed the side effect; "
+                    "automatic retry is blocked"
+                )
+                self._mark_reconciliation(state, call, reason)
+                return self._tool_end(
+                    state,
+                    call_id,
+                    tool_name,
+                    self._record_error(
+                        state,
+                        call_id,
+                        tool_name,
+                        f"execution_in_doubt: {reason}",
+                    ),
+                    False,
+                )
 
         if self.context_builder:
             context = self.context_builder(state)
         else:
             resolver = MappingResolver(self.tool_dependencies)
             context = SkillContext(_resolver=resolver)
+        context.trace_id = state.trace_id
+        context.step = state.step
+        context.tool_call_id = call_id
+        context.tool_name = tool_name
 
         try:
-            result = await self.executor.execute(skill, context, **arguments)
+            result = await (
+                self.executor.execute_prevalidated(skill, context, **arguments)
+                if uses_ledger
+                else self.executor.execute(skill, context, **arguments)
+            )
             duration = time.monotonic() - started
-            result_str = str(result)
-            state.tool_calls.append(
-                ToolCallRecord(tool_name=tool_name, tool_input=arguments,
-                               tool_output=result_str, duration_ms=duration * 1000))
+            safe_result = redact_sensitive_data(result)
+            result_str = str(safe_result)
 
             if self.enable_offload and self.artifact_store and len(result_str) > self.offload_threshold_chars:
                 try:
@@ -300,11 +427,36 @@ class Act:
                         f"{ref.total_lines} lines / {ref.total_chars} chars. "
                         f"Preview: {ref.preview}]\n"
                         f"Call read_artifact(id=\"{ref.id}\") to read the full content.")
+                    if uses_ledger:
+                        await self.execution_ledger.complete(
+                            state.trace_id,
+                            call_id,
+                            msg["content"],
+                        )
+                    state.tool_calls.append(
+                        ToolCallRecord(
+                            tool_name=tool_name,
+                            tool_input=redact_sensitive_data(arguments),
+                            tool_output=result_str,
+                            duration_ms=duration * 1000,
+                        )
+                    )
                     return self._tool_end(state, call_id, tool_name, msg, True)
                 except Exception:
                     logger.warning("Artifact offload failed, falling back to truncation", exc_info=True)
 
-            msg = tool_result_message(call_id, self._smart_truncate(result, self.max_tool_result_length))
+            content = self._smart_truncate(safe_result, self.max_tool_result_length)
+            msg = tool_result_message(call_id, wrap_untrusted_tool_output(content))
+            if uses_ledger:
+                await self.execution_ledger.complete(state.trace_id, call_id, msg["content"])
+            state.tool_calls.append(
+                ToolCallRecord(
+                    tool_name=tool_name,
+                    tool_input=redact_sensitive_data(arguments),
+                    tool_output=result_str,
+                    duration_ms=duration * 1000,
+                )
+            )
             return self._tool_end(state, call_id, tool_name, msg, True)
         except asyncio.CancelledError:
             raise
@@ -313,9 +465,26 @@ class Act:
             return self._tool_end(state, call_id, tool_name, self._record_error(state, call_id, tool_name, str(e)), False)
         except ToolExecutionError as e:
             logger.warning("Tool '%s' execution failed: %s", tool_name, e)
+            if uses_ledger:
+                try:
+                    await self.execution_ledger.fail(state.trace_id, call_id, str(e))
+                except ToolExecutionLedgerError:
+                    logger.exception("Failed to persist tool execution failure")
+                    self._mark_reconciliation(
+                        state,
+                        call,
+                        "tool raised an error but its ledger outcome could not be persisted",
+                    )
             return self._tool_end(state, call_id, tool_name, self._record_error(state, call_id, tool_name, str(e)), False)
         except Exception as e:
             logger.warning("Tool '%s' unexpected error: %s", tool_name, e)
+            if uses_ledger:
+                reason = (
+                    "tool returned but its completion could not be persisted"
+                    if isinstance(e, ToolExecutionLedgerError)
+                    else "tool raised unexpectedly after execution began"
+                )
+                self._mark_reconciliation(state, call, reason)
             return self._tool_end(state, call_id, tool_name, self._record_error(state, call_id, tool_name, f"{type(e).__name__}: {e}"), False)
 
     def _publish_tool_event(self, state: AgentLoopState, event_type: str, data: Dict[str, Any]) -> None:

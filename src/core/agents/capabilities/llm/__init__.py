@@ -9,7 +9,18 @@ LLM Layer - LLM 集成
 
 from .base import LLMProvider, LLMMessage, LLMResponse, LLMConfig, FinishReason
 from .providers import OpenAIProvider, ClaudeProvider, DeepSeekProvider
-from .deepseek import DeepSeekPlanner, DeepSeekSettings, load_dotenv
+
+
+_LEGACY_EXPORTS = {"DeepSeekPlanner", "DeepSeekSettings", "load_dotenv"}
+
+
+def __getattr__(name: str):
+    """Load the deprecated planner only when legacy callers request it."""
+    if name not in _LEGACY_EXPORTS:
+        raise AttributeError(name)
+    from . import deepseek as legacy
+
+    return getattr(legacy, name)
 
 __all__ = [
     # Base

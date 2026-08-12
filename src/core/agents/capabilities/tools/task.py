@@ -119,15 +119,16 @@ async def task_cancel(ctx: SkillContext, trace_id: str) -> bool:
     affected = await ctx.db.async_save(
         f"""
         UPDATE {table}
-        SET task_status = CASE
+        SET finish_timestamp = CASE
+                WHEN task_status IN (0, 5) THEN UNIX_TIMESTAMP()
+                ELSE finish_timestamp
+            END,
+            task_status = CASE
                 WHEN task_status = 0 THEN 3
                 WHEN task_status = 1 THEN 4
-            END,
-            finish_timestamp = CASE
-                WHEN task_status = 0 THEN UNIX_TIMESTAMP()
-                ELSE finish_timestamp
+                WHEN task_status = 5 THEN 3
             END
-        WHERE trace_id = %s AND task_status IN (0, 1) AND account_id = %s
+        WHERE trace_id = %s AND task_status IN (0, 1, 5) AND account_id = %s
         """,
         params=(trace_id, ctx.account_id),
     )
@@ -204,6 +205,8 @@ _VALID_TRANSITIONS = {
     0: {1, 3},  # INIT → PROCESSING, CANCELLED
     1: {2, 4, 99},  # PROCESSING → SUCCESS, CANCEL_REQUESTED, FAILED
     4: {3},  # CANCEL_REQUESTED → CANCELLED
+    5: {0, 3},  # WAITING_APPROVAL → INIT (resume), CANCELLED
+    6: {0, 3},  # WAITING_RECONCILIATION → INIT (resume), CANCELLED
 }
 
 
@@ -221,9 +224,9 @@ _VALID_TRANSITIONS = {
         },
         "new_status": {
             "type": "integer",
-            "description": "目标状态（0=INIT, 1=PROCESSING, 2=SUCCESS, 3=CANCELLED, 4=CANCEL_REQUESTED, 99=FAILED）",
+            "description": "目标状态（0=INIT, 1=PROCESSING, 2=SUCCESS, 3=CANCELLED, 4=CANCEL_REQUESTED, 5=WAITING_APPROVAL, 6=WAITING_RECONCILIATION, 99=FAILED）",
             "required": True,
-            "enum": [0, 1, 2, 3, 4, 99],
+            "enum": [0, 1, 2, 3, 4, 5, 99],
         },
     },
     examples=[

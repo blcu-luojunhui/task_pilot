@@ -5,10 +5,10 @@
 """
 
 import json
+import uuid
 from pathlib import Path
 from typing import Optional, Dict, Any
 from datetime import datetime
-from dataclasses import asdict
 
 from .models import AgentState, AgentLoopState, StopReason
 
@@ -36,6 +36,86 @@ class StateSnapshot:
             return text[:self.max_tool_result_length] + "... [truncated]"
         return text
 
+    @staticmethod
+    def serialize_state(
+        loop_state: AgentLoopState,
+        lifecycle_state: AgentState,
+        metadata: Optional[Dict[str, Any]] = None,
+        max_tool_result_length: int = 2000,
+    ) -> Dict[str, Any]:
+        """Serialize a resumable state without requiring filesystem storage."""
+        def truncate(text: Optional[str]) -> Optional[str]:
+            if text is None or len(text) <= max_tool_result_length:
+                return text
+            return text[:max_tool_result_length] + "... [truncated]"
+
+        return {
+            "schema_version": 4,
+            "lifecycle_state": lifecycle_state.value,
+            "loop_state": {
+                "goal": loop_state.goal,
+                "trace_id": loop_state.trace_id,
+                "step": loop_state.step,
+                "max_steps": loop_state.max_steps,
+                "messages": loop_state.messages,
+                "metadata": loop_state.metadata,
+                "token_usage": loop_state.token_usage,
+                "pending_approval": loop_state.pending_approval,
+                "pending_reconciliation": loop_state.pending_reconciliation,
+                "tool_calls": [
+                    {
+                        "tool_name": tc.tool_name,
+                        "tool_input": tc.tool_input,
+                        "tool_output": truncate(tc.tool_output),
+                        "error": tc.error,
+                        "duration_ms": tc.duration_ms,
+                    }
+                    for tc in loop_state.tool_calls
+                ],
+                "steps": [
+                    {
+                        "step_number": step.step_number,
+                        "thought": {
+                            "type": step.thought.type.value,
+                            "content": step.thought.content,
+                        }
+                        if step.thought
+                        else None,
+                        "action": {
+                            "type": step.action.type.value,
+                            "target": step.action.target,
+                            "parameters": step.action.parameters,
+                        }
+                        if step.action
+                        else None,
+                        "observation": {
+                            "result": step.observation.result,
+                            "success": step.observation.success,
+                            "error": step.observation.error,
+                            "duration_ms": step.observation.duration_ms,
+                        }
+                        if step.observation
+                        else None,
+                    }
+                    for step in loop_state.steps
+                ],
+                "final_answer": loop_state.final_answer,
+                "stop_reason": loop_state.stop_reason.value if loop_state.stop_reason else None,
+                "consecutive_tool_errors": loop_state.consecutive_tool_errors,
+                "plan": [
+                    {
+                        "id": plan_step.id,
+                        "goal": plan_step.goal,
+                        "status": plan_step.status.value,
+                        "result": plan_step.result,
+                    }
+                    for plan_step in loop_state.plan
+                ],
+            },
+            "metadata": metadata or {},
+            "timestamp": datetime.now().isoformat(),
+        }
+
     def save(
         self,
         agent_id: str,
@@ -55,67 +135,21 @@ class StateSnapshot:
         Returns:
             快照 ID
         """
-        snapshot_id = f"{agent_id}_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+        snapshot_id = (
+            f"{agent_id}_{datetime.now().strftime('%Y%m%d_%H%M%S_%f')}"
+            f"_{uuid.uuid4().hex[:8]}"
+        )
         snapshot_path = self.storage_dir / f"{snapshot_id}.json"
 
         snapshot_data = {
-            "schema_version": 2,
             "snapshot_id": snapshot_id,
             "agent_id": agent_id,
-            "lifecycle_state": lifecycle_state.value,
-            "loop_state": {
-                "goal": loop_state.goal,
-                "trace_id": loop_state.trace_id,
-                "step": loop_state.step,
-                "max_steps": loop_state.max_steps,
-                "messages": loop_state.messages,
-                "metadata": loop_state.metadata,
-                "tool_calls": [
-                    {
-                        "tool_name": tc.tool_name,
-                        "tool_input": tc.tool_input,
-                        "tool_output": self._truncate(tc.tool_output),
-                        "error": tc.error,
-                        "duration_ms": tc.duration_ms,
-                    }
-                    for tc in loop_state.tool_calls
-                ],
-                "steps": [
-                    {
-                        "step_number": s.step_number,
-                        "thought": {
-                            "type": s.thought.type.value if s.thought else None,
-                            "content": s.thought.content if s.thought else "",
-                        } if s.thought else None,
-                        "action": {
-                            "type": s.action.type.value if s.action else None,
-                            "target": s.action.target if s.action else "",
-                            "parameters": s.action.parameters if s.action else {},
-                        } if s.action else None,
-                        "observation": {
-                            "result": s.observation.result if s.observation else None,
-                            "success": s.observation.success if s.observation else False,
-                            "error": s.observation.error if s.observation else None,
-                            "duration_ms": s.observation.duration_ms if s.observation else 0.0,
-                        } if s.observation else None,
-                    }
-                    for s in loop_state.steps
-                ],
-                "final_answer": loop_state.final_answer,
-                "stop_reason": loop_state.stop_reason.value if loop_state.stop_reason else None,
-                "consecutive_tool_errors": loop_state.consecutive_tool_errors,
-                "plan": [
-                    {
-                        "id": ps.id,
-                        "goal": ps.goal,
-                        "status": ps.status.value,
-                        "result": ps.result,
-                    }
-                    for ps in getattr(loop_state, "plan", []) or []
-                ],
-            },
-            "metadata": metadata or {},
-            "timestamp": datetime.now().isoformat(),
+            **self.serialize_state(
+                loop_state,
+                lifecycle_state,
+                metadata,
+                self.max_tool_result_length,
+            ),
         }
 
         with open(snapshot_path, "w", encoding="utf-8") as f:
@@ -144,7 +178,11 @@ class StateSnapshot:
         with open(snapshot_path, "r", encoding="utf-8") as f:
             data = json.load(f)
 
-        # 恢复 lifecycle state
+        return self.deserialize_state(data)
+
+    @staticmethod
+    def deserialize_state(data: Dict[str, Any]) -> tuple[AgentLoopState, AgentState, Dict[str, Any]]:
+        """Restore state from a filesystem snapshot or database checkpoint."""
         lifecycle_state = AgentState(data["lifecycle_state"])
 
         # 恢复 loop state
@@ -159,6 +197,12 @@ class StateSnapshot:
         loop_state.final_answer = loop_data.get("final_answer")
         loop_state.consecutive_tool_errors = loop_data.get("consecutive_tool_errors", 0)
         loop_state.metadata = loop_data.get("metadata", {})
+        loop_state.token_usage = loop_data.get(
+            "token_usage",
+            {"prompt": 0, "completion": 0, "total": 0},
+        )
+        loop_state.pending_approval = loop_data.get("pending_approval")
+        loop_state.pending_reconciliation = loop_data.get("pending_reconciliation")
 
         if loop_data.get("stop_reason"):
             loop_state.stop_reason = StopReason(loop_data["stop_reason"])

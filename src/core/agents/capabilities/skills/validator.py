@@ -4,7 +4,7 @@
 验证 Skill 执行参数的合法性
 """
 
-from typing import Any, Dict
+from typing import Any, Dict, Mapping
 
 from .model import Skill
 
@@ -47,17 +47,16 @@ class ParameterValidator:
                     f"Missing required parameter '{param_name}' for skill '{skill.name}'"
                 )
 
-        # 验证参数类型
+        # 验证参数类型与 JSON Schema 子集
         for param_name, param_value in params.items():
             if param_name in skill.parameters:
                 param_spec = skill.parameters[param_name]
-                expected_type = param_spec.get("type", "string")
-                if not ParameterValidator.validate_type(param_value, expected_type):
-                    actual_type = type(param_value).__name__
-                    raise SkillValidationError(
-                        f"Parameter '{param_name}' for skill '{skill.name}' "
-                        f"expected type '{expected_type}', got '{actual_type}'"
-                    )
+                ParameterValidator.validate_schema(
+                    param_value,
+                    param_spec,
+                    path=param_name,
+                    skill_name=skill.name,
+                )
 
         # 验证未知参数
         defined_params = set(skill.parameters.keys())
@@ -81,13 +80,16 @@ class ParameterValidator:
         Returns:
             是否匹配类型
         """
+        if expected_type == "integer":
+            return isinstance(value, int) and not isinstance(value, bool)
+        if expected_type == "number":
+            return isinstance(value, (int, float)) and not isinstance(value, bool)
         type_map = {
             "string": str,
-            "integer": int,
-            "number": (int, float),
             "boolean": bool,
             "array": (list, tuple),
             "object": dict,
+            "null": type(None),
         }
 
         expected = type_map.get(expected_type)
@@ -95,6 +97,66 @@ class ParameterValidator:
             return True  # 未知类型，跳过验证
 
         return isinstance(value, expected)
+
+    @classmethod
+    def validate_schema(
+        cls,
+        value: Any,
+        schema: Mapping[str, Any],
+        *,
+        path: str,
+        skill_name: str,
+    ) -> None:
+        """Validate the JSON Schema subset emitted by TaskPilot tool specs."""
+        expected_type = schema.get("type")
+        if expected_type and not cls.validate_type(value, expected_type):
+            raise SkillValidationError(
+                f"Parameter '{path}' for skill '{skill_name}' expected type "
+                f"'{expected_type}', got '{type(value).__name__}'"
+            )
+
+        if "enum" in schema and value not in schema["enum"]:
+            raise SkillValidationError(
+                f"Parameter '{path}' for skill '{skill_name}' must be one of "
+                f"{schema['enum']!r}"
+            )
+
+        if expected_type == "array" and isinstance(value, (list, tuple)):
+            item_schema = schema.get("items")
+            if isinstance(item_schema, Mapping):
+                for index, item in enumerate(value):
+                    cls.validate_schema(
+                        item,
+                        item_schema,
+                        path=f"{path}[{index}]",
+                        skill_name=skill_name,
+                    )
+
+        if expected_type == "object" and isinstance(value, dict):
+            properties = schema.get("properties", {})
+            required = schema.get("required", [])
+            for required_name in required:
+                if required_name not in value:
+                    raise SkillValidationError(
+                        f"Missing required parameter '{path}.{required_name}' "
+                        f"for skill '{skill_name}'"
+                    )
+            if isinstance(properties, Mapping):
+                unknown = set(value) - set(properties)
+                if schema.get("additionalProperties") is False and unknown:
+                    raise SkillValidationError(
+                        f"Unknown parameters for '{path}' in skill '{skill_name}': "
+                        + ", ".join(sorted(unknown))
+                    )
+                for name, item in value.items():
+                    item_schema = properties.get(name)
+                    if isinstance(item_schema, Mapping):
+                        cls.validate_schema(
+                            item,
+                            item_schema,
+                            path=f"{path}.{name}",
+                            skill_name=skill_name,
+                        )
 
 
 __all__ = ["ParameterValidator", "SkillValidationError"]

@@ -11,10 +11,6 @@ from .types import DependencyResolver
 
 if TYPE_CHECKING:
     from src.core.dependency import ServerContainer
-    from src.infra.database import AsyncMySQLPool
-    from src.infra.observability import LogService
-    from src.infra.shared import AsyncHttpClient
-    from src.core.config import ProjectConfigSettings
 
 
 class ContainerResolver:
@@ -63,6 +59,17 @@ class SkillContext:
 
     _resolver: DependencyResolver
     _cache: Dict[str, Any] = field(default_factory=dict, repr=False)
+    trace_id: str = ""
+    step: int = 0
+    tool_call_id: str = ""
+    tool_name: str = ""
+
+    @property
+    def idempotency_key(self) -> str:
+        """Stable key for external side effects during one frozen tool call."""
+        if not self.tool_call_id:
+            return ""
+        return f"{self.trace_id}:{self.tool_call_id}" if self.trace_id else self.tool_call_id
 
     def __getattr__(self, name: str) -> Any:
         """动态解析依赖"""

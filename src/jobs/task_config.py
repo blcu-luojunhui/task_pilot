@@ -20,6 +20,8 @@ class TaskStatus:
     SUCCESS = 2
     CANCELLED = 3
     CANCEL_REQUESTED = 4
+    WAITING_APPROVAL = 5
+    WAITING_RECONCILIATION = 6
     FAILED = 99
 
 
