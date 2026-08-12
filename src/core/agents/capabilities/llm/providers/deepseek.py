@@ -91,6 +91,7 @@ class DeepSeekProvider(LLMProvider):
                 headers=headers,
                 json=payload,
             ) as resp:
+                await self._ensure_stream_response(resp)
                 async for line in resp.content:
                     line = line.decode("utf-8").strip()
                     if line.startswith("data: "):

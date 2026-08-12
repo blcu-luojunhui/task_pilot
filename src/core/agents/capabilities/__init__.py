@@ -28,6 +28,8 @@ from .skills import (
     ParameterValidator,
     SkillValidationError,
     PermissionGuard,
+    ToolPolicy,
+    ToolPolicyError,
     ToolOutput,
     DependencyResolver,
     ToolSpecAdapter,
@@ -38,11 +40,17 @@ from .tools import (
     DEFAULT_TOOL_AREAS,
     load_agentic_tools,
 )
-from .llm import (
-    DeepSeekPlanner,
-    DeepSeekSettings,
-    load_dotenv,
-)
+
+
+_LEGACY_LLM_EXPORTS = {"DeepSeekPlanner", "DeepSeekSettings", "load_dotenv"}
+
+
+def __getattr__(name: str):
+    if name not in _LEGACY_LLM_EXPORTS:
+        raise AttributeError(name)
+    from . import llm
+
+    return getattr(llm, name)
 
 __all__ = [
     # Skills
@@ -66,6 +74,8 @@ __all__ = [
     "ParameterValidator",
     "SkillValidationError",
     "PermissionGuard",
+    "ToolPolicy",
+    "ToolPolicyError",
     "ToolOutput",
     "DependencyResolver",
     "ToolSpecAdapter",

@@ -41,13 +41,34 @@ class TraceEventBus:
         self._closed_ttl_seconds = closed_ttl_seconds
         self._persister = persister
 
-    def ensure_trace(self, trace_id: str, metadata: Optional[Dict[str, Any]] = None) -> None:
+    def ensure_trace(
+        self,
+        trace_id: str,
+        metadata: Optional[Dict[str, Any]] = None,
+        initial_sequence: int = 0,
+    ) -> None:
         stream = self._traces.get(trace_id)
         if stream is None:
-            self._traces[trace_id] = _TraceStream(metadata=dict(metadata or {}))
+            self._traces[trace_id] = _TraceStream(
+                sequence=max(0, initial_sequence),
+                metadata=dict(metadata or {}),
+            )
             return
+        stream.sequence = max(stream.sequence, initial_sequence)
         if metadata:
             stream.metadata.update(metadata)
+
+    def reopen_trace(
+        self,
+        trace_id: str,
+        metadata: Optional[Dict[str, Any]] = None,
+        initial_sequence: int = 0,
+    ) -> None:
+        """Continue a durable trace after an approval or process restart."""
+        self.ensure_trace(trace_id, metadata, initial_sequence)
+        stream = self._traces[trace_id]
+        stream.closed = False
+        stream.closed_at = None
 
     def has_trace(self, trace_id: str) -> bool:
         return trace_id in self._traces

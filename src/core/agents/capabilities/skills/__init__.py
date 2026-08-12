@@ -6,8 +6,10 @@ from .executor import SkillExecutor, SkillExecutionError, execute_skill
 from .validator import ParameterValidator, SkillValidationError
 from .serializer import OpenAIAdapter, ClaudeAdapter, ToolSpecSerializer
 from .guard import PermissionGuard
+from .policy import ToolPolicy, ToolPolicyError
 from .output import ToolOutput
 from .types import DependencyResolver, ToolSpecAdapter, MarkdownParser
+from .security import redact_sensitive_data, wrap_untrusted_tool_output
 
 __all__ = [
     # 模型
@@ -37,10 +39,14 @@ __all__ = [
     "SkillValidationError",
     # 权限
     "PermissionGuard",
+    "ToolPolicy",
+    "ToolPolicyError",
     # 输出
     "ToolOutput",
     # 协议
     "DependencyResolver",
     "ToolSpecAdapter",
     "MarkdownParser",
+    "redact_sensitive_data",
+    "wrap_untrusted_tool_output",
 ]

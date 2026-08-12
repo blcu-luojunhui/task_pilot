@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from .strategy import DecisionStrategy, StepOutput, StrategyContext
+from .strategy import StepOutput, StrategyContext
 
 if TYPE_CHECKING:
     from ..state import AgentLoopState
@@ -34,7 +34,45 @@ class ReActStrategy:
         tool_calls = get_tool_calls(assistant_message)
         tool_results: list = []
         if tool_calls:
+            if ctx.approval_policy:
+                request = ctx.approval_policy.create_request(
+                    tool_calls,
+                    ctx.actor.registry,
+                    trace_id=state.trace_id,
+                    step=state.step,
+                )
+                if request:
+                    from ...state import StopReason
+
+                    state.pending_approval = {
+                        "request": request.to_dict(),
+                        "assistant_message": assistant_message,
+                    }
+                    return StepOutput(
+                        assistant_message=assistant_message,
+                        tool_results=[],
+                        stop_reason_override=StopReason.APPROVAL_REQUIRED,
+                    )
             tool_results = await ctx.actor.run(state, tool_calls)
+            if state.pending_reconciliation:
+                from ...state import StopReason
+
+                state.pending_reconciliation["assistant_message"] = assistant_message
+                target_id = state.pending_reconciliation["tool_call_id"]
+                target_index = next(
+                    (
+                        index
+                        for index, result in enumerate(tool_results)
+                        if result.get("tool_call_id") == target_id
+                    ),
+                    len(tool_results),
+                )
+                state.pending_reconciliation["tool_results_before"] = tool_results[:target_index]
+                return StepOutput(
+                    assistant_message=assistant_message,
+                    tool_results=tool_results,
+                    stop_reason_override=StopReason.EXECUTION_IN_DOUBT,
+                )
 
         # 3. Observe
         ctx.observer.run(state, assistant_message, tool_results)

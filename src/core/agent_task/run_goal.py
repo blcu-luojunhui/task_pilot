@@ -16,11 +16,22 @@ from src.core.agents.capabilities.llm.providers import (
     OpenAIProvider, ClaudeProvider, DeepSeekProvider,
 )
 from src.core.agents.capabilities.skills import get_global_registry, SkillExecutor
+from src.core.agents.capabilities.skills import RiskLevel, ToolPolicy, ToolPolicyError
+from src.core.agents.capabilities.llm.retry import LLMRetryPolicy
 from src.core.agents.capabilities.tools.loader import load_agentic_tools
 from src.core.agents.state.protocol import normalize_tool_calls
 from src.core.agents.engine.runner import AgentLoopRunner
 from src.core.agents.engine.loop import AssistantPlanner
 from src.core.agents.state import AgentLoopResult
+from src.core.agents.state import AgentState, StateSnapshot, StopReason
+from src.core.agents.runtime.harness import (
+    ApprovalDecision,
+    ApprovalPolicy,
+    ApprovalPolicyError,
+    ReconciliationDecision,
+    ReconciliationError,
+)
+from src.core.agents.execution import DBToolExecutionLedger
 from src.core.agent_task.prompts import RUN_GOAL_SYSTEM_PROMPT
 from src.core.chat.repository import ChatRepository, MSG_STATUS_COMPLETED
 from src.jobs.task_config import TaskStatus
@@ -68,20 +79,34 @@ def _build_llm_provider(cfg) -> LLMProvider:
         model=cfg.model or defaults["model"],
         base_url=cfg.base_url or defaults["base_url"],
         temperature=cfg.temperature,
+        timeout=cfg.timeout,
     )
     logger.info("Agent.run provider=%s model=%s", key, llm_config.model)
     return provider_cls(llm_config)
 
 
-def _build_planner(provider: LLMProvider, tools: List[Any]) -> AssistantPlanner:
+def _build_planner(
+    provider: LLMProvider,
+    tools: List[Any],
+    retry_policy: Optional[LLMRetryPolicy] = None,
+) -> AssistantPlanner:
     """构造 planner callable，支持流式 token 回调。"""
 
     openai_tools: Optional[List[Dict]] = None
     if tools:
-        from src.core.agents.capabilities.skills.serializer import OpenAIAdapter, ToolSpecSerializer
-        serializer = ToolSpecSerializer(OpenAIAdapter())
+        from src.core.agents.capabilities.skills.serializer import (
+            ClaudeAdapter,
+            OpenAIAdapter,
+            ToolSpecSerializer,
+        )
+        adapter = ClaudeAdapter() if provider.name == "claude" else OpenAIAdapter()
+        serializer = ToolSpecSerializer(adapter)
         specs = serializer.serialize_many([t for t in tools if getattr(t, "is_executable", True)])
-        openai_tools = [{"type": "function", "function": s} for s in specs]
+        openai_tools = (
+            specs
+            if provider.name == "claude"
+            else [{"type": "function", "function": spec} for spec in specs]
+        )
 
     async def _planner(messages: List[Dict[str, Any]], step: int, **kwargs) -> Dict[str, Any]:
         llm_messages = [
@@ -99,7 +124,14 @@ def _build_planner(provider: LLMProvider, tools: List[Any]) -> AssistantPlanner:
         # 有工具时走非流式，确保 tool_calls 不丢失
         if stream_callback and provider.supports_streaming and not tools_param:
             full_content = ""
-            async for token in provider.stream_chat(llm_messages, temperature=provider.config.temperature):
+            policy = retry_policy or LLMRetryPolicy(max_retries=0)
+            async for token in policy.iterate(
+                lambda: provider.stream_chat(
+                    llm_messages,
+                    temperature=provider.config.temperature,
+                ),
+                on_retry=kwargs.get("on_retry"),
+            ):
                 full_content += token
                 result = stream_callback(token)
                 import inspect
@@ -108,9 +140,16 @@ def _build_planner(provider: LLMProvider, tools: List[Any]) -> AssistantPlanner:
             return {"role": "assistant", "content": full_content}
 
         # 非流式（有工具时必须走此路径以正确收集 tool_calls）
-        resp = await provider.chat(
-            messages=llm_messages, tools=tools_param,
-            temperature=provider.config.temperature,
+        async def _call_provider():
+            return await provider.chat(
+                messages=llm_messages,
+                tools=tools_param,
+                temperature=provider.config.temperature,
+            )
+
+        resp = await (retry_policy or LLMRetryPolicy(max_retries=0)).call(
+            _call_provider,
+            on_retry=kwargs.get("on_retry"),
         )
         result: Dict[str, Any] = {"role": "assistant", "content": resp.content or ""}
         if resp.tool_calls:
@@ -196,19 +235,39 @@ async def _run_agent_mode(
     goal = data.get("goal")
     tool_areas = data.get("tool_areas") or _DEFAULT_TOOL_AREAS
     enable_memory = bool(data.get("enable_memory", False))
+    max_steps = data.get("max_steps", scheduler.config.llm.max_steps)
 
     if not goal or not isinstance(goal, str):
         return TaskStatus.FAILED
 
     if not isinstance(tool_areas, list) or not all(isinstance(a, str) for a in tool_areas):
         return TaskStatus.FAILED
+    if not isinstance(max_steps, int) or isinstance(max_steps, bool) or not 1 <= max_steps <= 50:
+        return TaskStatus.FAILED
 
     logger.info("Agent mode trace_id=%s goal=%.100s tool_areas=%s", trace_id, goal, tool_areas)
+
+    try:
+        tool_policy = ToolPolicy.from_mapping(
+            data.get("tool_policy"),
+            default_risk_levels=(RiskLevel.READ,),
+        )
+        approval_policy = ApprovalPolicy.from_mapping(data.get("approval_policy"))
+        approval_decision = ApprovalDecision.from_mapping(data.get("approval_decision"))
+        reconciliation_decision = ReconciliationDecision.from_mapping(
+            data.get("reconciliation_decision")
+        )
+    except (ToolPolicyError, ApprovalPolicyError, ReconciliationError):
+        logger.warning("Agent mode: invalid runtime policy", exc_info=True)
+        return TaskStatus.FAILED
 
     # 加载工具
     load_agentic_tools(tool_areas)
     registry = get_global_registry()
-    tools = list(registry.filter(lambda s: s.is_executable))
+    requested_areas = set(tool_areas)
+    tools = list(registry.filter(
+        lambda s: s.is_executable and getattr(s, "domain", "general") in requested_areas
+    ))
 
     allowed_groups = data.get("allowed_tool_groups")
     exclude_tools = data.get("exclude_tools")
@@ -216,13 +275,20 @@ async def _run_agent_mode(
         from src.core.agents.capabilities.tools.group_filter import filter_tools_by_groups
         tools = filter_tools_by_groups(tools, allowed_groups, exclude_tools)
 
+    tools = tool_policy.filter_skills(tools)
+
     if not tools:
         logger.warning("Agent mode: no tools loaded for areas=%s", tool_areas)
         return TaskStatus.FAILED
 
     # 构建 planner + runner
-    planner = _build_planner(provider, tools)
-    executor = SkillExecutor(validate_params=False)
+    retry_policy = LLMRetryPolicy(
+        max_retries=scheduler.config.llm.max_retries,
+        base_delay_seconds=scheduler.config.llm.retry_backoff_seconds,
+    )
+    planner = _build_planner(provider, tools, retry_policy)
+    permission_guard = tool_policy.to_guard(tools)
+    executor = SkillExecutor(validate_params=True, permission_guard=permission_guard)
 
     tool_deps = {
         "db": scheduler.db_client, "log": scheduler.log_service,
@@ -244,9 +310,15 @@ async def _run_agent_mode(
 
     runner = AgentLoopRunner(
         planner=planner, registry=registry, executor=executor,
-        max_steps=10, max_context_tokens=60000,
+        max_steps=max_steps, max_context_tokens=60000,
+        permission_guard=permission_guard,
         is_cancelled=cancel_checker, tool_dependencies=tool_deps,
         event_bus=events_bus,
+        approval_policy=approval_policy,
+        execution_ledger=DBToolExecutionLedger(
+            scheduler.db_client,
+            account_id=scheduler.account_id,
+        ),
     )
     runner._goal_label = (data.get("original_goal") or goal).strip()
 
@@ -267,6 +339,17 @@ async def _run_agent_mode(
             logger.warning("fetch reflections failed", exc_info=True)
 
     # 执行
+    initial_state = None
+    checkpoint = data.get("checkpoint")
+    if checkpoint is not None:
+        try:
+            initial_state, _lifecycle_state, _checkpoint_metadata = StateSnapshot.deserialize_state(
+                checkpoint
+            )
+        except (KeyError, TypeError, ValueError):
+            logger.warning("Agent mode: invalid checkpoint", exc_info=True)
+            return TaskStatus.FAILED
+
     try:
         result: AgentLoopResult = await runner.run(
             goal=goal,
@@ -275,6 +358,16 @@ async def _run_agent_mode(
                 {"role": "user", "content": goal},
             ],
             trace_id=trace_id,
+            metadata={
+                "account_id": scheduler.account_id,
+                "tool_policy": tool_policy.to_dict(),
+                "tool_areas": tool_areas,
+                "max_steps": max_steps,
+                "approval_policy": approval_policy.to_dict(),
+            },
+            initial_state=initial_state,
+            approval_decision=approval_decision,
+            reconciliation_decision=reconciliation_decision,
         )
     except Exception:
         logger.exception("AgentLoopRunner failed")
@@ -287,7 +380,14 @@ async def _run_agent_mode(
         return TaskStatus.FAILED
 
     # 记忆写回（provider.close 之前）
-    if enable_memory and scope_key:
+    if (
+        result.stop_reason not in {
+            StopReason.APPROVAL_REQUIRED,
+            StopReason.EXECUTION_IN_DOUBT,
+        }
+        and enable_memory
+        and scope_key
+    ):
         try:
             from src.core.agents.capabilities.memory_store import generate_reflection, save_reflection
             is_success = result.success
@@ -310,12 +410,44 @@ async def _run_agent_mode(
 
     # 持久化
     try:
+        is_waiting_approval = result.stop_reason == StopReason.APPROVAL_REQUIRED
+        is_waiting_reconciliation = result.stop_reason == StopReason.EXECUTION_IN_DOUBT
+        is_waiting = is_waiting_approval or is_waiting_reconciliation
         final_data = {
-            "goal": goal, "tool_areas": tool_areas,
-            "status": "completed" if result.success else "failed",
+            "task_name": data.get("task_name", "agent.run"),
+            "goal": goal,
+            "original_goal": data.get("original_goal") or goal,
+            "tool_areas": tool_areas,
+            "max_steps": max_steps,
+            "status": (
+                "waiting_approval"
+                if is_waiting_approval
+                else "waiting_reconciliation"
+                if is_waiting_reconciliation
+                else ("completed" if result.success else "failed")
+            ),
             "content": result.final_answer,
             "token_usage": result.token_usage,
+            "stop_reason": result.stop_reason.value if result.stop_reason else None,
+            "tool_policy": tool_policy.to_dict(),
+            "approval_policy": approval_policy.to_dict(),
+            "enable_memory": enable_memory,
+            "allowed_tool_groups": data.get("allowed_tool_groups"),
+            "exclude_tools": data.get("exclude_tools"),
+            "approval_history": result.metadata.get("approval_history", []),
+            "reconciliation_history": result.metadata.get("reconciliation_history", []),
         }
+        if is_waiting:
+            assert runner.harness is not None and runner.harness._current_state is not None
+            if is_waiting_approval:
+                final_data["pending_approval"] = result.pending_approval
+            else:
+                final_data["pending_reconciliation"] = result.pending_reconciliation
+            final_data["checkpoint"] = StateSnapshot.serialize_state(
+                runner.harness._current_state,
+                AgentState.PAUSED,
+                metadata={"account_id": scheduler.account_id},
+            )
         await scheduler.db_client.async_save(
             "UPDATE task_manager SET data = %s WHERE trace_id = %s AND account_id = %s",
             (_json.dumps(final_data, ensure_ascii=False), trace_id, scheduler.account_id),
@@ -325,6 +457,10 @@ async def _run_agent_mode(
 
     if cancel_flag["requested"]:
         return TaskStatus.CANCELLED
+    if result.stop_reason == StopReason.APPROVAL_REQUIRED:
+        return TaskStatus.WAITING_APPROVAL
+    if result.stop_reason == StopReason.EXECUTION_IN_DOUBT:
+        return TaskStatus.WAITING_RECONCILIATION
     return TaskStatus.SUCCESS if result.success else TaskStatus.FAILED
 
 
@@ -356,7 +492,11 @@ async def _run_chat_mode(
 
     # 构造 runner（空工具）
     registry = get_global_registry()
-    planner = _build_planner(provider, [])
+    retry_policy = LLMRetryPolicy(
+        max_retries=scheduler.config.llm.max_retries,
+        base_delay_seconds=scheduler.config.llm.retry_backoff_seconds,
+    )
+    planner = _build_planner(provider, [], retry_policy)
     executor = SkillExecutor(validate_params=False)
     runner = AgentLoopRunner(
         planner=planner, registry=registry, executor=executor,

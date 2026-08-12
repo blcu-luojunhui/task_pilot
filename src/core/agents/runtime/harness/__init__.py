@@ -24,6 +24,13 @@ from .improvement import (
 from .logging import HarnessEventLogger
 from .workflow import WorkflowController, WorkflowDecision
 from .reflection import ReflectionProvider
+from .approval import (
+    ApprovalDecision,
+    ApprovalPolicy,
+    ApprovalPolicyError,
+    ApprovalRequest,
+)
+from .reconciliation import ReconciliationDecision, ReconciliationError
 
 __all__ = [
     "HarnessEvent",
@@ -42,4 +49,11 @@ __all__ = [
     "HarnessEventLogger",
     "WorkflowController",
     "WorkflowDecision",
+    "ReflectionProvider",
+    "ApprovalDecision",
+    "ApprovalPolicy",
+    "ApprovalPolicyError",
+    "ApprovalRequest",
+    "ReconciliationDecision",
+    "ReconciliationError",
 ]

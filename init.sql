@@ -13,6 +13,7 @@ DROP TABLE IF EXISTS agent_memory;
 DROP TABLE IF EXISTS chat_messages;
 DROP TABLE IF EXISTS chat_conversations;
 DROP TABLE IF EXISTS agent_run_summaries;
+DROP TABLE IF EXISTS agent_tool_executions;
 DROP TABLE IF EXISTS agent_events;
 DROP TABLE IF EXISTS task_manager;
 DROP TABLE IF EXISTS account_daily_usage;
@@ -45,7 +46,7 @@ CREATE TABLE task_manager (
     date_string      VARCHAR(64)    NULL,
     task_name        VARCHAR(256)   NULL,
     task_status      TINYINT        NOT NULL DEFAULT 0
-        COMMENT '0:INIT 1:PROCESSING 2:SUCCESS 3:CANCELLED 4:CANCEL_REQUESTED 99:FAILED',
+        COMMENT '0:INIT 1:PROCESSING 2:SUCCESS 3:CANCELLED 4:CANCEL_REQUESTED 5:WAITING_APPROVAL 6:WAITING_RECONCILIATION 99:FAILED',
     start_timestamp  BIGINT         NULL,
     finish_timestamp BIGINT         NULL,
     trace_id         VARCHAR(128)   NULL,
@@ -100,6 +101,23 @@ CREATE TABLE agent_run_summaries (
     UNIQUE INDEX uk_trace_id (trace_id),
     INDEX idx_success (success),
     INDEX idx_created (created_at),
+    INDEX idx_account_id (account_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE agent_tool_executions (
+    id               BIGINT AUTO_INCREMENT PRIMARY KEY,
+    trace_id         VARCHAR(128) NOT NULL,
+    tool_call_id     VARCHAR(128) NOT NULL,
+    tool_name        VARCHAR(128) NOT NULL,
+    arguments_digest CHAR(64) NOT NULL,
+    status           VARCHAR(24) NOT NULL,
+    result_content   LONGTEXT NULL,
+    error_message    TEXT NULL,
+    account_id       BIGINT NOT NULL DEFAULT 0,
+    created_at       TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at       TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE INDEX uk_trace_tool_call (trace_id, tool_call_id),
+    INDEX idx_status_updated (status, updated_at),
     INDEX idx_account_id (account_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
@@ -461,7 +479,11 @@ CREATE TABLE IF NOT EXISTS schema_migrations (
     INDEX idx_applied (applied_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
-INSERT IGNORE INTO schema_migrations (version) VALUES ('001_message_tree'), ('002_account_avatars'), ('003_skill_store');
+INSERT IGNORE INTO schema_migrations (version) VALUES
+    ('001_message_tree'),
+    ('002_account_avatars'),
+    ('003_skill_store'),
+    ('004_agent_tool_executions');
 
 -- ============================================================
 -- 默认管理员账号

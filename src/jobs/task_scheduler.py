@@ -2,7 +2,7 @@ import asyncio
 import json
 import logging
 import time
-from datetime import datetime, timezone
+from datetime import datetime
 from zoneinfo import ZoneInfo
 from typing import TYPE_CHECKING, Optional, Dict, Any, List
 
@@ -259,7 +259,14 @@ class TaskScheduler(TaskHandler):
                 )
 
                 # 记录成功完成的任务
-                status_label = "success" if status == TaskStatus.SUCCESS else "failed"
+                if status == TaskStatus.SUCCESS:
+                    status_label = "success"
+                elif status == TaskStatus.WAITING_APPROVAL:
+                    status_label = "waiting_approval"
+                elif status == TaskStatus.WAITING_RECONCILIATION:
+                    status_label = "waiting_reconciliation"
+                else:
+                    status_label = "failed"
                 metrics.tasks_completed_total.labels(
                     task_name=task_name,
                     status=status_label,
@@ -340,7 +347,11 @@ class TaskScheduler(TaskHandler):
                 if self.lifecycle:
                     await self.lifecycle.unregister(self.trace_id)
                 self._publish_event(
-                    "task.finished",
+                    "task.waiting_approval"
+                    if status == TaskStatus.WAITING_APPROVAL
+                    else "task.waiting_reconciliation"
+                    if status == TaskStatus.WAITING_RECONCILIATION
+                    else "task.finished",
                     {
                         "task_name": task_name,
                         "status": str(status),
@@ -375,28 +386,38 @@ class TaskScheduler(TaskHandler):
         trace_id = trace_id or self.trace_id
         query = f"""
             UPDATE {self.table}
-            SET task_status = CASE
-                    WHEN task_status = %s THEN %s
-                    WHEN task_status = %s THEN %s
-                END,
-                finish_timestamp = CASE
-                    WHEN task_status = %s THEN %s
+            SET finish_timestamp = CASE
+                    WHEN task_status IN (%s, %s, %s) THEN %s
                     ELSE finish_timestamp
+                END,
+                task_status = CASE
+                    WHEN task_status = %s THEN %s
+                    WHEN task_status = %s THEN %s
+                    WHEN task_status = %s THEN %s
+                    WHEN task_status = %s THEN %s
                 END
-            WHERE trace_id = %s AND task_status IN (%s, %s) AND account_id = %s
+            WHERE trace_id = %s AND task_status IN (%s, %s, %s, %s) AND account_id = %s
         """
         result = await self.db_client.async_save(
             query,
             (
                 TaskStatus.INIT,
+                TaskStatus.WAITING_APPROVAL,
+                TaskStatus.WAITING_RECONCILIATION,
+                int(time.time()),
+                TaskStatus.INIT,
                 TaskStatus.CANCELLED,
                 TaskStatus.PROCESSING,
                 TaskStatus.CANCEL_REQUESTED,
-                TaskStatus.INIT,
-                int(time.time()),
+                TaskStatus.WAITING_APPROVAL,
+                TaskStatus.CANCELLED,
+                TaskStatus.WAITING_RECONCILIATION,
+                TaskStatus.CANCELLED,
                 trace_id,
                 TaskStatus.INIT,
                 TaskStatus.PROCESSING,
+                TaskStatus.WAITING_APPROVAL,
+                TaskStatus.WAITING_RECONCILIATION,
                 self.account_id,
             ),
         )

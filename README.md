@@ -166,6 +166,7 @@ result = await agent.run_from_snapshot(snapshot_id)
 - [Quickstart](docs/quickstart.md)：本地与 Docker 启动、环境变量、数据库初始化。
 - [API Guide](docs/api.md)：接口分组、核心请求和典型调用链路。
 - [Project Guide](docs/project.md)：项目分层、状态机、关闭路径和设计原则。
+- [Agent Runtime V2](docs/agent-runtime-v2.md)：按运行隔离工具能力、LLM 重试和完整事件追踪。
 
 ## License
 

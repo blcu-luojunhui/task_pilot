@@ -8,6 +8,7 @@ from typing import Any, Dict, List, Optional, Protocol, TYPE_CHECKING
 if TYPE_CHECKING:
     from ...state import AgentLoopState
     from ..loop import Think, Act, Observe
+    from ...runtime.harness.approval import ApprovalPolicy
 
 
 @dataclass
@@ -26,6 +27,7 @@ class StrategyContext:
     thinker: "Think"
     actor: "Act"
     observer: "Observe"
+    approval_policy: Optional["ApprovalPolicy"] = None
 
 
 class DecisionStrategy(Protocol):

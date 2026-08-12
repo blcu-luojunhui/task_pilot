@@ -44,6 +44,8 @@ class StopReason(str, Enum):
     # 外部控制
     USER_CANCELLED = "user_cancelled"  # 用户取消
     USER_PAUSED = "user_paused"  # 用户暂停
+    APPROVAL_REQUIRED = "approval_required"  # 等待人工审批后可恢复
+    EXECUTION_IN_DOUBT = "execution_in_doubt"  # 副作用可能已发生，禁止自动重试
     CONSTRAINT_VIOLATION = "constraint_violation"  # 约束违反
 
 
@@ -85,6 +87,12 @@ class AgentLoopState:
 
     # 元数据
     metadata: Dict[str, Any] = field(default_factory=dict)
+
+    # 待审批工具调用。包含 request 与原始 assistant message，可安全恢复。
+    pending_approval: Optional[Dict[str, Any]] = None
+
+    # 副作用执行结果不确定时冻结当前工具批次，等待人工对账。
+    pending_reconciliation: Optional[Dict[str, Any]] = None
 
     # 累计 token 使用量
     token_usage: Dict[str, int] = field(default_factory=lambda: {"prompt": 0, "completion": 0, "total": 0})
@@ -128,3 +136,5 @@ class AgentLoopResult:
     duration_seconds: float = 0.0
     token_usage: Dict[str, int] = field(default_factory=lambda: {"prompt": 0, "completion": 0, "total": 0})
     metadata: Dict[str, Any] = field(default_factory=dict)
+    pending_approval: Optional[Dict[str, Any]] = None
+    pending_reconciliation: Optional[Dict[str, Any]] = None
