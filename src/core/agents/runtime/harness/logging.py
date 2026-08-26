@@ -11,22 +11,16 @@ turn those events into concise logs without making the harness own formatting.
 
 import json
 import logging
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Any, Callable, Dict, Optional
 
 logger = logging.getLogger("agent.loop")
 
-# 确保 logger 有 handler
-if not logger.handlers:
-    _handler = logging.StreamHandler()
-    _handler.setFormatter(
-        logging.Formatter("[%(asctime)s] %(levelname)-5s | %(message)s", datefmt="%H:%M:%S")
-    )
-    logger.addHandler(_handler)
-    logger.setLevel(logging.DEBUG)
 
-
-def _format_tool_calls(tool_calls) -> str:
+def _format_tool_calls(
+    tool_calls,
+    sanitizer: Optional[Callable[[str], str]] = None,
+) -> str:
     """格式化 tool_calls 为可读字符串"""
     lines = []
     for tc in tool_calls:
@@ -41,6 +35,8 @@ def _format_tool_calls(tool_calls) -> str:
         args_str = json.dumps(args, ensure_ascii=False) if isinstance(args, dict) else str(args)
         if len(args_str) > 120:
             args_str = args_str[:120] + "..."
+        if sanitizer is not None:
+            args_str = sanitizer(args_str)
         lines.append(f"{name}({args_str})")
     return " | ".join(lines)
 
@@ -82,8 +78,7 @@ class HarnessEventLogger:
         return self.sanitizer(text)
 
     # ==================== Verbose 模式 ====================
-    @staticmethod
-    def _log_verbose(event: Any) -> None:
+    def _log_verbose(self, event: Any) -> None:
         """详细可读日志"""
         state = event.state
         name = event.name
@@ -94,7 +89,7 @@ class HarnessEventLogger:
             logger.info(
                 "[%s] ── Agent Loop START ── goal=%r  budget=%d steps",
                 trace,
-                state.goal,
+                self._sanitize(state.goal),
                 state.max_steps,
             )
 
@@ -114,7 +109,7 @@ class HarnessEventLogger:
                     logger.info(
                         "[%s] Think  | tool_call → %s",
                         trace,
-                        _format_tool_calls(tool_calls),
+                        _format_tool_calls(tool_calls, self._sanitize),
                     )
                     if content:
                         short = self._sanitize(content[:80] + "..." if len(content) > 80 else content)
@@ -196,7 +191,11 @@ class HarnessEventLogger:
             )
 
         elif name == "run_error":
-            logger.error("[%s] ERROR  | %s", trace, payload.get("error"))
+            logger.error(
+                "[%s] ERROR  | %s",
+                trace,
+                self._sanitize(str(payload.get("error", ""))),
+            )
 
     # ==================== Compact 模式 ====================
 
@@ -286,11 +285,10 @@ class HarnessEventLogger:
         if message is None:
             return None
         content = message.get("content")
-        if isinstance(content, str) and len(content) > 120:
-            content = f"{content[:117]}..."
         return {
             "role": message.get("role"),
-            "content": content,
+            # compact 模式用于生产日志，只保留度量，不落模型正文。
+            "content_length": len(content) if isinstance(content, str) else 0,
             "has_tool_calls": bool(message.get("tool_calls")),
         }
 

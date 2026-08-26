@@ -231,7 +231,7 @@ class Agent:
             llm_base_url: LLM API 地址（None 使用 provider 默认值）
             llm_temperature: 温度参数
             max_steps: 最大执行步数
-            tool_areas: 要加载的工具区域列表
+            tool_areas: 要加载的工具区域列表；None 时不开放可执行工具
             tool_dependencies: 工具依赖注入
             enable_routing: 是否启用任务路由
             verbose: 是否展示日志
@@ -281,7 +281,7 @@ class Agent:
         if tool_areas:
             load_agentic_tools(tool_areas)
 
-        registry = cls._build_registry()
+        registry = cls._build_registry(tool_areas)
         executor = SkillExecutor()
         provider = cls._build_provider(llm_provider, resolved_model, resolved_base_url, config)
         planner_factory = cls._build_planner(registry, provider, config)
@@ -310,10 +310,16 @@ class Agent:
     # ── Builder helpers ───────────────────────────────────
 
     @staticmethod
-    def _build_registry() -> SkillRegistry:
+    def _build_registry(tool_areas: Optional[List[str]] = None) -> SkillRegistry:
         global_reg = get_global_registry()
         registry = SkillRegistry(namespace=f"agent_{id(global_reg)}")
-        for skill in global_reg.filter(lambda _: True):
+        selected_areas = set(tool_areas or [])
+        for skill in global_reg.filter(
+            lambda candidate: (
+                not candidate.is_executable
+                or candidate.domain in selected_areas
+            )
+        ):
             registry.register(skill)
         _logger = logging.getLogger("agent.loop")
         system_skills = registry.list_executable()

@@ -637,6 +637,18 @@ class AgentLoopHarness:
             result_metadata["reconciliation_history"] = list(
                 state.metadata["reconciliation_history"]
             )
+        if state.metadata.get("planning"):
+            result_metadata["planning"] = dict(state.metadata["planning"])
+        if state.plan:
+            result_metadata["plan"] = [
+                {
+                    "id": plan_step.id,
+                    "goal": plan_step.goal,
+                    "status": plan_step.status.value,
+                    "result": plan_step.result,
+                }
+                for plan_step in state.plan
+            ]
         return AgentLoopResult(
             trace_id=state.trace_id,
             success=state.stop_reason == StopReason.MODEL_FINAL,

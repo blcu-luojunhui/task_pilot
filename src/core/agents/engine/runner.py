@@ -186,15 +186,22 @@ class AgentLoopRunner:
                 event_bus=self.event_bus,
                 approval_policy=self.approval_policy,
             )
-        # OPT-3: 启用反思
-        if self.enable_reflection:
+        # reflexion 策略的公开语义必须包含反思反馈；enable_reflection 仍可让
+        # 其他策略按需复用同一 Provider。
+        if self.enable_reflection or self.strategy == "reflexion":
             from src.core.agents.runtime.harness.reflection import ReflectionProvider
-            self.feedback_loop.providers.append(
-                ReflectionProvider(
-                    planner=self.planner,
-                    trigger_errors=self.reflection_trigger_errors,
-                )
+
+            has_reflection_provider = any(
+                isinstance(provider, ReflectionProvider)
+                for provider in self.feedback_loop.providers
             )
+            if not has_reflection_provider:
+                self.feedback_loop.providers.append(
+                    ReflectionProvider(
+                        planner=self.planner,
+                        trigger_errors=self.reflection_trigger_errors,
+                    )
+                )
 
         if self.router is None:
             self.router = TaskRouter(planner=self.planner)
@@ -297,22 +304,10 @@ class AgentLoopRunner:
                 }
             )
 
-            # 为子任务创建独立 runner，避免共享预算竞态
-            sub_runner = AgentLoopRunner(
-                planner=self.planner,
-                registry=self.registry,
-                executor=self.executor,
-                max_steps=min(remaining_steps, self.max_steps),
-                abort_on_tool_error=self.abort_on_tool_error,
-                max_tool_result_length=self.max_tool_result_length,
-                max_consecutive_errors=self.max_consecutive_errors,
-                max_context_tokens=self.max_context_tokens,
-                llm_model=self.llm_model,
-                permission_guard=self.permission_guard,
-                is_cancelled=self.is_cancelled,
-                lifecycle=self.lifecycle,
-                tool_dependencies=self.tool_dependencies,
-                context_builder=self.context_builder,
+            # 子任务使用独立预算和 Harness，但必须继承父 Runner 的安全、
+            # 可观测性与策略契约，避免路由入口成为治理旁路。
+            sub_runner = self._build_routed_sub_runner(
+                max_steps=min(remaining_steps, self.max_steps)
             )
             last_result = await sub_runner.run(
                 goal=sub_goal,
@@ -338,4 +333,37 @@ class AgentLoopRunner:
             total_steps=total_steps,
             tool_calls_count=total_tool_calls,
             duration_seconds=_time.monotonic() - total_started,
+        )
+
+    def _build_routed_sub_runner(self, max_steps: int) -> "AgentLoopRunner":
+        return AgentLoopRunner(
+            planner=self.planner,
+            registry=self.registry,
+            executor=self.executor,
+            max_steps=max_steps,
+            abort_on_tool_error=self.abort_on_tool_error,
+            max_tool_result_length=self.max_tool_result_length,
+            max_consecutive_errors=self.max_consecutive_errors,
+            max_context_tokens=self.max_context_tokens,
+            llm_model=self.llm_model,
+            permission_guard=self.permission_guard,
+            is_cancelled=self.is_cancelled,
+            lifecycle=self.lifecycle,
+            tool_dependencies=self.tool_dependencies,
+            context_builder=self.context_builder,
+            hooks=list(self.hooks or []),
+            constraints=self.constraints,
+            feedback_loop=self.feedback_loop,
+            continuous_improvement=self.continuous_improvement,
+            memory_manager=self.memory_manager,
+            stream_callback=self.stream_callback,
+            chat_mode=self.chat_mode,
+            strategy=self.strategy,
+            enable_reflection=self.enable_reflection,
+            reflection_trigger_errors=self.reflection_trigger_errors,
+            llm_provider=self.llm_provider,
+            enable_summary_compaction=self.enable_summary_compaction,
+            event_bus=self.event_bus,
+            approval_policy=self.approval_policy,
+            execution_ledger=self.execution_ledger,
         )

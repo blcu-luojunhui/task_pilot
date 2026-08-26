@@ -106,9 +106,10 @@ class PromptAssembler:
         }
         lines = ["## Plan"]
         for s in plan:
-            icon = status_icon.get(s.status.value if hasattr(s, "status") else s.get("status", "pending"), "⬜")
+            status = s.status.value if hasattr(s, "status") else s.get("status", "pending")
+            icon = status_icon.get(status, "⬜")
             goal = s.goal if hasattr(s, "goal") else s.get("goal", "")
-            lines.append(f"  {icon} [{s.status}] {goal}")
+            lines.append(f"  {icon} [{status}] {goal}")
         return "\n".join(lines)
 
     def _budget_section(self, state: AgentLoopState) -> str:
